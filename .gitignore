@@ -1,0 +1,26 @@
+# MCP config (contains secrets)
+.mcp.json
+
+# Environment files
+.env
+.env.local
+.env*.local
+
+# Dependencies
+node_modules/
+
+# Build outputs
+.next/
+out/
+build/
+dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
