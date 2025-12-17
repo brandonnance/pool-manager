@@ -28,12 +28,11 @@ A multi-tenant bowl pool management application built with Next.js 16 and Supaba
 - [x] Commissioner tools accessible when pool is open
 - [x] Pick deletion on team changes (bowl: single game, CFP: all picks)
 - [x] Entry creation auto-creates pool membership
-
-### In Progress
-- [ ] Members management (`/pools/[id]/members`) - Approve/reject join requests
+- [x] Members management (`/pools/[id]/members`) - List, approve/reject/remove members
+- [x] Join links - Generate/copy/delete invite links with expiration and max uses
+- [x] Public join page (`/join/[token]`) - Validates token, handles auth redirect
 
 ### Not Started
-- [ ] Join links - Generate invite links for pools
 - [ ] Game locking (5 min before kickoff)
 - [ ] Pool completion status (open -> locked -> completed)
 
@@ -55,7 +54,9 @@ pool-manager/
 │   │   │   │           ├── games/     # Commissioner game management
 │   │   │   │           ├── picks/     # Bowl picks page
 │   │   │   │           ├── cfp/       # CFP bracket management
-│   │   │   │           └── cfp-picks/ # CFP bracket picker
+│   │   │   │           ├── cfp-picks/ # CFP bracket picker
+│   │   │   │           └── members/   # Members management
+│   │   │   ├── join/[token]/ # Public join link redemption
 │   │   │   └── auth/callback/
 │   │   ├── components/
 │   │   │   ├── auth/
@@ -63,6 +64,7 @@ pool-manager/
 │   │   │   ├── pools/
 │   │   │   ├── games/
 │   │   │   ├── cfp/           # CFP bracket components
+│   │   │   ├── members/       # Member management components
 │   │   │   └── standings/     # Pool standings component
 │   │   ├── lib/supabase/     # Client, server, middleware
 │   │   └── types/database.ts # Auto-generated types
@@ -107,6 +109,10 @@ pool-manager/
 | `frontend/src/components/games/edit-spread-button.tsx` | Edit game details modal |
 | `frontend/src/components/standings/pool-standings.tsx` | Standings table |
 | `frontend/src/components/cfp/cfp-bracket-picker.tsx` | Interactive CFP bracket |
+| `frontend/src/app/(dashboard)/pools/[id]/members/page.tsx` | Members management page |
+| `frontend/src/components/members/member-actions.tsx` | Approve/reject/remove buttons |
+| `frontend/src/components/members/generate-link-button.tsx` | Create invite link modal |
+| `frontend/src/app/join/[token]/page.tsx` | Public join link redemption |
 
 ## Scoring Logic
 
@@ -123,17 +129,13 @@ When teams are changed on games:
 
 ## Next Steps (Priority Order)
 
-1. **Members Management** (`/pools/[id]/members`)
-   - List pending/approved members
-   - Approve/reject buttons for commissioners
-
-2. **Join Links**
-   - Generate shareable invite links
-   - Auto-approve or pending based on pool settings
-
-3. **Game Locking**
+1. **Game Locking**
    - Lock picks 5 minutes before kickoff
    - Show locked status in picks UI
+
+2. **Pool Completion**
+   - Transition pool to completed status when all games final
+   - Final standings display
 
 ## Running the Project
 
@@ -158,4 +160,5 @@ The MCP server is configured in `.mcp.json`. Use these tools:
 - Super admin account is set up (user set `is_super_admin = true` manually)
 - Pool statuses: draft -> open -> locked -> completed
 - Game statuses: scheduled -> in_progress -> final
-- Input text color fix applied in `globals.css`
+- Dark mode disabled in `globals.css` (app uses light theme only)
+- Join requests go to "pending" status, commissioners approve via `/pools/[id]/members`

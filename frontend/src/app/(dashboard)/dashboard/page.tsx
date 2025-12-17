@@ -41,7 +41,7 @@ export default async function DashboardPage() {
     role: m.role
   })) || []
 
-  const pools = poolMemberships?.map(pm => pm.pools) || []
+  const pools = poolMemberships?.map(pm => pm.pools).filter(Boolean) || []
 
   return (
     <div className="space-y-8">

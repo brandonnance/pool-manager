@@ -780,6 +780,7 @@ export type Database = {
       }
       request_join_pool: { Args: { p_token: string }; Returns: Json }
       user_org_ids: { Args: never; Returns: string[] }
+      validate_join_link: { Args: { p_token: string }; Returns: Json }
     }
     Enums: {
       [_ in never]: never

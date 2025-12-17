@@ -1,18 +1,21 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
 export function SignupForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+
+  const redirectTo = searchParams.get('next') || '/dashboard'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -21,6 +24,9 @@ export function SignupForm() {
 
     const supabase = createClient()
 
+    // Build the callback URL with the redirect parameter
+    const callbackUrl = `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectTo)}`
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -28,6 +34,7 @@ export function SignupForm() {
         data: {
           display_name: displayName,
         },
+        emailRedirectTo: callbackUrl,
       },
     })
 
@@ -133,7 +140,7 @@ export function SignupForm() {
 
       <div className="text-center text-sm">
         <span className="text-gray-600">Already have an account?</span>{' '}
-        <Link href="/login" className="font-medium text-blue-600 hover:text-blue-500">
+        <Link href={redirectTo !== '/dashboard' ? `/login?next=${encodeURIComponent(redirectTo)}` : '/login'} className="font-medium text-blue-600 hover:text-blue-500">
           Sign in
         </Link>
       </div>

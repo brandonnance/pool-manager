@@ -89,6 +89,13 @@ export default async function PoolDetailPage({ params }: PageProps) {
     .eq('pool_id', id)
     .eq('status', 'approved')
 
+  // Get pending member count for commissioners
+  const { count: pendingMemberCount } = await supabase
+    .from('pool_memberships')
+    .select('*', { count: 'exact', head: true })
+    .eq('pool_id', id)
+    .eq('status', 'pending')
+
   // Get user's entry if they have one
   const { data: entry } = await supabase
     .from('bb_entries')
@@ -371,9 +378,14 @@ export default async function PoolDetailPage({ params }: PageProps) {
               {isCommissioner && (
                 <Link
                   href={`/pools/${id}/members`}
-                  className="text-sm text-blue-600 hover:text-blue-700"
+                  className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-2"
                 >
                   Manage
+                  {(pendingMemberCount ?? 0) > 0 && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                      {pendingMemberCount} pending
+                    </span>
+                  )}
                 </Link>
               )}
             </div>
