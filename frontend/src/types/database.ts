@@ -162,6 +162,45 @@ export type Database = {
           },
         ]
       }
+      bb_cfp_pool_byes: {
+        Row: {
+          created_at: string | null
+          id: string
+          pool_id: string
+          seed: number
+          team_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          pool_id: string
+          seed: number
+          team_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          pool_id?: string
+          seed?: number
+          team_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bb_cfp_pool_byes_pool_id_fkey"
+            columns: ["pool_id"]
+            isOneToOne: false
+            referencedRelation: "pools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bb_cfp_pool_byes_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "bb_teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bb_cfp_pool_config: {
         Row: {
           cfp_lock_at: string
@@ -395,6 +434,7 @@ export type Database = {
           external_source: string
           game_name: string | null
           home_score: number | null
+          home_spread: number | null
           home_team_id: string | null
           id: string
           kickoff_at: string | null
@@ -408,6 +448,7 @@ export type Database = {
           external_source: string
           game_name?: string | null
           home_score?: number | null
+          home_spread?: number | null
           home_team_id?: string | null
           id?: string
           kickoff_at?: string | null
@@ -421,6 +462,7 @@ export type Database = {
           external_source?: string
           game_name?: string | null
           home_score?: number | null
+          home_spread?: number | null
           home_team_id?: string | null
           id?: string
           kickoff_at?: string | null
@@ -489,6 +531,7 @@ export type Database = {
       bb_teams: {
         Row: {
           abbrev: string | null
+          color: string | null
           created_at: string | null
           id: string
           logo_url: string | null
@@ -496,6 +539,7 @@ export type Database = {
         }
         Insert: {
           abbrev?: string | null
+          color?: string | null
           created_at?: string | null
           id?: string
           logo_url?: string | null
@@ -503,6 +547,7 @@ export type Database = {
         }
         Update: {
           abbrev?: string | null
+          color?: string | null
           created_at?: string | null
           id?: string
           logo_url?: string | null

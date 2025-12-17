@@ -20,19 +20,22 @@ A multi-tenant bowl pool management application built with Next.js 16 and Supaba
 - [x] Pools CRUD (create within orgs, detail page)
 - [x] Games management (add bowl games with teams, kickoff times)
 - [x] Teams management (add teams on-the-fly when creating games)
-- [x] Pool activation (draft -> active status)
+- [x] Pool activation (draft -> open status)
+- [x] Bowl picks page (`/pools/[id]/picks`) - Pick winners for each bowl game
+- [x] CFP bracket picker (`/pools/[id]/cfp-picks`) - Interactive bracket UI
+- [x] Standings on pool page - Margin-of-victory scoring
+- [x] Score entry for commissioners - Enter final scores for games
+- [x] Commissioner tools accessible when pool is open
+- [x] Pick deletion on team changes (bowl: single game, CFP: all picks)
+- [x] Entry creation auto-creates pool membership
 
 ### In Progress
-- [ ] Picks UI - Allow users to make bowl game picks
+- [ ] Members management (`/pools/[id]/members`) - Approve/reject join requests
 
 ### Not Started
-- [ ] Picks page (`/pools/[id]/picks`) - Select winners for each game
-- [ ] Standings page (`/pools/[id]/standings`) - Leaderboard with scores
-- [ ] Members management (`/pools/[id]/members`) - Approve/reject join requests
 - [ ] Join links - Generate invite links for pools
-- [ ] CFP bracket picks (separate from bowl picks)
-- [ ] Score calculation (margin-of-victory scoring)
 - [ ] Game locking (5 min before kickoff)
+- [ ] Pool completion status (open -> locked -> completed)
 
 ## Project Structure
 
@@ -49,13 +52,18 @@ pool-manager/
 │   │   │   │   │   └── [id]/
 │   │   │   │   └── pools/
 │   │   │   │       └── [id]/
-│   │   │   │           └── games/
+│   │   │   │           ├── games/     # Commissioner game management
+│   │   │   │           ├── picks/     # Bowl picks page
+│   │   │   │           ├── cfp/       # CFP bracket management
+│   │   │   │           └── cfp-picks/ # CFP bracket picker
 │   │   │   └── auth/callback/
 │   │   ├── components/
 │   │   │   ├── auth/
 │   │   │   ├── orgs/
 │   │   │   ├── pools/
-│   │   │   └── games/
+│   │   │   ├── games/
+│   │   │   ├── cfp/           # CFP bracket components
+│   │   │   └── standings/     # Pool standings component
 │   │   ├── lib/supabase/     # Client, server, middleware
 │   │   └── types/database.ts # Auto-generated types
 │   └── .env.local            # Supabase URL + anon key
@@ -76,17 +84,14 @@ pool-manager/
 ### Bowl Buster
 - `bb_teams` - College football teams
 - `bb_games` - Bowl games with scores/status
-- `bb_pool_games` - Games included in a pool
+- `bb_pool_games` - Games included in a pool (kind: 'bowl' or 'cfp')
 - `bb_entries` - User entries in a pool
-- `bb_bowl_picks` - User picks for each game
+- `bb_bowl_picks` - User picks for bowl games
 
-### CFP Bracket (Not Yet Implemented)
-- `bb_cfp_templates` - Bracket templates
-- `bb_cfp_template_slots` - Bracket slot definitions
-- `bb_cfp_pool_config` - Pool CFP settings
-- `bb_cfp_pool_round1` - First round matchups
-- `bb_cfp_pool_slot_games` - Slot to game mappings
-- `bb_cfp_entry_picks` - User bracket picks
+### CFP Bracket
+- `bb_cfp_pool_byes` - Top 4 seeds that get first-round byes
+- `bb_cfp_pool_round1` - First round matchups (seeds 5-12)
+- `bb_cfp_entry_picks` - User bracket picks for each slot
 
 ## Key Files to Know
 
@@ -98,28 +103,37 @@ pool-manager/
 | `frontend/src/app/(dashboard)/layout.tsx` | Dashboard layout with header/nav |
 | `frontend/src/components/pools/pool-settings.tsx` | Pool activation controls |
 | `frontend/src/components/games/add-game-button.tsx` | Add game modal |
+| `frontend/src/components/games/enter-score-button.tsx` | Score entry modal |
+| `frontend/src/components/games/edit-spread-button.tsx` | Edit game details modal |
+| `frontend/src/components/standings/pool-standings.tsx` | Standings table |
+| `frontend/src/components/cfp/cfp-bracket-picker.tsx` | Interactive CFP bracket |
+
+## Scoring Logic
+
+Bowl picks use margin-of-victory scoring:
+- **Correct pick**: +margin (e.g., pick winner by 14 = +14 points)
+- **Wrong pick**: -margin (e.g., pick loser by 14 = -14 points)
+- **Tie games**: No points awarded
+
+## Pick Deletion Rules
+
+When teams are changed on games:
+- **Bowl games**: Only picks for that specific game are deleted
+- **CFP games/byes**: ALL CFP bracket picks for ALL users in the pool are deleted (cascading picks make partial updates impractical)
 
 ## Next Steps (Priority Order)
 
-1. **Build Picks Page** (`/pools/[id]/picks`)
-   - List all games in the pool
-   - For each game, show team buttons to pick winner
-   - Save picks to `bb_bowl_picks` table
-   - Show lock status (game locks 5 min before kickoff)
-   - Need RLS policies for `bb_entries` and `bb_bowl_picks`
-
-2. **Create Entry Flow**
-   - "Create Entry" button already exists on pool page
-   - Need to add RLS policy for `bb_entries` INSERT
-
-3. **Standings Page** (`/pools/[id]/standings`)
-   - Query all entries with picks
-   - Calculate scores using `calculate_pick_score` function
-   - Display leaderboard
-
-4. **Members Management** (`/pools/[id]/members`)
+1. **Members Management** (`/pools/[id]/members`)
    - List pending/approved members
    - Approve/reject buttons for commissioners
+
+2. **Join Links**
+   - Generate shareable invite links
+   - Auto-approve or pending based on pool settings
+
+3. **Game Locking**
+   - Lock picks 5 minutes before kickoff
+   - Show locked status in picks UI
 
 ## Running the Project
 
@@ -140,7 +154,8 @@ The MCP server is configured in `.mcp.json`. Use these tools:
 
 ## Notes
 
-- Dev server may already be running in background (task bc99f24)
+- Dev server runs on http://localhost:3000
 - Super admin account is set up (user set `is_super_admin = true` manually)
-- Pool is created and has games added, ready for picks UI
+- Pool statuses: draft -> open -> locked -> completed
+- Game statuses: scheduled -> in_progress -> final
 - Input text color fix applied in `globals.css`

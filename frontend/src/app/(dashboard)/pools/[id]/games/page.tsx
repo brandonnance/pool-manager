@@ -3,6 +3,27 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { AddGameButton } from '@/components/games/add-game-button'
 import { RemoveGameButton } from '@/components/games/remove-game-button'
+import { EditSpreadButton } from '@/components/games/edit-spread-button'
+import { EnterScoreButton } from '@/components/games/enter-score-button'
+
+function formatMatchupWithSpread(
+  awayTeam: string,
+  homeTeam: string,
+  homeSpread: number | null
+): string {
+  if (homeSpread === null || homeSpread === undefined) {
+    return `${awayTeam} @ ${homeTeam}`
+  }
+  if (homeSpread === 0) {
+    return `${awayTeam} @ ${homeTeam} (EVEN)`
+  }
+  if (homeSpread < 0) {
+    // Home team favored
+    return `${awayTeam} @ ${homeTeam} (${homeSpread})`
+  }
+  // Away team favored (positive home_spread means home is underdog)
+  return `${awayTeam} (${-homeSpread}) @ ${homeTeam}`
+}
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -70,6 +91,7 @@ export default async function PoolGamesPage({ params }: PageProps) {
         status,
         home_score,
         away_score,
+        home_spread,
         home_team_id,
         away_team_id,
         home_team:bb_teams!bb_games_home_team_id_fkey (id, name, abbrev),
@@ -82,7 +104,7 @@ export default async function PoolGamesPage({ params }: PageProps) {
   // Get all teams for the add game form
   const { data: teams } = await supabase
     .from('bb_teams')
-    .select('id, name, abbrev')
+    .select('id, name, abbrev, logo_url, color')
     .order('name')
 
   return (
@@ -131,7 +153,7 @@ export default async function PoolGamesPage({ params }: PageProps) {
           <AddGameButton poolId={id} teams={teams ?? []} />
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="bg-white rounded-lg shadow overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -147,7 +169,7 @@ export default async function PoolGamesPage({ params }: PageProps) {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -165,9 +187,23 @@ export default async function PoolGamesPage({ params }: PageProps) {
                       </div>
                       <div className="text-xs text-gray-500">{pg.kind}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {game.away_team?.name ?? 'TBD'} @ {game.home_team?.name ?? 'TBD'}
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-900 flex items-center gap-2 flex-wrap">
+                        <span className="whitespace-nowrap">
+                          {formatMatchupWithSpread(
+                            game.away_team?.name ?? 'TBD',
+                            game.home_team?.name ?? 'TBD',
+                            game.home_spread
+                          )}
+                        </span>
+                        {game.home_spread === null && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 whitespace-nowrap">
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                            Needs Spread
+                          </span>
+                        )}
                       </div>
                       {game.status === 'final' && (
                         <div className="text-xs text-gray-500">
@@ -191,8 +227,32 @@ export default async function PoolGamesPage({ params }: PageProps) {
                         {game.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <RemoveGameButton poolGameId={pg.id} gameName={game.game_name || 'this game'} />
+                    <td className="px-6 py-4 text-sm font-medium">
+                      <div className="flex flex-col gap-1 items-start">
+                        <EnterScoreButton
+                          gameId={game.id}
+                          gameName={game.game_name || 'Bowl Game'}
+                          homeTeamName={game.home_team?.name ?? 'Home'}
+                          awayTeamName={game.away_team?.name ?? 'Away'}
+                          currentHomeScore={game.home_score}
+                          currentAwayScore={game.away_score}
+                          currentStatus={game.status}
+                        />
+                        <EditSpreadButton
+                          gameId={game.id}
+                          poolGameId={pg.id}
+                          poolId={id}
+                          kind={pg.kind as 'bowl' | 'cfp'}
+                          currentSpread={game.home_spread}
+                          gameName={game.game_name || 'this game'}
+                          currentGameName={game.game_name}
+                          currentHomeTeamId={game.home_team_id}
+                          currentAwayTeamId={game.away_team_id}
+                          currentKickoffAt={game.kickoff_at}
+                          teams={teams ?? []}
+                        />
+                        <RemoveGameButton poolGameId={pg.id} gameName={game.game_name || 'this game'} />
+                      </div>
                     </td>
                   </tr>
                 )

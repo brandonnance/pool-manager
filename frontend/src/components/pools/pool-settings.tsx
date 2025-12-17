@@ -33,7 +33,7 @@ export function PoolSettings({ pool }: PoolSettingsProps) {
 
     const { error: updateError } = await supabase
       .from('pools')
-      .update({ status: 'active' })
+      .update({ status: 'open' })
       .eq('id', pool.id)
 
     if (updateError) {
@@ -54,7 +54,7 @@ export function PoolSettings({ pool }: PoolSettingsProps) {
 
     const { error: updateError } = await supabase
       .from('pools')
-      .update({ status: 'archived' })
+      .update({ status: 'completed' })
       .eq('id', pool.id)
 
     if (updateError) {
@@ -86,7 +86,7 @@ export function PoolSettings({ pool }: PoolSettingsProps) {
           </button>
         )}
 
-        {pool.status === 'active' && (
+        {pool.status === 'open' && (
           <button
             onClick={handleArchive}
             className="w-full px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-50"

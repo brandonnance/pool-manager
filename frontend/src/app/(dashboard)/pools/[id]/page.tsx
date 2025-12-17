@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { PoolSettings } from '@/components/pools/pool-settings'
 import { JoinPoolButton } from '@/components/pools/join-pool-button'
 import { CreateEntryButton } from '@/components/pools/create-entry-button'
+import { PoolStandings } from '@/components/standings/pool-standings'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -59,10 +60,10 @@ export default async function PoolDetailPage({ params }: PageProps) {
     .eq('user_id', user.id)
     .single()
 
-  // Check if super admin
+  // Check if super admin and get display name
   const { data: profile } = await supabase
     .from('profiles')
-    .select('is_super_admin')
+    .select('is_super_admin, display_name')
     .eq('id', user.id)
     .single()
 
@@ -96,6 +97,104 @@ export default async function PoolDetailPage({ params }: PageProps) {
     .eq('user_id', user.id)
     .single()
 
+  // Calculate standings - get all entries with their picks and game results
+  const { data: entriesData } = await supabase
+    .from('bb_entries')
+    .select(`
+      id,
+      user_id,
+      bb_bowl_picks (
+        id,
+        picked_team_id,
+        pool_game_id,
+        bb_pool_games (
+          id,
+          kind,
+          bb_games (
+            status,
+            home_score,
+            away_score,
+            home_team_id,
+            away_team_id
+          )
+        )
+      )
+    `)
+    .eq('pool_id', id)
+
+  // Get profiles for all entry users
+  const userIds = (entriesData ?? []).map(e => e.user_id)
+  const { data: profilesData } = userIds.length > 0
+    ? await supabase
+        .from('profiles')
+        .select('id, display_name')
+        .in('id', userIds)
+    : { data: [] }
+
+  const profilesMap = new Map((profilesData ?? []).map(p => [p.id, p.display_name]))
+
+  // Process standings data to calculate scores
+  interface EntryStanding {
+    entry_id: string
+    display_name: string
+    total_score: number
+    correct_picks: number
+    wrong_picks: number
+    pending_picks: number
+  }
+
+  const standings: EntryStanding[] = (entriesData ?? []).map((entry) => {
+    let total_score = 0
+    let correct_picks = 0
+    let wrong_picks = 0
+    let pending_picks = 0
+
+    const picks = entry.bb_bowl_picks ?? []
+    for (const pick of picks) {
+      const poolGame = pick.bb_pool_games
+      if (!poolGame || poolGame.kind !== 'bowl') continue
+
+      const game = poolGame.bb_games
+      if (!game) continue
+
+      if (game.status !== 'final' || game.home_score === null || game.away_score === null) {
+        pending_picks++
+        continue
+      }
+
+      const margin = Math.abs(game.home_score - game.away_score)
+      let winnerId: string | null = null
+
+      if (game.home_score > game.away_score) {
+        winnerId = game.home_team_id
+      } else if (game.away_score > game.home_score) {
+        winnerId = game.away_team_id
+      }
+
+      if (winnerId === null) {
+        // Tie game - no points
+        continue
+      }
+
+      if (pick.picked_team_id === winnerId) {
+        total_score += margin
+        correct_picks++
+      } else {
+        total_score -= margin
+        wrong_picks++
+      }
+    }
+
+    return {
+      entry_id: entry.id,
+      display_name: profilesMap.get(entry.user_id) ?? 'Unknown',
+      total_score,
+      correct_picks,
+      wrong_picks,
+      pending_picks,
+    }
+  })
+
   return (
     <div>
       {/* Breadcrumb */}
@@ -124,7 +223,7 @@ export default async function PoolDetailPage({ params }: PageProps) {
             <div className="flex items-center space-x-3">
               <h1 className="text-2xl font-bold text-gray-900">{pool.name}</h1>
               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                pool.status === 'active'
+                pool.status === 'open'
                   ? 'bg-green-100 text-green-800'
                   : pool.status === 'draft'
                   ? 'bg-yellow-100 text-yellow-800'
@@ -172,7 +271,13 @@ export default async function PoolDetailPage({ params }: PageProps) {
                   href={`/pools/${id}/games`}
                   className="block w-full text-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
                 >
-                  Manage Games
+                  Manage Bowl Games
+                </Link>
+                <Link
+                  href={`/pools/${id}/cfp`}
+                  className="block w-full text-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Manage CFP Bracket
                 </Link>
                 <Link
                   href={`/pools/${id}/settings`}
@@ -221,19 +326,13 @@ export default async function PoolDetailPage({ params }: PageProps) {
             </div>
           )}
 
-          {/* Standings Preview */}
-          {(isMember || isCommissioner) && pool.status === 'active' && (
+          {/* Standings */}
+          {(isMember || isCommissioner) && pool.status === 'open' && (
             <div className="bg-white rounded-lg shadow p-6">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-semibold text-gray-900">Standings</h2>
-                <Link
-                  href={`/pools/${id}/standings`}
-                  className="text-sm text-blue-600 hover:text-blue-700"
-                >
-                  View Full Standings
-                </Link>
               </div>
-              <p className="text-gray-500 text-sm">Standings will appear here once games are played.</p>
+              <PoolStandings standings={standings} currentUserId={profile?.display_name ?? user.email ?? undefined} />
             </div>
           )}
         </div>
@@ -242,6 +341,27 @@ export default async function PoolDetailPage({ params }: PageProps) {
         <div className="space-y-6">
           {isCommissioner && (
             <PoolSettings pool={pool} />
+          )}
+
+          {/* Commissioner Tools - shown when pool is open */}
+          {isCommissioner && pool.status === 'open' && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Commissioner Tools</h2>
+              <div className="space-y-2">
+                <Link
+                  href={`/pools/${id}/games`}
+                  className="block w-full text-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Manage Games & Scores
+                </Link>
+                <Link
+                  href={`/pools/${id}/cfp`}
+                  className="block w-full text-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Manage CFP Bracket
+                </Link>
+              </div>
+            </div>
           )}
 
           {/* Members */}
