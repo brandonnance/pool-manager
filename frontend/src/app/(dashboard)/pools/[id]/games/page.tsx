@@ -9,20 +9,25 @@ import { EnterScoreButton } from '@/components/games/enter-score-button'
 function formatMatchupWithSpread(
   awayTeam: string,
   homeTeam: string,
-  homeSpread: number | null
+  homeSpread: number | null,
+  awaySeed?: number,
+  homeSeed?: number
 ): string {
+  const awayDisplay = awaySeed ? `#${awaySeed} ${awayTeam}` : awayTeam
+  const homeDisplay = homeSeed ? `#${homeSeed} ${homeTeam}` : homeTeam
+
   if (homeSpread === null || homeSpread === undefined) {
-    return `${awayTeam} @ ${homeTeam}`
+    return `${awayDisplay} @ ${homeDisplay}`
   }
   if (homeSpread === 0) {
-    return `${awayTeam} @ ${homeTeam} (EVEN)`
+    return `${awayDisplay} @ ${homeDisplay} (EVEN)`
   }
   if (homeSpread < 0) {
     // Home team favored
-    return `${awayTeam} @ ${homeTeam} (${homeSpread})`
+    return `${awayDisplay} @ ${homeDisplay} (${homeSpread})`
   }
   // Away team favored (positive home_spread means home is underdog)
-  return `${awayTeam} (${-homeSpread}) @ ${homeTeam}`
+  return `${awayDisplay} (${-homeSpread}) @ ${homeDisplay}`
 }
 
 interface PageProps {
@@ -106,6 +111,44 @@ export default async function PoolGamesPage({ params }: PageProps) {
     .from('bb_teams')
     .select('id, name, abbrev, logo_url, color')
     .order('name')
+
+  // Get CFP seed information for this pool
+  const { data: cfpByes } = await supabase
+    .from('bb_cfp_pool_byes')
+    .select('seed, team_id')
+    .eq('pool_id', id)
+
+  const { data: cfpRound1 } = await supabase
+    .from('bb_cfp_pool_round1')
+    .select('slot_key, team_a_id, team_b_id')
+    .eq('pool_id', id)
+
+  // Build seed map: team_id -> seed number
+  const seedMap = new Map<string, number>()
+
+  // Add bye seeds (1-4)
+  cfpByes?.forEach((bye) => {
+    if (bye.team_id) {
+      seedMap.set(bye.team_id, bye.seed)
+    }
+  })
+
+  // Add R1 seeds based on slot
+  // R1A: #8 vs #9 (plays seed 1), R1B: #7 vs #10 (plays seed 2), R1C: #6 vs #11 (plays seed 3), R1D: #5 vs #12 (plays seed 4)
+  const r1Seeds: Record<string, { a: number; b: number }> = {
+    R1A: { a: 8, b: 9 },
+    R1B: { a: 7, b: 10 },
+    R1C: { a: 6, b: 11 },
+    R1D: { a: 5, b: 12 },
+  }
+
+  cfpRound1?.forEach((r1) => {
+    const seeds = r1Seeds[r1.slot_key]
+    if (seeds) {
+      if (r1.team_a_id) seedMap.set(r1.team_a_id, seeds.a)
+      if (r1.team_b_id) seedMap.set(r1.team_b_id, seeds.b)
+    }
+  })
 
   return (
     <div>
@@ -193,10 +236,12 @@ export default async function PoolGamesPage({ params }: PageProps) {
                           {formatMatchupWithSpread(
                             game.away_team?.name ?? 'TBD',
                             game.home_team?.name ?? 'TBD',
-                            game.home_spread
+                            game.home_spread,
+                            pg.kind === 'cfp' && game.away_team_id ? seedMap.get(game.away_team_id) : undefined,
+                            pg.kind === 'cfp' && game.home_team_id ? seedMap.get(game.home_team_id) : undefined
                           )}
                         </span>
-                        {game.home_spread === null && (
+                        {game.home_spread === null && pg.kind === 'bowl' && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 whitespace-nowrap">
                             <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
@@ -232,8 +277,16 @@ export default async function PoolGamesPage({ params }: PageProps) {
                         <EnterScoreButton
                           gameId={game.id}
                           gameName={game.game_name || 'Bowl Game'}
-                          homeTeamName={game.home_team?.name ?? 'Home'}
-                          awayTeamName={game.away_team?.name ?? 'Away'}
+                          homeTeamName={
+                            pg.kind === 'cfp' && game.home_team_id && seedMap.get(game.home_team_id)
+                              ? `#${seedMap.get(game.home_team_id)} ${game.home_team?.name ?? 'Home'}`
+                              : game.home_team?.name ?? 'Home'
+                          }
+                          awayTeamName={
+                            pg.kind === 'cfp' && game.away_team_id && seedMap.get(game.away_team_id)
+                              ? `#${seedMap.get(game.away_team_id)} ${game.away_team?.name ?? 'Away'}`
+                              : game.away_team?.name ?? 'Away'
+                          }
                           currentHomeScore={game.home_score}
                           currentAwayScore={game.away_score}
                           currentStatus={game.status}

@@ -29,6 +29,7 @@ export default async function PoolDetailPage({ params }: PageProps) {
       status,
       season_label,
       settings,
+      visibility,
       created_at,
       created_by,
       org_id,
@@ -76,11 +77,19 @@ export default async function PoolDetailPage({ params }: PageProps) {
   const isMember = membership?.status === 'approved'
   const isPending = membership?.status === 'pending'
 
-  // Get pool games count
-  const { count: gamesCount } = await supabase
+  // Get pool games with status for completion tracking
+  const { data: poolGamesData, count: gamesCount } = await supabase
     .from('bb_pool_games')
-    .select('*', { count: 'exact', head: true })
+    .select(`
+      id,
+      bb_games (status)
+    `, { count: 'exact' })
     .eq('pool_id', id)
+
+  // Calculate how many games are final
+  const finalGamesCount = poolGamesData?.filter(pg => pg.bb_games?.status === 'final').length ?? 0
+  const totalGamesCount = gamesCount ?? 0
+  const allGamesFinal = totalGamesCount > 0 && finalGamesCount === totalGamesCount
 
   // Get member count
   const { count: memberCount } = await supabase
@@ -234,9 +243,11 @@ export default async function PoolDetailPage({ params }: PageProps) {
                   ? 'bg-green-100 text-green-800'
                   : pool.status === 'draft'
                   ? 'bg-yellow-100 text-yellow-800'
+                  : pool.status === 'completed'
+                  ? 'bg-blue-100 text-blue-800'
                   : 'bg-gray-100 text-gray-800'
               }`}>
-                {pool.status}
+                {pool.status === 'completed' ? 'Completed' : pool.status}
               </span>
             </div>
             <p className="text-gray-600 mt-1">
@@ -334,12 +345,18 @@ export default async function PoolDetailPage({ params }: PageProps) {
           )}
 
           {/* Standings */}
-          {(isMember || isCommissioner) && pool.status === 'open' && (
+          {(isMember || isCommissioner) && (pool.status === 'open' || pool.status === 'completed') && (
             <div className="bg-white rounded-lg shadow p-6">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">Standings</h2>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  {pool.status === 'completed' ? 'Final Standings' : 'Standings'}
+                </h2>
               </div>
-              <PoolStandings standings={standings} currentUserId={profile?.display_name ?? user.email ?? undefined} />
+              <PoolStandings
+                standings={standings}
+                currentUserId={profile?.display_name ?? user.email ?? undefined}
+                isCompleted={pool.status === 'completed'}
+              />
             </div>
           )}
         </div>
@@ -347,7 +364,12 @@ export default async function PoolDetailPage({ params }: PageProps) {
         {/* Right Column - Pool Info */}
         <div className="space-y-6">
           {isCommissioner && (
-            <PoolSettings pool={pool} />
+            <PoolSettings
+              pool={pool}
+              allGamesFinal={allGamesFinal}
+              finalGamesCount={finalGamesCount}
+              totalGamesCount={totalGamesCount}
+            />
           )}
 
           {/* Commissioner Tools - shown when pool is open */}

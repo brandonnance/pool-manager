@@ -12,9 +12,10 @@ interface EntryStanding {
 interface PoolStandingsProps {
   standings: EntryStanding[]
   currentUserId?: string
+  isCompleted?: boolean
 }
 
-export function PoolStandings({ standings, currentUserId }: PoolStandingsProps) {
+export function PoolStandings({ standings, currentUserId, isCompleted = false }: PoolStandingsProps) {
   if (standings.length === 0) {
     return (
       <div className="text-center py-8 text-gray-500">
@@ -43,9 +44,11 @@ export function PoolStandings({ standings, currentUserId }: PoolStandingsProps) 
             <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
               W-L
             </th>
-            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Pending
-            </th>
+            {!isCompleted && (
+              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Pending
+              </th>
+            )}
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
@@ -59,32 +62,55 @@ export function PoolStandings({ standings, currentUserId }: PoolStandingsProps) 
             }
 
             const isCurrentUser = entry.display_name === currentUserId
+            const isWinner = isCompleted && rank === 1
 
             return (
               <tr
                 key={entry.entry_id}
-                className={isCurrentUser ? 'bg-blue-50' : undefined}
+                className={
+                  isWinner
+                    ? 'bg-yellow-50'
+                    : isCurrentUser
+                    ? 'bg-blue-50'
+                    : undefined
+                }
               >
                 <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                  {rank}
+                  {isWinner ? (
+                    <span className="flex items-center gap-1">
+                      <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1.323l3.954 1.582 1.599-.8a1 1 0 01.894 1.79l-1.233.617 1.738 5.42a1 1 0 01-.285 1.05A3.989 3.989 0 0115 15a3.989 3.989 0 01-2.667-1.018 1 1 0 01-.285-1.05l1.715-5.349L10 6.417l-3.763 1.166 1.715 5.349a1 1 0 01-.285 1.05A3.989 3.989 0 015 15a3.989 3.989 0 01-2.667-1.018 1 1 0 01-.285-1.05l1.738-5.42-1.233-.617a1 1 0 01.894-1.79l1.599.8L9 4.323V3a1 1 0 011-1zm-5 8.274l-.818 2.552c.25.112.526.174.818.174.292 0 .569-.062.818-.174L5 10.274zm10 0l-.818 2.552c.25.112.526.174.818.174.292 0 .569-.062.818-.174L15 10.274zM10 18a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                      </svg>
+                      <span className="font-bold text-yellow-700">1</span>
+                    </span>
+                  ) : (
+                    rank
+                  )}
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {entry.display_name}
+                  <span className={isWinner ? 'font-bold text-yellow-700' : ''}>
+                    {entry.display_name}
+                  </span>
                   {isCurrentUser && (
                     <span className="ml-2 text-xs text-blue-600">(You)</span>
                   )}
+                  {isWinner && (
+                    <span className="ml-2 text-xs text-yellow-600 font-medium">Champion!</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-semibold">
-                  <span className={entry.total_score >= 0 ? 'text-green-600' : 'text-red-600'}>
+                  <span className={isWinner ? 'text-yellow-700' : entry.total_score >= 0 ? 'text-green-600' : 'text-red-600'}>
                     {entry.total_score > 0 ? '+' : ''}{entry.total_score}
                   </span>
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-600">
                   {entry.correct_picks}-{entry.wrong_picks}
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-500">
-                  {entry.pending_picks}
-                </td>
+                {!isCompleted && (
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-500">
+                    {entry.pending_picks}
+                  </td>
+                )}
               </tr>
             )
           })}

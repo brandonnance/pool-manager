@@ -8,7 +8,7 @@ A multi-tenant bowl pool management application built with Next.js 16 and Supaba
 - **Backend**: Supabase (PostgreSQL, Auth, RLS)
 - **MCP**: Supabase MCP server for database management
 
-## Current Status: MVP In Progress
+## Current Status: MVP Complete
 
 ### Completed
 - [x] Supabase MCP server setup (npx-based with PAT)
@@ -31,10 +31,14 @@ A multi-tenant bowl pool management application built with Next.js 16 and Supaba
 - [x] Members management (`/pools/[id]/members`) - List, approve/reject/remove members
 - [x] Join links - Generate/copy/delete invite links with expiration and max uses
 - [x] Public join page (`/join/[token]`) - Validates token, handles auth redirect
+- [x] Game locking - Bowl picks lock 5 min before kickoff, CFP locks at `cfp_lock_at`
+- [x] Pool completion - Commissioner can complete pool when all games final, winner highlight in standings
+- [x] Hybrid org membership - Pool join auto-creates org membership, dashboard groups pools by org
+- [x] Pool visibility - Commissioners can set pools to "invite_only" or "open_to_org"
+- [x] Pool discovery - Org members can see and join "open_to_org" pools from dashboard
+- [x] CFP auto-population - When games are marked final, next round games auto-populate with winners (DB trigger)
 
-### Not Started
-- [ ] Game locking (5 min before kickoff)
-- [ ] Pool completion status (open -> locked -> completed)
+### MVP Complete!
 
 ## Project Structure
 
@@ -127,15 +131,19 @@ When teams are changed on games:
 - **Bowl games**: Only picks for that specific game are deleted
 - **CFP games/byes**: ALL CFP bracket picks for ALL users in the pool are deleted (cascading picks make partial updates impractical)
 
-## Next Steps (Priority Order)
+## Potential Future Enhancements
 
-1. **Game Locking**
-   - Lock picks 5 minutes before kickoff
-   - Show locked status in picks UI
+1. **CFP Scoring**
+   - Points for correct CFP bracket picks
+   - Different point values per round (R1=1, QF=2, SF=4, F=8)
 
-2. **Pool Completion**
-   - Transition pool to completed status when all games final
-   - Final standings display
+2. **Notifications**
+   - Email notifications for game results
+   - Reminders to make picks before lock
+
+3. **Enhanced Stats**
+   - Pick accuracy percentages
+   - Historical pool results
 
 ## Running the Project
 
@@ -162,3 +170,11 @@ The MCP server is configured in `.mcp.json`. Use these tools:
 - Game statuses: scheduled -> in_progress -> final
 - Dark mode disabled in `globals.css` (app uses light theme only)
 - Join requests go to "pending" status, commissioners approve via `/pools/[id]/members`
+- Hybrid org membership: joining a pool auto-creates org membership (DB trigger)
+- Pool visibility: `invite_only` (default) or `open_to_org` (discoverable by org members)
+- CFP bracket auto-population: `cfp_auto_populate_trigger` on bb_games updates next round games when status='final'
+  - R1 winner + bye team → QF game
+  - QF winners → SF game: QFA+QFD → SFA, QFB+QFC → SFB
+  - SF winners → Final (when both SF games are final)
+- CFP seeds display on games page (seeds 1-12 shown next to team names for CFP games)
+- CFP bracket seeding: R1A=#8v#9→#1, R1B=#7v#10→#2, R1C=#6v#11→#3, R1D=#5v#12→#4

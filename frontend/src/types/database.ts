@@ -695,6 +695,7 @@ export type Database = {
           settings: Json | null
           status: string
           type: string
+          visibility: string
         }
         Insert: {
           created_at?: string | null
@@ -706,6 +707,7 @@ export type Database = {
           settings?: Json | null
           status?: string
           type: string
+          visibility?: string
         }
         Update: {
           created_at?: string | null
@@ -717,6 +719,7 @@ export type Database = {
           settings?: Json | null
           status?: string
           type?: string
+          visibility?: string
         }
         Relationships: [
           {
