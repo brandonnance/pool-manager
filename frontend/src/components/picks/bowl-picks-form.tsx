@@ -37,15 +37,17 @@ interface BowlPicksFormProps {
   entryId: string
   poolGames: PoolGame[]
   picksMap: Record<string, string | null>
+  demoMode?: boolean
 }
 
-export function BowlPicksForm({ poolId, entryId, poolGames, picksMap }: BowlPicksFormProps) {
+export function BowlPicksForm({ poolId, entryId, poolGames, picksMap, demoMode }: BowlPicksFormProps) {
   const [picks, setPicks] = useState<Record<string, string | null>>(picksMap)
   const [saving, setSaving] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
   const isGameLocked = (kickoffAt: string | null): boolean => {
+    if (demoMode) return false // Demo mode bypasses locking
     if (!kickoffAt) return false
     const lockTime = new Date(kickoffAt)
     lockTime.setMinutes(lockTime.getMinutes() - 5) // Lock 5 minutes before kickoff
@@ -157,7 +159,7 @@ export function BowlPicksForm({ poolId, entryId, poolGames, picksMap }: BowlPick
           const game = pg.bb_games
           if (!game) return null
 
-          const isLocked = isGameLocked(game.kickoff_at) || game.status === 'final' || game.status === 'in_progress'
+          const isLocked = !demoMode && (isGameLocked(game.kickoff_at) || game.status === 'final' || game.status === 'in_progress')
           const currentPick = picks[pg.id]
           const isSaving = saving === pg.id
 

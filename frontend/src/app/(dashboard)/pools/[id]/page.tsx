@@ -5,6 +5,9 @@ import { PoolSettings } from '@/components/pools/pool-settings'
 import { JoinPoolButton } from '@/components/pools/join-pool-button'
 import { CreateEntryButton } from '@/components/pools/create-entry-button'
 import { PoolStandings } from '@/components/standings/pool-standings'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -30,6 +33,7 @@ export default async function PoolDetailPage({ params }: PageProps) {
       season_label,
       settings,
       visibility,
+      demo_mode,
       created_at,
       created_by,
       org_id,
@@ -215,149 +219,164 @@ export default async function PoolDetailPage({ params }: PageProps) {
     <div>
       {/* Breadcrumb */}
       <nav className="mb-4">
-        <ol className="flex items-center space-x-2 text-sm text-gray-500">
+        <ol className="flex items-center space-x-2 text-sm text-muted-foreground">
           <li>
-            <Link href="/orgs" className="hover:text-gray-700">
+            <Link href="/orgs" className="hover:text-foreground transition-colors">
               Organizations
             </Link>
           </li>
           <li>/</li>
           <li>
-            <Link href={`/orgs/${pool.org_id}`} className="hover:text-gray-700">
+            <Link href={`/orgs/${pool.org_id}`} className="hover:text-foreground transition-colors">
               {pool.organizations?.name}
             </Link>
           </li>
           <li>/</li>
-          <li className="text-gray-900 font-medium">{pool.name}</li>
+          <li className="text-foreground font-medium">{pool.name}</li>
         </ol>
       </nav>
 
       {/* Pool Header */}
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <div className="flex justify-between items-start">
-          <div>
-            <div className="flex items-center space-x-3">
-              <h1 className="text-2xl font-bold text-gray-900">{pool.name}</h1>
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                pool.status === 'open'
-                  ? 'bg-green-100 text-green-800'
-                  : pool.status === 'draft'
-                  ? 'bg-yellow-100 text-yellow-800'
-                  : pool.status === 'completed'
-                  ? 'bg-blue-100 text-blue-800'
-                  : 'bg-gray-100 text-gray-800'
-              }`}>
-                {pool.status === 'completed' ? 'Completed' : pool.status}
-              </span>
+      <Card className="mb-6 border-l-4 border-l-primary">
+        <CardContent className="p-6">
+          <div className="flex justify-between items-start">
+            <div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-bold text-foreground">{pool.name}</h1>
+                <Badge
+                  variant={
+                    pool.status === 'open' ? 'default' :
+                    pool.status === 'completed' ? 'secondary' :
+                    'outline'
+                  }
+                  className={
+                    pool.status === 'open' ? 'bg-primary' :
+                    pool.status === 'draft' ? 'border-amber-500 text-amber-600' :
+                    ''
+                  }
+                >
+                  {pool.status === 'completed' ? 'Completed' : pool.status}
+                </Badge>
+              </div>
+              <p className="text-muted-foreground mt-1">
+                {pool.type === 'bowl_buster' ? 'Bowl Buster' : pool.type}
+                {pool.season_label && ` - ${pool.season_label}`}
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                {memberCount} member{memberCount !== 1 ? 's' : ''} &middot; {gamesCount ?? 0} games
+              </p>
             </div>
-            <p className="text-gray-600 mt-1">
-              {pool.type === 'bowl_buster' ? 'Bowl Buster' : pool.type}
-              {pool.season_label && ` - ${pool.season_label}`}
-            </p>
-            <p className="text-sm text-gray-500 mt-2">
-              {memberCount} member{memberCount !== 1 ? 's' : ''} &middot; {gamesCount ?? 0} games
-            </p>
+            <div className="flex items-center gap-3">
+              {isCommissioner && (
+                <Badge variant="secondary" className="bg-primary/10 text-primary">
+                  Commissioner
+                </Badge>
+              )}
+              {!isMember && !isPending && !isCommissioner && <JoinPoolButton poolId={id} />}
+              {isPending && (
+                <Badge variant="outline" className="border-amber-500 text-amber-600">
+                  Pending Approval
+                </Badge>
+              )}
+            </div>
           </div>
-          <div className="flex items-center space-x-3">
-            {isCommissioner && (
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                Commissioner
-              </span>
-            )}
-            {!isMember && !isPending && !isCommissioner && <JoinPoolButton poolId={id} />}
-            {isPending && (
-              <span className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium bg-yellow-100 text-yellow-800">
-                Pending Approval
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Main Content */}
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Left Column - Games/Picks */}
         <div className="lg:col-span-2 space-y-6">
           {pool.status === 'draft' && isCommissioner ? (
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Pool Setup</h2>
-              <p className="text-gray-600 mb-4">
-                This pool is in draft mode. Add games and configure settings before activating.
-              </p>
-              <div className="space-y-3">
-                <Link
-                  href={`/pools/${id}/games`}
-                  className="block w-full text-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  Manage Bowl Games
-                </Link>
-                <Link
-                  href={`/pools/${id}/cfp`}
-                  className="block w-full text-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  Manage CFP Bracket
-                </Link>
-                <Link
-                  href={`/pools/${id}/settings`}
-                  className="block w-full text-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  Pool Settings
-                </Link>
-              </div>
-            </div>
+            <Card>
+              <CardHeader>
+                <CardTitle>Pool Setup</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground mb-4">
+                  This pool is in draft mode. Add games and configure settings before activating.
+                </p>
+                <div className="space-y-2">
+                  <Button variant="outline" className="w-full" asChild>
+                    <Link href={`/pools/${id}/games`}>
+                      Manage Bowl Games
+                    </Link>
+                  </Button>
+                  <Button variant="outline" className="w-full" asChild>
+                    <Link href={`/pools/${id}/cfp`}>
+                      Manage CFP Bracket
+                    </Link>
+                  </Button>
+                  <Button variant="outline" className="w-full" asChild>
+                    <Link href={`/pools/${id}/settings`}>
+                      Pool Settings
+                    </Link>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           ) : pool.status === 'draft' ? (
-            <div className="bg-white rounded-lg shadow p-6 text-center">
-              <h2 className="text-lg font-semibold text-gray-900 mb-2">Pool Not Active</h2>
-              <p className="text-gray-600">
-                This pool is still being set up. Check back soon!
-              </p>
-            </div>
+            <Card>
+              <CardContent className="py-8 text-center">
+                <h2 className="text-lg font-semibold text-foreground mb-2">Pool Not Active</h2>
+                <p className="text-muted-foreground">
+                  This pool is still being set up. Check back soon!
+                </p>
+              </CardContent>
+            </Card>
           ) : isMember || isCommissioner ? (
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Bowl Picks</h2>
-              {gamesCount === 0 ? (
-                <p className="text-gray-600">No games have been added to this pool yet.</p>
-              ) : entry ? (
-                <div>
-                  <p className="text-gray-600 mb-4">Make your picks for each bowl game.</p>
-                  <Link
-                    href={`/pools/${id}/picks`}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
-                  >
-                    View/Edit Picks
-                  </Link>
-                </div>
-              ) : (
-                <div>
-                  <p className="text-gray-600 mb-4">Create an entry to start making picks.</p>
-                  <CreateEntryButton poolId={id} />
-                </div>
-              )}
-            </div>
+            <Card>
+              <CardHeader>
+                <CardTitle>Bowl Picks</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {gamesCount === 0 ? (
+                  <p className="text-muted-foreground">No games have been added to this pool yet.</p>
+                ) : entry ? (
+                  <div>
+                    <p className="text-muted-foreground mb-4">Make your picks for each bowl game.</p>
+                    <Button asChild>
+                      <Link href={`/pools/${id}/picks`}>
+                        View/Edit Picks
+                      </Link>
+                    </Button>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-muted-foreground mb-4">Create an entry to start making picks.</p>
+                    <CreateEntryButton poolId={id} />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           ) : (
-            <div className="bg-white rounded-lg shadow p-6 text-center">
-              <h2 className="text-lg font-semibold text-gray-900 mb-2">Join to View Picks</h2>
-              <p className="text-gray-600 mb-4">
-                You need to be a member of this pool to view and make picks.
-              </p>
-              <JoinPoolButton poolId={id} />
-            </div>
+            <Card>
+              <CardContent className="py-8 text-center">
+                <h2 className="text-lg font-semibold text-foreground mb-2">Join to View Picks</h2>
+                <p className="text-muted-foreground mb-4">
+                  You need to be a member of this pool to view and make picks.
+                </p>
+                <JoinPoolButton poolId={id} />
+              </CardContent>
+            </Card>
           )}
 
           {/* Standings */}
           {(isMember || isCommissioner) && (pool.status === 'open' || pool.status === 'completed') && (
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">
+            <Card>
+              <CardHeader>
+                <CardTitle>
                   {pool.status === 'completed' ? 'Final Standings' : 'Standings'}
-                </h2>
-              </div>
-              <PoolStandings
-                standings={standings}
-                currentUserId={profile?.display_name ?? user.email ?? undefined}
-                isCompleted={pool.status === 'completed'}
-              />
-            </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <PoolStandings
+                  standings={standings}
+                  currentUserId={profile?.display_name ?? user.email ?? undefined}
+                  isCompleted={pool.status === 'completed'}
+                />
+              </CardContent>
+            </Card>
           )}
         </div>
 
@@ -374,45 +393,47 @@ export default async function PoolDetailPage({ params }: PageProps) {
 
           {/* Commissioner Tools - shown when pool is open */}
           {isCommissioner && pool.status === 'open' && (
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Commissioner Tools</h2>
-              <div className="space-y-2">
-                <Link
-                  href={`/pools/${id}/games`}
-                  className="block w-full text-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  Manage Games & Scores
-                </Link>
-                <Link
-                  href={`/pools/${id}/cfp`}
-                  className="block w-full text-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  Manage CFP Bracket
-                </Link>
-              </div>
-            </div>
+            <Card>
+              <CardHeader>
+                <CardTitle>Commissioner Tools</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Button variant="outline" className="w-full" asChild>
+                  <Link href={`/pools/${id}/games`}>
+                    Manage Games & Scores
+                  </Link>
+                </Button>
+                <Button variant="outline" className="w-full" asChild>
+                  <Link href={`/pools/${id}/cfp`}>
+                    Manage CFP Bracket
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
           )}
 
           {/* Members */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Members</h2>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle>Members</CardTitle>
               {isCommissioner && (
                 <Link
                   href={`/pools/${id}/members`}
-                  className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-2"
+                  className="text-sm text-primary hover:text-primary/80 flex items-center gap-2"
                 >
                   Manage
                   {(pendingMemberCount ?? 0) > 0 && (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                    <Badge variant="outline" className="border-amber-500 text-amber-600 text-xs">
                       {pendingMemberCount} pending
-                    </span>
+                    </Badge>
                   )}
                 </Link>
               )}
-            </div>
-            <p className="text-gray-600">{memberCount} approved member{memberCount !== 1 ? 's' : ''}</p>
-          </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">{memberCount} approved member{memberCount !== 1 ? 's' : ''}</p>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

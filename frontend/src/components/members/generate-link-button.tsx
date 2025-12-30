@@ -3,6 +3,19 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 
 interface GenerateLinkButtonProps {
   poolId: string
@@ -83,123 +96,106 @@ export function GenerateLinkButton({ poolId }: GenerateLinkButtonProps) {
     }
   }
 
-  const handleClose = () => {
-    setIsOpen(false)
-    setGeneratedUrl(null)
-    setError(null)
-    setMaxUses('')
-    setExpiresIn('never')
-    setCopied(false)
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open)
+    if (!open) {
+      setGeneratedUrl(null)
+      setError(null)
+      setMaxUses('')
+      setExpiresIn('never')
+      setCopied(false)
+    }
   }
 
   return (
-    <>
-      <button
-        onClick={() => setIsOpen(true)}
-        className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md"
-      >
-        Generate Invite Link
-      </button>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogTrigger asChild>
+        <Button>Generate Invite Link</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            {generatedUrl ? 'Invite Link Created!' : 'Generate Invite Link'}
+          </DialogTitle>
+          <DialogDescription>
+            {generatedUrl
+              ? 'Share this link with people you want to invite to the pool.'
+              : 'Create an invite link that others can use to join this pool.'
+            }
+          </DialogDescription>
+        </DialogHeader>
 
-      {isOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-4">
-            <div className="fixed inset-0 bg-black/50" onClick={handleClose} />
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-            <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                {generatedUrl ? 'Invite Link Created!' : 'Generate Invite Link'}
-              </h2>
-
-              {error && (
-                <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md text-sm">
-                  {error}
-                </div>
-              )}
-
-              {generatedUrl ? (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Share this link
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        readOnly
-                        value={generatedUrl}
-                        className="flex-1 px-3 py-2 border rounded-md text-sm bg-gray-50"
-                      />
-                      <button
-                        onClick={handleCopy}
-                        className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md"
-                      >
-                        {copied ? 'Copied!' : 'Copy'}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex justify-end">
-                    <button
-                      onClick={handleClose}
-                      className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md"
-                    >
-                      Done
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Maximum uses (optional)
-                    </label>
-                    <input
-                      type="number"
-                      value={maxUses}
-                      onChange={(e) => setMaxUses(e.target.value)}
-                      placeholder="Unlimited"
-                      min="1"
-                      className="w-full px-3 py-2 border rounded-md text-sm"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Expires
-                    </label>
-                    <select
-                      value={expiresIn}
-                      onChange={(e) => setExpiresIn(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-md text-sm"
-                    >
-                      <option value="never">Never</option>
-                      <option value="1d">In 1 day</option>
-                      <option value="7d">In 7 days</option>
-                      <option value="30d">In 30 days</option>
-                    </select>
-                  </div>
-
-                  <div className="flex justify-end gap-2 pt-2">
-                    <button
-                      onClick={handleClose}
-                      className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleGenerate}
-                      disabled={isLoading}
-                      className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50"
-                    >
-                      {isLoading ? 'Generating...' : 'Generate'}
-                    </button>
-                  </div>
-                </div>
-              )}
+        {generatedUrl ? (
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Share this link</Label>
+              <div className="flex gap-2">
+                <Input
+                  readOnly
+                  value={generatedUrl}
+                  className="bg-muted"
+                />
+                <Button onClick={handleCopy} variant="secondary">
+                  {copied ? 'Copied!' : 'Copy'}
+                </Button>
+              </div>
             </div>
+            <DialogFooter>
+              <Button onClick={() => handleOpenChange(false)}>
+                Done
+              </Button>
+            </DialogFooter>
           </div>
-        </div>
-      )}
-    </>
+        ) : (
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="maxUses">Maximum uses (optional)</Label>
+              <Input
+                id="maxUses"
+                type="number"
+                value={maxUses}
+                onChange={(e) => setMaxUses(e.target.value)}
+                placeholder="Unlimited"
+                min="1"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="expiresIn">Expires</Label>
+              <select
+                id="expiresIn"
+                value={expiresIn}
+                onChange={(e) => setExpiresIn(e.target.value)}
+                className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <option value="never">Never</option>
+                <option value="1d">In 1 day</option>
+                <option value="7d">In 7 days</option>
+                <option value="30d">In 30 days</option>
+              </select>
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => handleOpenChange(false)}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleGenerate} disabled={isLoading}>
+                {isLoading ? 'Generating...' : 'Generate'}
+              </Button>
+            </DialogFooter>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   )
 }

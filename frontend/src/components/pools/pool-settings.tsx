@@ -3,6 +3,11 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { Json } from '@/types/database'
 
 interface Pool {
@@ -11,6 +16,7 @@ interface Pool {
   status: string
   settings: Json | null
   visibility: string
+  demo_mode: boolean
 }
 
 interface PoolSettingsProps {
@@ -24,7 +30,9 @@ export function PoolSettings({ pool, allGamesFinal, finalGamesCount, totalGamesC
   const [isActivating, setIsActivating] = useState(false)
   const [isCompleting, setIsCompleting] = useState(false)
   const [isUpdatingVisibility, setIsUpdatingVisibility] = useState(false)
+  const [isUpdatingDemoMode, setIsUpdatingDemoMode] = useState(false)
   const [visibility, setVisibility] = useState(pool.visibility)
+  const [demoMode, setDemoMode] = useState(pool.demo_mode)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
@@ -98,39 +106,62 @@ export function PoolSettings({ pool, allGamesFinal, finalGamesCount, totalGamesC
     router.refresh()
   }
 
+  const handleDemoModeToggle = async (checked: boolean) => {
+    setIsUpdatingDemoMode(true)
+    setError(null)
+
+    const supabase = createClient()
+
+    const { error: updateError } = await supabase
+      .from('pools')
+      .update({ demo_mode: checked })
+      .eq('id', pool.id)
+
+    if (updateError) {
+      setError(updateError.message)
+      setIsUpdatingDemoMode(false)
+      return
+    }
+
+    setDemoMode(checked)
+    setIsUpdatingDemoMode(false)
+    router.refresh()
+  }
+
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-lg font-semibold text-gray-900 mb-4">Pool Settings</h2>
+    <Card>
+      <CardHeader>
+        <CardTitle>Pool Settings</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-      {error && (
-        <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md text-sm">
-          {error}
-        </div>
-      )}
-
-      <div className="space-y-3">
         {pool.status === 'draft' && (
-          <button
+          <Button
             onClick={handleActivate}
             disabled={isActivating}
-            className="w-full px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
+            className="w-full"
           >
             {isActivating ? 'Activating...' : 'Activate Pool'}
-          </button>
+          </Button>
         )}
 
         {pool.status === 'open' && (
           <>
             {allGamesFinal ? (
-              <button
+              <Button
                 onClick={handleComplete}
                 disabled={isCompleting}
-                className="w-full px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
+                className="w-full"
               >
                 {isCompleting ? 'Completing...' : 'Complete Pool'}
-              </button>
+              </Button>
             ) : (
-              <div className="text-sm text-gray-600 bg-gray-50 rounded-md p-3">
+              <div className="text-sm text-muted-foreground bg-muted rounded-md p-3">
                 <p className="font-medium">Games in progress</p>
                 <p className="text-xs mt-1">
                   {finalGamesCount ?? 0} of {totalGamesCount ?? 0} games final
@@ -141,12 +172,12 @@ export function PoolSettings({ pool, allGamesFinal, finalGamesCount, totalGamesC
         )}
 
         {/* Visibility Toggle */}
-        <div className="pt-3 border-t border-gray-200">
-          <label className="text-sm font-medium text-gray-700 block mb-2">
+        <div className="pt-3 border-t border-border">
+          <Label className="text-sm font-medium block mb-3">
             Pool Visibility
-          </label>
+          </Label>
           <div className="space-y-2">
-            <label className="flex items-center">
+            <label className="flex items-center cursor-pointer">
               <input
                 type="radio"
                 name="visibility"
@@ -154,13 +185,13 @@ export function PoolSettings({ pool, allGamesFinal, finalGamesCount, totalGamesC
                 checked={visibility === 'invite_only'}
                 onChange={() => handleVisibilityChange('invite_only')}
                 disabled={isUpdatingVisibility}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                className="h-4 w-4 text-primary focus:ring-primary border-input"
               />
-              <span className="ml-2 text-sm text-gray-700">
+              <span className="ml-2 text-sm">
                 Invite Only
               </span>
             </label>
-            <label className="flex items-center">
+            <label className="flex items-center cursor-pointer">
               <input
                 type="radio"
                 name="visibility"
@@ -168,24 +199,50 @@ export function PoolSettings({ pool, allGamesFinal, finalGamesCount, totalGamesC
                 checked={visibility === 'open_to_org'}
                 onChange={() => handleVisibilityChange('open_to_org')}
                 disabled={isUpdatingVisibility}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                className="h-4 w-4 text-primary focus:ring-primary border-input"
               />
-              <span className="ml-2 text-sm text-gray-700">
+              <span className="ml-2 text-sm">
                 Open to Organization
               </span>
             </label>
           </div>
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-2 text-xs text-muted-foreground">
             {visibility === 'invite_only'
               ? 'Only users with an invite link can join'
               : 'Any organization member can see and request to join'}
           </p>
         </div>
 
-        <p className="text-xs text-gray-500 pt-2">
+        {/* Demo Mode Toggle */}
+        <div className="pt-3 border-t border-border">
+          <div className="flex items-center justify-between">
+            <div>
+              <Label className="text-sm font-medium">
+                Demo Mode
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Bypass pick locking for testing
+              </p>
+            </div>
+            <Switch
+              checked={demoMode}
+              onCheckedChange={handleDemoModeToggle}
+              disabled={isUpdatingDemoMode}
+            />
+          </div>
+          {demoMode && (
+            <Alert className="mt-3 bg-amber-50 border-amber-200">
+              <AlertDescription className="text-amber-700 text-xs">
+                Demo mode is ON - all pick locks are bypassed
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+
+        <p className="text-xs text-muted-foreground pt-2">
           Status: <span className="font-medium">{pool.status}</span>
         </p>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   )
 }

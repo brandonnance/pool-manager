@@ -3,6 +3,19 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 
 interface EnterScoreButtonProps {
   gameId: string
@@ -78,149 +91,116 @@ export function EnterScoreButton({
     router.refresh()
   }
 
-  // Quick action to mark as final with current scores
-  const handleMarkFinal = async () => {
-    if (homeScore === '' || awayScore === '') {
-      setError('Please enter both scores first')
-      return
-    }
-    setStatus('final')
-    // Submit will be triggered by form
-  }
-
   const isFinal = currentStatus === 'final'
 
   return (
-    <>
-      <button
-        onClick={handleOpen}
-        className={`${
-          isFinal
-            ? 'text-gray-500 hover:text-gray-700'
-            : 'text-green-600 hover:text-green-700'
-        }`}
-      >
-        {isFinal ? 'Edit Score' : 'Score'}
-      </button>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <button
+          onClick={handleOpen}
+          className={`text-sm font-medium ${
+            isFinal
+              ? 'text-muted-foreground hover:text-foreground'
+              : 'text-primary hover:text-primary/80'
+          }`}
+        >
+          {isFinal ? 'Edit Score' : 'Score'}
+        </button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Enter Score</DialogTitle>
+          <DialogDescription>{gameName}</DialogDescription>
+        </DialogHeader>
 
-      {isOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">
-              Enter Score
-            </h2>
-            <p className="text-gray-600 text-sm mb-4">{gameName}</p>
-
-            <form onSubmit={handleSubmit}>
-              <div className="space-y-4">
-                {/* Score Entry */}
-                <div className="grid grid-cols-3 gap-4 items-center">
-                  {/* Away Team */}
-                  <div className="text-center">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {awayTeamName}
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={awayScore}
-                      onChange={(e) => setAwayScore(e.target.value)}
-                      className="w-full px-3 py-3 text-2xl font-bold text-center border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="0"
-                    />
-                  </div>
-
-                  {/* VS */}
-                  <div className="text-center text-gray-400 text-lg font-medium pt-6">
-                    @
-                  </div>
-
-                  {/* Home Team */}
-                  <div className="text-center">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {homeTeamName}
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={homeScore}
-                      onChange={(e) => setHomeScore(e.target.value)}
-                      className="w-full px-3 py-3 text-2xl font-bold text-center border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="0"
-                    />
-                  </div>
-                </div>
-
-                {/* Status */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Game Status
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setStatus('scheduled')}
-                      className={`px-3 py-2 text-sm font-medium rounded-md border ${
-                        status === 'scheduled'
-                          ? 'bg-blue-50 border-blue-500 text-blue-700'
-                          : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      Scheduled
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setStatus('in_progress')}
-                      className={`px-3 py-2 text-sm font-medium rounded-md border ${
-                        status === 'in_progress'
-                          ? 'bg-yellow-50 border-yellow-500 text-yellow-700'
-                          : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      In Progress
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setStatus('final')}
-                      className={`px-3 py-2 text-sm font-medium rounded-md border ${
-                        status === 'final'
-                          ? 'bg-green-50 border-green-500 text-green-700'
-                          : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      Final
-                    </button>
-                  </div>
-                </div>
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-4 py-4">
+            {/* Score Entry */}
+            <div className="grid grid-cols-3 gap-4 items-center">
+              {/* Away Team */}
+              <div className="text-center">
+                <Label className="block mb-2">{awayTeamName}</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={awayScore}
+                  onChange={(e) => setAwayScore(e.target.value)}
+                  className="text-2xl font-bold text-center h-14"
+                  placeholder="0"
+                />
               </div>
 
-              {error && (
-                <div className="mt-4 p-3 bg-red-50 text-red-700 rounded-md text-sm">
-                  {error}
-                </div>
-              )}
+              {/* VS */}
+              <div className="text-center text-muted-foreground text-lg font-medium pt-6">
+                @
+              </div>
 
-              <div className="mt-6 flex justify-end space-x-3">
-                <button
+              {/* Home Team */}
+              <div className="text-center">
+                <Label className="block mb-2">{homeTeamName}</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={homeScore}
+                  onChange={(e) => setHomeScore(e.target.value)}
+                  className="text-2xl font-bold text-center h-14"
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            {/* Status */}
+            <div className="space-y-2">
+              <Label>Game Status</Label>
+              <div className="grid grid-cols-3 gap-2">
+                <Button
                   type="button"
-                  onClick={() => setIsOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
-                  disabled={isLoading}
+                  variant={status === 'scheduled' ? 'default' : 'outline'}
+                  onClick={() => setStatus('scheduled')}
+                  className={status === 'scheduled' ? '' : ''}
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                  Scheduled
+                </Button>
+                <Button
+                  type="button"
+                  variant={status === 'in_progress' ? 'default' : 'outline'}
+                  onClick={() => setStatus('in_progress')}
+                  className={status === 'in_progress' ? 'bg-amber-500 hover:bg-amber-600' : ''}
                 >
-                  {isLoading ? 'Saving...' : 'Save Score'}
-                </button>
+                  In Progress
+                </Button>
+                <Button
+                  type="button"
+                  variant={status === 'final' ? 'default' : 'outline'}
+                  onClick={() => setStatus('final')}
+                >
+                  Final
+                </Button>
               </div>
-            </form>
+            </div>
+
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
           </div>
-        </div>
-      )}
-    </>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setIsOpen(false)}
+              disabled={isLoading}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? 'Saving...' : 'Save Score'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   )
 }

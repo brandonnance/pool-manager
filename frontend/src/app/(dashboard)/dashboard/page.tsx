@@ -1,5 +1,8 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -164,78 +167,74 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="mt-1 text-sm text-gray-600">
+        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Welcome back! Here&apos;s an overview of your pools.
         </p>
       </div>
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="text-sm font-medium text-gray-500">Organizations</div>
-          <div className="mt-2 text-3xl font-bold text-gray-900">{orgsWithPools.length}</div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="text-sm font-medium text-gray-500">Active Pools</div>
-          <div className="mt-2 text-3xl font-bold text-gray-900">{activePools}</div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="text-sm font-medium text-gray-500">Total Pools</div>
-          <div className="mt-2 text-3xl font-bold text-gray-900">{totalPools}</div>
-          {discoverableCount > 0 && (
-            <div className="mt-1 text-sm text-blue-600">
-              +{discoverableCount} available to join
-            </div>
-          )}
-        </div>
+        <Card className="border-l-4 border-l-primary">
+          <CardContent className="p-6">
+            <div className="text-sm font-medium text-muted-foreground">Organizations</div>
+            <div className="mt-2 text-3xl font-bold text-foreground">{orgsWithPools.length}</div>
+          </CardContent>
+        </Card>
+        <Card className="border-l-4 border-l-accent">
+          <CardContent className="p-6">
+            <div className="text-sm font-medium text-muted-foreground">Active Pools</div>
+            <div className="mt-2 text-3xl font-bold text-foreground">{activePools}</div>
+          </CardContent>
+        </Card>
+        <Card className="border-l-4 border-l-primary">
+          <CardContent className="p-6">
+            <div className="text-sm font-medium text-muted-foreground">Total Pools</div>
+            <div className="mt-2 text-3xl font-bold text-foreground">{totalPools}</div>
+            {discoverableCount > 0 && (
+              <div className="mt-1 text-sm text-primary font-medium">
+                +{discoverableCount} available to join
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Pools grouped by Organization */}
       {orgsWithPools.length === 0 ? (
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-            <h2 className="text-lg font-medium text-gray-900">Your Pools</h2>
-            <Link
-              href="/orgs/new"
-              className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-            >
-              Create Organization
-            </Link>
-          </div>
-          <div className="px-6 py-8 text-center text-gray-500">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Your Pools</CardTitle>
+            <Button asChild>
+              <Link href="/orgs/new">Create Organization</Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="py-8 text-center text-muted-foreground">
             <p>You&apos;re not a member of any organizations yet.</p>
             <p className="mt-1 text-sm">Create one to get started, or join a pool using an invite link!</p>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       ) : (
         orgsWithPools.map((org) => (
-          <div key={org.id} className="bg-white rounded-lg shadow">
-            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+          <Card key={org.id} className="overflow-hidden">
+            <CardHeader className="bg-muted/50 flex flex-row items-center justify-between py-4">
               <div className="flex items-center gap-3">
-                <Link href={`/orgs/${org.id}`} className="text-lg font-medium text-gray-900 hover:text-blue-600">
+                <Link href={`/orgs/${org.id}`} className="text-lg font-semibold text-foreground hover:text-primary transition-colors">
                   {org.name}
                 </Link>
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                  org.role === 'commissioner'
-                    ? 'bg-blue-100 text-blue-800'
-                    : 'bg-gray-100 text-gray-800'
-                }`}>
+                <Badge variant={org.role === 'commissioner' ? 'default' : 'secondary'}>
                   {org.role}
-                </span>
+                </Badge>
               </div>
               {org.role === 'commissioner' && (
-                <Link
-                  href={`/orgs/${org.id}`}
-                  className="text-sm text-blue-600 hover:text-blue-700"
-                >
-                  Manage
-                </Link>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href={`/orgs/${org.id}`}>Manage</Link>
+                </Button>
               )}
-            </div>
-            <div className="divide-y divide-gray-200">
+            </CardHeader>
+            <div className="divide-y divide-border">
               {org.pools.length === 0 ? (
-                <div className="px-6 py-6 text-center text-gray-500 text-sm">
+                <div className="px-6 py-6 text-center text-muted-foreground text-sm">
                   No pools in this organization yet.
                 </div>
               ) : (
@@ -243,41 +242,43 @@ export default async function DashboardPage() {
                   <Link
                     key={pool.id}
                     href={`/pools/${pool.id}`}
-                    className="block px-6 py-4 hover:bg-gray-50"
+                    className="block px-6 py-4 hover:bg-muted/50 transition-colors"
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <div className="text-sm font-medium text-gray-900">{pool.name}</div>
+                        <div className="text-sm font-medium text-foreground">{pool.name}</div>
                         {pool.season_label && (
-                          <div className="text-sm text-gray-500">{pool.season_label}</div>
+                          <div className="text-sm text-muted-foreground">{pool.season_label}</div>
                         )}
                       </div>
                       <div className="flex items-center gap-2">
                         {pool.membership_status === 'discoverable' && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            Join
-                          </span>
+                          <Badge className="bg-accent text-accent-foreground">Join</Badge>
                         )}
                         {pool.membership_status === 'pending' && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                            Pending
-                          </span>
+                          <Badge variant="outline" className="border-yellow-500 text-yellow-600">Pending</Badge>
                         )}
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          pool.status === 'open' ? 'bg-green-100 text-green-800' :
-                          pool.status === 'completed' ? 'bg-blue-100 text-blue-800' :
-                          pool.status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
+                        <Badge
+                          variant={
+                            pool.status === 'open' ? 'default' :
+                            pool.status === 'completed' ? 'secondary' :
+                            'outline'
+                          }
+                          className={
+                            pool.status === 'open' ? 'bg-primary' :
+                            pool.status === 'draft' ? 'border-yellow-500 text-yellow-600' :
+                            ''
+                          }
+                        >
                           {pool.status === 'completed' ? 'Completed' : pool.status}
-                        </span>
+                        </Badge>
                       </div>
                     </div>
                   </Link>
                 ))
               )}
             </div>
-          </div>
+          </Card>
         ))
       )}
     </div>

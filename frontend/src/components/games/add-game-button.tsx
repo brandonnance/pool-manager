@@ -4,6 +4,19 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { TeamAutocomplete } from './team-autocomplete'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 
 interface Team {
   id: string
@@ -163,206 +176,186 @@ export function AddGameButton({ poolId, teams }: AddGameButtonProps) {
     setIsLoading(false)
   }
 
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open)
+    if (!open) {
+      resetForm()
+    }
+  }
+
   return (
-    <>
-      <button
-        onClick={() => setIsOpen(true)}
-        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-      >
-        Add Game
-      </button>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogTrigger asChild>
+        <Button>Add Game</Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Add Bowl Game</DialogTitle>
+          <DialogDescription>
+            Add a new bowl game to this pool.
+          </DialogDescription>
+        </DialogHeader>
 
-      {isOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              Add Bowl Game
-            </h2>
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-4 py-4">
+            {/* Game Name */}
+            <div className="space-y-2">
+              <Label htmlFor="gameName">Bowl Name</Label>
+              <Input
+                id="gameName"
+                value={gameName}
+                onChange={(e) => setGameName(e.target.value)}
+                placeholder="e.g., Rose Bowl"
+              />
+            </div>
 
-            <form onSubmit={handleSubmit}>
-              <div className="space-y-4">
-                {/* Game Name */}
-                <div>
-                  <label htmlFor="gameName" className="block text-sm font-medium text-gray-700 mb-1">
-                    Bowl Name
-                  </label>
-                  <input
-                    type="text"
-                    id="gameName"
-                    value={gameName}
-                    onChange={(e) => setGameName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="e.g., Rose Bowl"
-                  />
-                </div>
+            {/* Away Team */}
+            <TeamAutocomplete
+              teams={localTeams}
+              selectedTeamId={awayTeamId}
+              onSelect={setAwayTeamId}
+              label="Away Team"
+              id="awayTeam"
+              placeholder="Search for away team..."
+            />
 
-                {/* Away Team */}
-                <TeamAutocomplete
-                  teams={localTeams}
-                  selectedTeamId={awayTeamId}
-                  onSelect={setAwayTeamId}
-                  label="Away Team"
-                  id="awayTeam"
-                  placeholder="Search for away team..."
-                />
+            {/* Home Team */}
+            <TeamAutocomplete
+              teams={localTeams}
+              selectedTeamId={homeTeamId}
+              onSelect={setHomeTeamId}
+              label="Home Team"
+              id="homeTeam"
+              placeholder="Search for home team..."
+            />
 
-                {/* Home Team */}
-                <TeamAutocomplete
-                  teams={localTeams}
-                  selectedTeamId={homeTeamId}
-                  onSelect={setHomeTeamId}
-                  label="Home Team"
-                  id="homeTeam"
-                  placeholder="Search for home team..."
-                />
-
-                {/* Add New Team Toggle */}
-                {!showNewTeamForm ? (
+            {/* Add New Team Toggle */}
+            {!showNewTeamForm ? (
+              <button
+                type="button"
+                onClick={() => setShowNewTeamForm(true)}
+                className="text-sm text-primary hover:text-primary/80"
+              >
+                + Add a new team
+              </button>
+            ) : (
+              <div className="bg-muted p-4 rounded-md space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium">New Team</span>
                   <button
                     type="button"
-                    onClick={() => setShowNewTeamForm(true)}
-                    className="text-sm text-blue-600 hover:text-blue-700"
+                    onClick={() => setShowNewTeamForm(false)}
+                    className="text-sm text-muted-foreground hover:text-foreground"
                   >
-                    + Add a new team
+                    Cancel
                   </button>
-                ) : (
-                  <div className="bg-gray-50 p-4 rounded-md space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-gray-700">New Team</span>
-                      <button
-                        type="button"
-                        onClick={() => setShowNewTeamForm(false)}
-                        className="text-sm text-gray-500 hover:text-gray-700"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <input
-                        type="text"
-                        value={newTeamName}
-                        onChange={(e) => setNewTeamName(e.target.value)}
-                        placeholder="Team name"
-                        className="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                      />
-                      <input
-                        type="text"
-                        value={newTeamAbbrev}
-                        onChange={(e) => setNewTeamAbbrev(e.target.value)}
-                        placeholder="Abbrev (e.g., OSU)"
-                        className="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleAddTeam}
-                      disabled={isLoading || !newTeamName.trim()}
-                      className="w-full px-3 py-2 text-sm border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 disabled:opacity-50"
-                    >
-                      Add Team
-                    </button>
-                  </div>
-                )}
-
-                {/* Kickoff Date */}
-                <div>
-                  <label htmlFor="kickoffDate" className="block text-sm font-medium text-gray-700 mb-1">
-                    Kickoff Date
-                  </label>
-                  <input
-                    type="date"
-                    id="kickoffDate"
-                    value={kickoffDate}
-                    onChange={(e) => setKickoffDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input
+                    value={newTeamName}
+                    onChange={(e) => setNewTeamName(e.target.value)}
+                    placeholder="Team name"
+                  />
+                  <Input
+                    value={newTeamAbbrev}
+                    onChange={(e) => setNewTeamAbbrev(e.target.value)}
+                    placeholder="Abbrev (e.g., OSU)"
                   />
                 </div>
-
-                {/* Kickoff Time */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Kickoff Time
-                  </label>
-                  <div className="flex gap-2">
-                    <select
-                      value={kickoffHour}
-                      onChange={(e) => setKickoffHour(e.target.value)}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      {[12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((h) => (
-                        <option key={h} value={h}>{h}</option>
-                      ))}
-                    </select>
-                    <span className="flex items-center text-gray-500">:</span>
-                    <select
-                      value={kickoffMinute}
-                      onChange={(e) => setKickoffMinute(e.target.value)}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      {['00', '15', '30', '45'].map((m) => (
-                        <option key={m} value={m}>{m}</option>
-                      ))}
-                    </select>
-                    <select
-                      value={kickoffAmPm}
-                      onChange={(e) => setKickoffAmPm(e.target.value as 'AM' | 'PM')}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="AM">AM</option>
-                      <option value="PM">PM</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Home Team Spread */}
-                <div>
-                  <label htmlFor="homeSpread" className="block text-sm font-medium text-gray-700 mb-1">
-                    Home Team Spread
-                  </label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    id="homeSpread"
-                    value={homeSpread}
-                    onChange={(e) => setHomeSpread(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="e.g., -7.5 (negative = home favored)"
-                  />
-                  <p className="mt-1 text-xs text-gray-500">
-                    Negative = home team favored, Positive = away team favored
-                  </p>
-                </div>
-              </div>
-
-              {error && (
-                <div className="mt-4 p-3 bg-red-50 text-red-700 rounded-md text-sm">
-                  {error}
-                </div>
-              )}
-
-              <div className="mt-6 flex justify-end space-x-3">
-                <button
+                <Button
                   type="button"
-                  onClick={() => {
-                    setIsOpen(false)
-                    resetForm()
-                  }}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleAddTeam}
+                  disabled={isLoading || !newTeamName.trim()}
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isLoading ? 'Adding...' : 'Add Game'}
-                </button>
+                  Add Team
+                </Button>
               </div>
-            </form>
+            )}
+
+            {/* Kickoff Date */}
+            <div className="space-y-2">
+              <Label htmlFor="kickoffDate">Kickoff Date</Label>
+              <Input
+                type="date"
+                id="kickoffDate"
+                value={kickoffDate}
+                onChange={(e) => setKickoffDate(e.target.value)}
+              />
+            </div>
+
+            {/* Kickoff Time */}
+            <div className="space-y-2">
+              <Label>Kickoff Time</Label>
+              <div className="flex gap-2">
+                <select
+                  value={kickoffHour}
+                  onChange={(e) => setKickoffHour(e.target.value)}
+                  className="flex-1 h-10 px-3 rounded-md border border-input bg-background text-sm"
+                >
+                  {[12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((h) => (
+                    <option key={h} value={h}>{h}</option>
+                  ))}
+                </select>
+                <span className="flex items-center text-muted-foreground">:</span>
+                <select
+                  value={kickoffMinute}
+                  onChange={(e) => setKickoffMinute(e.target.value)}
+                  className="flex-1 h-10 px-3 rounded-md border border-input bg-background text-sm"
+                >
+                  {['00', '15', '30', '45'].map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+                <select
+                  value={kickoffAmPm}
+                  onChange={(e) => setKickoffAmPm(e.target.value as 'AM' | 'PM')}
+                  className="flex-1 h-10 px-3 rounded-md border border-input bg-background text-sm"
+                >
+                  <option value="AM">AM</option>
+                  <option value="PM">PM</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Home Team Spread */}
+            <div className="space-y-2">
+              <Label htmlFor="homeSpread">Home Team Spread</Label>
+              <Input
+                type="number"
+                step="0.5"
+                id="homeSpread"
+                value={homeSpread}
+                onChange={(e) => setHomeSpread(e.target.value)}
+                placeholder="e.g., -7.5 (negative = home favored)"
+              />
+              <p className="text-xs text-muted-foreground">
+                Negative = home team favored, Positive = away team favored
+              </p>
+            </div>
+
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
           </div>
-        </div>
-      )}
-    </>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => handleOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? 'Adding...' : 'Add Game'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   )
 }

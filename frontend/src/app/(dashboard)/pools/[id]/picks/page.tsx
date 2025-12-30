@@ -25,6 +25,7 @@ export default async function PoolPicksPage({ params }: PageProps) {
       name,
       org_id,
       status,
+      demo_mode,
       organizations (name)
     `)
     .eq('id', id)
@@ -171,8 +172,8 @@ export default async function PoolPicksPage({ params }: PageProps) {
 
     cfpExistingPicks = cfpPicks ?? []
 
-    // Check if CFP is locked
-    cfpIsLocked = cfpConfig.cfp_lock_at ? new Date() >= new Date(cfpConfig.cfp_lock_at) : false
+    // Check if CFP is locked (unless demo_mode is enabled)
+    cfpIsLocked = pool.demo_mode ? false : (cfpConfig.cfp_lock_at ? new Date() >= new Date(cfpConfig.cfp_lock_at) : false)
   }
 
   return (
@@ -251,6 +252,7 @@ export default async function PoolPicksPage({ params }: PageProps) {
                 entryId={entry.id}
                 poolGames={bowlGames}
                 picksMap={bowlPicksMap}
+                demoMode={pool.demo_mode}
               />
             )}
           </>
