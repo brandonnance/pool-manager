@@ -755,6 +755,195 @@ export type Database = {
         }
         Relationships: []
       }
+      sq_games: {
+        Row: {
+          away_score: number | null
+          away_team: string
+          created_at: string | null
+          display_order: number | null
+          game_name: string
+          game_time: string | null
+          halftime_away_score: number | null
+          halftime_home_score: number | null
+          halftime_payout: number | null
+          home_score: number | null
+          home_team: string
+          id: string
+          normal_payout: number | null
+          pays_halftime: boolean | null
+          reverse_payout: number | null
+          round: string
+          sq_pool_id: string
+          status: string | null
+        }
+        Insert: {
+          away_score?: number | null
+          away_team: string
+          created_at?: string | null
+          display_order?: number | null
+          game_name: string
+          game_time?: string | null
+          halftime_away_score?: number | null
+          halftime_home_score?: number | null
+          halftime_payout?: number | null
+          home_score?: number | null
+          home_team: string
+          id?: string
+          normal_payout?: number | null
+          pays_halftime?: boolean | null
+          reverse_payout?: number | null
+          round: string
+          sq_pool_id: string
+          status?: string | null
+        }
+        Update: {
+          away_score?: number | null
+          away_team?: string
+          created_at?: string | null
+          display_order?: number | null
+          game_name?: string
+          game_time?: string | null
+          halftime_away_score?: number | null
+          halftime_home_score?: number | null
+          halftime_payout?: number | null
+          home_score?: number | null
+          home_team?: string
+          id?: string
+          normal_payout?: number | null
+          pays_halftime?: boolean | null
+          reverse_payout?: number | null
+          round?: string
+          sq_pool_id?: string
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sq_games_sq_pool_id_fkey"
+            columns: ["sq_pool_id"]
+            isOneToOne: false
+            referencedRelation: "sq_pools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sq_pools: {
+        Row: {
+          col_numbers: number[] | null
+          created_at: string | null
+          id: string
+          max_squares_per_player: number | null
+          numbers_locked: boolean | null
+          pool_id: string
+          reverse_scoring: boolean | null
+          row_numbers: number[] | null
+        }
+        Insert: {
+          col_numbers?: number[] | null
+          created_at?: string | null
+          id?: string
+          max_squares_per_player?: number | null
+          numbers_locked?: boolean | null
+          pool_id: string
+          reverse_scoring?: boolean | null
+          row_numbers?: number[] | null
+        }
+        Update: {
+          col_numbers?: number[] | null
+          created_at?: string | null
+          id?: string
+          max_squares_per_player?: number | null
+          numbers_locked?: boolean | null
+          pool_id?: string
+          reverse_scoring?: boolean | null
+          row_numbers?: number[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sq_pools_pool_id_fkey"
+            columns: ["pool_id"]
+            isOneToOne: true
+            referencedRelation: "pools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sq_squares: {
+        Row: {
+          claimed_at: string | null
+          col_index: number
+          id: string
+          row_index: number
+          sq_pool_id: string
+          user_id: string | null
+        }
+        Insert: {
+          claimed_at?: string | null
+          col_index: number
+          id?: string
+          row_index: number
+          sq_pool_id: string
+          user_id?: string | null
+        }
+        Update: {
+          claimed_at?: string | null
+          col_index?: number
+          id?: string
+          row_index?: number
+          sq_pool_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sq_squares_sq_pool_id_fkey"
+            columns: ["sq_pool_id"]
+            isOneToOne: false
+            referencedRelation: "sq_pools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sq_winners: {
+        Row: {
+          created_at: string | null
+          id: string
+          payout: number | null
+          sq_game_id: string
+          square_id: string | null
+          win_type: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          payout?: number | null
+          sq_game_id: string
+          square_id?: string | null
+          win_type: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          payout?: number | null
+          sq_game_id?: string
+          square_id?: string | null
+          win_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sq_winners_sq_game_id_fkey"
+            columns: ["sq_game_id"]
+            isOneToOne: false
+            referencedRelation: "sq_games"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sq_winners_square_id_fkey"
+            columns: ["square_id"]
+            isOneToOne: false
+            referencedRelation: "sq_squares"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -771,6 +960,7 @@ export type Database = {
         }
         Returns: number
       }
+      get_game_winner: { Args: { p_game_id: string }; Returns: string }
       is_bowl_pick_locked: {
         Args: { p_pool_game_id: string }
         Returns: boolean
