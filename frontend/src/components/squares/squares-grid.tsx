@@ -38,6 +38,8 @@ interface Member {
   display_name: string
 }
 
+export type LegendMode = 'full_playoff' | 'single_game' | 'score_change'
+
 export interface SquaresGridProps {
   sqPoolId: string
   poolId: string
@@ -53,6 +55,7 @@ export interface SquaresGridProps {
   winningSquareRounds?: Map<string, WinningRound>
   homeTeamLabel?: string
   awayTeamLabel?: string
+  legendMode?: LegendMode
   className?: string
 }
 
@@ -71,6 +74,7 @@ export function SquaresGrid({
   winningSquareRounds = new Map(),
   homeTeamLabel = 'Home',
   awayTeamLabel = 'Away',
+  legendMode = 'full_playoff',
   className,
 }: SquaresGridProps) {
   const router = useRouter()
@@ -389,26 +393,62 @@ export function SquaresGrid({
           <div className="size-4 rounded border border-border bg-card" />
           <span>Claimed</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <div className="size-4 rounded border border-amber-400 bg-amber-100" />
-          <span>Wild Card</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="size-4 rounded border border-emerald-400 bg-emerald-100" />
-          <span>Divisional</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="size-4 rounded border border-red-400 bg-red-100" />
-          <span>Conference</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="size-4 rounded border border-violet-300 bg-violet-50" />
-          <span>SB Halftime</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="size-4 rounded border border-purple-400 bg-purple-100" />
-          <span>Super Bowl</span>
-        </div>
+        {legendMode === 'full_playoff' ? (
+          <>
+            <div className="flex items-center gap-1.5">
+              <div className="size-4 rounded border border-amber-400 bg-amber-100" />
+              <span>Wild Card</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="size-4 rounded border border-emerald-400 bg-emerald-100" />
+              <span>Divisional</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="size-4 rounded border border-red-400 bg-red-100" />
+              <span>Conference</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="size-4 rounded border border-violet-300 bg-violet-50" />
+              <span>SB Halftime</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="size-4 rounded border border-purple-400 bg-purple-100" />
+              <span>Super Bowl</span>
+            </div>
+          </>
+        ) : legendMode === 'score_change' ? (
+          <>
+            <div className="flex items-center gap-1.5">
+              <div className="size-4 rounded border border-emerald-400 bg-emerald-100" />
+              <span>Forward</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="size-4 rounded border border-rose-400 bg-rose-100" />
+              <span>Reverse</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="size-4 rounded border border-purple-400 bg-gradient-to-br from-emerald-100 from-50% to-rose-100 to-50%" />
+              <span>Both</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="size-4 rounded border border-purple-400 bg-purple-100" />
+              <span>Final</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="size-4 rounded border border-fuchsia-400 bg-fuchsia-100" />
+              <span>Final Rev</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="size-4 rounded border border-violet-400 bg-gradient-to-br from-purple-100 from-50% to-fuchsia-100 to-50%" />
+              <span>Final Both</span>
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center gap-1.5">
+            <div className="size-4 rounded border border-teal-400 bg-teal-100" />
+            <span>Winner</span>
+          </div>
+        )}
       </div>
 
       {/* Admin Assignment Dialog */}

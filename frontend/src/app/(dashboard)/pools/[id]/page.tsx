@@ -6,6 +6,7 @@ import { JoinPoolButton } from '@/components/pools/join-pool-button'
 import { CreateEntryButton } from '@/components/pools/create-entry-button'
 import { PoolStandings } from '@/components/standings/pool-standings'
 import { PlayoffSquaresContent } from '@/components/squares/playoff-squares-content'
+import { SingleGameSquaresContent } from '@/components/squares/single-game-squares-content'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -139,10 +140,22 @@ export default async function PoolDetailPage({ params }: PageProps) {
     away_score: number | null
     halftime_home_score: number | null
     halftime_away_score: number | null
+    q1_home_score: number | null
+    q1_away_score: number | null
+    q3_home_score: number | null
+    q3_away_score: number | null
     round: string
     status: string | null
     pays_halftime: boolean | null
     display_order: number | null
+  }> = []
+  let sqScoreChangesData: Array<{
+    id: string
+    sq_game_id: string | null
+    home_score: number
+    away_score: number
+    change_order: number
+    created_at: string | null
   }> = []
   let sqWinnersData: Array<{
     id: string
@@ -196,6 +209,16 @@ export default async function PoolDetailPage({ params }: PageProps) {
           .select('*')
           .in('sq_game_id', gameIds)
         sqWinnersData = winners ?? []
+
+        // Get score changes (for single_game mode with score_change scoring)
+        if (sqPool.mode === 'single_game' && sqPool.scoring_mode === 'score_change') {
+          const { data: scoreChanges } = await supabase
+            .from('sq_score_changes')
+            .select('*')
+            .in('sq_game_id', gameIds)
+            .order('change_order', { ascending: true })
+          sqScoreChangesData = scoreChanges ?? []
+        }
       }
     }
   }
@@ -405,7 +428,40 @@ export default async function PoolDetailPage({ params }: PageProps) {
       </Card>
 
       {/* Main Content - Conditional based on pool type */}
-      {pool.type === 'playoff_squares' && sqPoolData ? (
+      {pool.type === 'playoff_squares' && sqPoolData && sqPoolData.mode === 'single_game' ? (
+        <SingleGameSquaresContent
+          pool={{
+            id: pool.id,
+            name: pool.name,
+            status: pool.status,
+            visibility: pool.visibility,
+          }}
+          sqPool={{
+            id: sqPoolData.id,
+            pool_id: sqPoolData.pool_id,
+            reverse_scoring: sqPoolData.reverse_scoring,
+            max_squares_per_player: sqPoolData.max_squares_per_player,
+            numbers_locked: sqPoolData.numbers_locked,
+            row_numbers: sqPoolData.row_numbers,
+            col_numbers: sqPoolData.col_numbers,
+            mode: sqPoolData.mode,
+            scoring_mode: sqPoolData.scoring_mode,
+            q1_payout: sqPoolData.q1_payout,
+            halftime_payout: sqPoolData.halftime_payout,
+            q3_payout: sqPoolData.q3_payout,
+            final_payout: sqPoolData.final_payout,
+            per_change_payout: sqPoolData.per_change_payout,
+            final_bonus_payout: sqPoolData.final_bonus_payout,
+          }}
+          squares={squaresForGrid}
+          game={sqGamesData[0]}
+          winners={sqWinnersData}
+          scoreChanges={sqScoreChangesData}
+          currentUserId={user.id}
+          isCommissioner={isCommissioner}
+          isMember={isMember}
+        />
+      ) : pool.type === 'playoff_squares' && sqPoolData ? (
         <PlayoffSquaresContent
           pool={{
             id: pool.id,

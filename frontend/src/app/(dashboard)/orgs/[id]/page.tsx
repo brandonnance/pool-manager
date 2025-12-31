@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { CreatePoolButton } from '@/components/pools/create-pool-button'
+import { DeletePoolButton } from '@/components/pools/delete-pool-button'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -144,8 +145,17 @@ export default async function OrgDetailPage({ params }: PageProps) {
               <Link
                 key={pool.id}
                 href={`/pools/${pool.id}`}
-                className="block bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6"
+                className="block bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6 relative"
               >
+                {isSuperAdmin && (
+                  <div className="absolute top-2 right-2 z-10">
+                    <DeletePoolButton
+                      poolId={pool.id}
+                      poolName={pool.name}
+                      poolType={pool.type}
+                    />
+                  </div>
+                )}
                 <div className="flex justify-between items-start mb-2">
                   <h3 className="text-lg font-semibold text-gray-900">
                     {pool.name}
@@ -156,12 +166,12 @@ export default async function OrgDetailPage({ params }: PageProps) {
                       : pool.status === 'draft'
                       ? 'bg-yellow-100 text-yellow-800'
                       : 'bg-gray-100 text-gray-800'
-                  }`}>
+                  } ${isSuperAdmin ? 'mr-6' : ''}`}>
                     {pool.status}
                   </span>
                 </div>
                 <p className="text-sm text-gray-600 mb-3">
-                  {pool.type === 'bowl_buster' ? 'Bowl Buster' : pool.type}
+                  {pool.type === 'bowl_buster' ? 'Bowl Buster' : pool.type === 'playoff_squares' ? 'Playoff Squares' : pool.type}
                   {pool.season_label && ` - ${pool.season_label}`}
                 </p>
                 <div className="flex justify-between items-center text-sm">

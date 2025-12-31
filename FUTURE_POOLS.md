@@ -1,7 +1,7 @@
 # BN Pools - Future Pool Types Roadmap
 
 ## Current State
-- **Bowl Buster** ✅ Complete and live at pools.brandon-nance.com
+- **Bowl Buster** - Complete and live at pools.brandon-nance.com
   - Bowl game picks with margin-of-victory scoring
   - CFP bracket picker
   - Demo mode for testing
@@ -10,126 +10,41 @@
 
 ## Pool Type #1: NFL Playoff Squares
 
+### Status: IMPLEMENTED
+
 ### Overview
 Classic 10x10 squares grid for NFL playoff games. Players claim squares, numbers are randomly assigned after grid is full, and winners are determined by the last digit of each team's score.
 
-### Core Mechanics
-- **Grid**: 10x10 = 100 squares
-- **Axes**: Rows = Home team score (last digit), Columns = Away team score (last digit)
-- **Number Assignment**: Random 0-9 assigned to each axis AFTER all squares are claimed
-- **Winning**: Match the last digit of each team's final score to find winning square
+### Implemented Features
+- [x] 10x10 grid with visual ownership display
+- [x] Click-to-claim squares (members can claim/unclaim before numbers locked)
+- [x] Commissioner can assign/reassign squares to any member
+- [x] Random number generation for row/column axes
+- [x] Configurable max squares per player
+- [x] Reverse scoring option (both forward and reverse winners)
+- [x] Halftime scoring for Super Bowl
+- [x] 13 NFL playoff games pre-structured (Wild Card, Divisional, Conference, Super Bowl)
+- [x] Color-coded winners by round:
+  - Wild Card: Amber
+  - Divisional: Emerald
+  - Conference: Red
+  - Super Bowl Halftime: Violet
+  - Super Bowl Final: Purple
+- [x] Commissioner score entry for each game
+- [x] Automatic winner calculation based on score digits
+- [x] Payout leaderboard showing total winnings per player
+- [x] Team labels on grid axes
+- [x] Grid legend showing all colors
+- [x] Your squares highlighted in sky blue
 
-### Configuration Options
-| Setting | Default | Description |
-|---------|---------|-------------|
-| Max squares per player | Unlimited | Optional limit on squares per person |
-| Reverse scoring | On | Both (H=3,A=7) and (H=7,A=3) win |
-| Halftime scoring | Super Bowl only | Pay out at halftime for specific games |
-| Grid view mode | Random | Toggle: "Random" (original positions) or "Ordered" (0-9 sorted) |
-
-### Payout Structure
-- Fixed payout per game for normal winner
-- Fixed payout per game for reverse winner (if different square)
-- Payout amounts increase by round:
-  - Wild Card: $X
-  - Divisional: $Y
-  - Conference Championship: $Z
-  - Super Bowl: $W (includes halftime payout)
-- If same square wins both normal + reverse (e.g., 0-0, 5-5), that person gets both prizes
-
-### NFL Playoff Structure
-Games are pre-populated with the standard bracket (team names optional/cosmetic):
-- **Wild Card Round**: 6 games (3 AFC, 3 NFC)
-- **Divisional Round**: 4 games (2 AFC, 2 NFC)
-- **Conference Championships**: 2 games (AFC, NFC)
-- **Super Bowl**: 1 game (includes halftime payout)
-- **Total**: 13 games
-
-Commissioner can optionally add team names for display, but scoring works regardless.
-
-### User Flow
-1. **Commissioner creates pool** → Sets payout structure, reverse on/off
-2. **Games auto-populate** → 13 playoff games with round labels
-3. **Players join and claim squares** → Click on available squares in grid UI
-4. **Grid fills up** → Commissioner locks grid and triggers number randomization
-5. **Games play out** → Commissioner enters scores, system auto-determines winners
-6. **Payouts tracked** → Show who won what per game
-
-### Database Schema (Proposed)
-
-```sql
--- Squares pool configuration
-CREATE TABLE sq_pools (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  pool_id UUID REFERENCES pools(id) ON DELETE CASCADE,
-  reverse_scoring BOOLEAN DEFAULT true,
-  max_squares_per_player INTEGER, -- NULL = unlimited
-  numbers_locked BOOLEAN DEFAULT false,
-  row_numbers INTEGER[], -- [0-9] shuffled, NULL until locked
-  col_numbers INTEGER[], -- [0-9] shuffled, NULL until locked
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
--- Individual squares ownership
-CREATE TABLE sq_squares (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  sq_pool_id UUID REFERENCES sq_pools(id) ON DELETE CASCADE,
-  row_index INTEGER NOT NULL CHECK (row_index >= 0 AND row_index <= 9),
-  col_index INTEGER NOT NULL CHECK (col_index >= 0 AND col_index <= 9),
-  user_id UUID REFERENCES auth.users(id),
-  claimed_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(sq_pool_id, row_index, col_index)
-);
-
--- Games included in the squares pool
-CREATE TABLE sq_games (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  sq_pool_id UUID REFERENCES sq_pools(id) ON DELETE CASCADE,
-  game_name TEXT NOT NULL, -- "Chiefs vs Ravens - Divisional"
-  home_team TEXT NOT NULL,
-  away_team TEXT NOT NULL,
-  home_score INTEGER,
-  away_score INTEGER,
-  round TEXT, -- 'wild_card', 'divisional', 'conference', 'super_bowl'
-  pays_halftime BOOLEAN DEFAULT false,
-  halftime_home_score INTEGER,
-  halftime_away_score INTEGER,
-  status TEXT DEFAULT 'scheduled', -- scheduled, in_progress, final
-  game_time TIMESTAMPTZ,
-  normal_payout DECIMAL(10,2),
-  reverse_payout DECIMAL(10,2),
-  halftime_payout DECIMAL(10,2)
-);
-
--- Winners log
-CREATE TABLE sq_winners (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  sq_game_id UUID REFERENCES sq_games(id) ON DELETE CASCADE,
-  square_id UUID REFERENCES sq_squares(id),
-  win_type TEXT NOT NULL, -- 'normal', 'reverse', 'halftime', 'halftime_reverse'
-  payout DECIMAL(10,2),
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-```
-
-### UI Components Needed
-- **SquaresGrid** - 10x10 clickable grid showing ownership
-- **SquareCell** - Individual square with owner name/initials, highlight on hover
-- **NumbersOverlay** - Show row/column numbers after reveal
-- **ClaimSquareButton** - Click to claim available square
-- **GameScoreCard** - Show game, score, winning square highlighted
-- **PayoutSummary** - Who won what across all games
-
-### Key Features
-- [ ] Visual grid with color-coded ownership (your squares highlighted in distinct color)
-- [ ] Click-to-claim squares before numbers revealed
-- [ ] Animated number reveal when commissioner locks grid
-- [ ] Toggle: View grid in random order vs. sorted 0-9 order
-- [ ] Won squares get special shading/highlight (cumulative across games)
-- [ ] Leaderboard showing total winnings per player
-- [ ] Manual score entry by commissioner
+### Database Schema (Implemented)
+- `sq_pools` - Pool configuration (reverse_scoring, max_squares_per_player, numbers_locked, row_numbers, col_numbers, mode)
+- `sq_squares` - Individual square ownership
+- `sq_games` - Games with scores, round, status
+- `sq_winners` - Winner records with win_type and payout
 
 ### Future Enhancements
+- [ ] Animated number reveal when commissioner locks grid
 - [ ] Live score API integration
 - [ ] "Current winning square" highlight during live games
 - [ ] Push notifications when your square wins
@@ -138,75 +53,59 @@ CREATE TABLE sq_winners (
 
 ## Pool Type #2: Single Game Squares (Super Bowl Squares)
 
+### Status: MOSTLY IMPLEMENTED
+
 ### Overview
 Same 10x10 grid mechanics as NFL Playoff Squares, but for a single game with more granular scoring options.
 
-### Scoring Options (Commissioner Picks One)
+### Scoring Mode A: Every Score Change - IMPLEMENTED
+- [x] Game starts 0-0 with automatic first winner
+- [x] Every score change during game creates winners
+- [x] Forward winner (green) and reverse winner (red) for each score
+- [x] Both forward + reverse shown with diagonal gradient split
+- [x] Score change log with newest first
+- [x] Commissioner can add score changes via dialog
+- [x] Validation: scores cannot decrease
+- [x] Validation: only one team can score at a time
+- [x] Validation: score must change from previous entry
+- [x] Delete score change with cascade warning
+- [x] Final score winners highlighted in purple/fuchsia
+- [x] Final Score Winners card with prominent display
+- [x] Payout leaderboard
 
-#### Option A: Every Score Change
-- Game starts 0-0 → automatic first winner (forward + reverse if enabled)
-- Every score change during the game creates a winner
-- Forward winner gets set payout
-- Reverse winner gets set payout (if enabled)
-- Final score winner gets remaining pot after all payouts
+### Scoring Mode B: Quarter Scoring (Traditional) - NOT TESTED
+- [x] Database and UI support exists
+- [x] Q1, Halftime, Q3, Final score entry
+- [ ] Needs end-to-end testing
 
-**Example flow:**
-| Score | Forward Winner | Reverse Winner |
-|-------|---------------|----------------|
-| 0-0 (start) | 0-0 square | 0-0 square |
-| 7-0 | 7-0 square | 0-7 square |
-| 7-3 | 7-3 square | 3-7 square |
-| 14-3 | 4-3 square | 3-4 square |
-| ... | ... | ... |
-| Final: 31-17 | 1-7 square (BIG payout) | 7-1 square |
+### Color Scheme (Score Change Mode)
+| State | Color |
+|-------|-------|
+| Forward winner | Emerald/Green |
+| Reverse winner | Rose/Red |
+| Both forward + reverse | Green/Rose diagonal gradient |
+| Final forward | Purple |
+| Final reverse | Fuchsia |
+| Final both | Purple/Fuchsia diagonal gradient |
 
-#### Option B: Quarter Scoring (Traditional)
-- **End of Q1**: Forward + Reverse winners
-- **Halftime**: Forward + Reverse winners
-- **End of Q3**: Forward + Reverse winners
-- **Final Score**: Forward + Reverse winners (includes OT)
+### Database Additions (Implemented)
+- `sq_pools.mode` - 'full_playoff' or 'single_game'
+- `sq_pools.scoring_mode` - 'quarter' or 'score_change'
+- `sq_pools.q1_payout`, `halftime_payout`, `q3_payout`, `final_payout`
+- `sq_pools.per_change_payout`, `final_bonus_payout`
+- `sq_score_changes` - Track all score changes with order
+- Win types: 'score_change', 'score_change_reverse', 'score_change_final', 'score_change_final_reverse', 'q1', 'q1_reverse', 'q3', 'q3_reverse'
 
-**Payout structure**: Commissioner sets payout per quarter (can be equal or escalating)
-
-### Configuration Options
-| Setting | Default | Description |
-|---------|---------|-------------|
-| Scoring mode | Quarter | "Every Score Change" or "Quarter Scoring" |
-| Reverse scoring | On | Pay reverse winners |
-| Per-change payout | $X | (Score Change mode) Fixed payout per score change |
-| Final score bonus | Remainder | (Score Change mode) What's left after payouts |
-| Q1 payout | $X | (Quarter mode) |
-| Halftime payout | $X | (Quarter mode) |
-| Q3 payout | $X | (Quarter mode) |
-| Final payout | $X | (Quarter mode) |
-
-### Database Additions
-```sql
--- Extends sq_pools for single game mode
-ALTER TABLE sq_pools ADD COLUMN scoring_mode TEXT DEFAULT 'quarter'; -- 'quarter' or 'score_change'
-ALTER TABLE sq_pools ADD COLUMN per_change_payout DECIMAL(10,2);
-ALTER TABLE sq_pools ADD COLUMN final_bonus_payout DECIMAL(10,2);
-
--- For score change mode, track all score changes
-CREATE TABLE sq_score_changes (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  sq_game_id UUID REFERENCES sq_games(id) ON DELETE CASCADE,
-  home_score INTEGER NOT NULL,
-  away_score INTEGER NOT NULL,
-  change_order INTEGER NOT NULL, -- 1, 2, 3...
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-```
-
-### UI Additions
-- **Scoring mode selector** in pool creation
-- **Live score change log** for "Every Score Change" mode
-- **Quarter score entry** for traditional mode
-- **Running payout tracker** showing cumulative winnings
+### Remaining Work
+- [ ] Test quarter scoring mode end-to-end
+- [ ] Verify payout calculations are correct
+- [ ] Consider live score API integration
 
 ---
 
 ## Pool Type #3: March Madness Blind Draw
+
+### Status: DESIGNED, NOT IMPLEMENTED
 
 ### Overview
 64-player pool where each player is randomly assigned one NCAA tournament team. Advancement is based on **covering the spread**, not just winning. The twist: you always inherit the WINNING team, so even underdogs have a fair shot.
@@ -246,16 +145,6 @@ CREATE TABLE sq_score_changes (
 | Final Four | 4 | Z% each |
 | Runner-up | 1 | A% |
 | Champion | 1 | B% |
-
-### Configuration Options
-| Setting | Default | Description |
-|---------|---------|-------------|
-| Entry fee | $X | Cost per entry |
-| Sweet 16 payout % | TBD | % of pot for reaching Sweet 16 |
-| Elite 8 payout % | TBD | % of pot for reaching Elite 8 |
-| Final Four payout % | TBD | % of pot for reaching Final Four |
-| Runner-up payout % | TBD | % of pot for runner-up |
-| Champion payout % | TBD | % of pot for champion |
 
 ### Database Schema (Proposed)
 
@@ -316,22 +205,6 @@ CREATE TABLE mm_games (
 );
 ```
 
-### UI Components Needed
-- **BlindDrawGrid** - Show all 64 players and their current teams
-- **BracketView** - Standard tournament bracket with spread info
-- **TeamCard** - Team with seed, owner, and elimination status
-- **SpreadEntry** - Commissioner enters game spreads
-- **ResultsEntry** - Commissioner enters final scores
-- **PayoutTracker** - Who has cashed and for how much
-
-### Key Features
-- [ ] Random team assignment (triggered by commissioner after First Four)
-- [ ] Visual bracket showing ownership and spreads
-- [ ] Team inheritance when advancing via non-cover
-- [ ] Automatic advancement calculation based on spread
-- [ ] Round-by-round payout distribution
-- [ ] "My Journey" view showing your team history
-
 ### Complexity Notes
 - Need to handle spread ties (push) - typically goes to favorite?
 - Commissioner needs to enter spreads before each round (or pull from API)
@@ -341,19 +214,23 @@ CREATE TABLE mm_games (
 
 ## Pool Type #4: NFL Survivor (Future)
 
+### Status: NOT DESIGNED
+
 *To be designed - Pick one team per week, can't reuse, eliminated on loss*
 
 ---
 
 ## Pool Type #5: Weekly Pick'em (Future)
 
+### Status: NOT DESIGNED
+
 *To be designed - Pick winners each week, straight up or against spread*
 
 ---
 
 ## Implementation Priority
-1. **NFL Playoff Squares** - January timing, unique visual UI
-2. **Single Game Squares** - Super Bowl timing, shares grid UI with #1
+1. **NFL Playoff Squares** - DONE
+2. **Single Game Squares** - DONE (needs quarter mode testing)
 3. **March Madness Blind Draw** - March timing, spread-based advancement
 4. **NFL Survivor** - September timing, simple mechanics
 5. **Weekly Pick'em** - Anytime, most flexible

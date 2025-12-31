@@ -5,6 +5,7 @@ import { MemberActions } from '@/components/members/member-actions'
 import { GenerateLinkButton } from '@/components/members/generate-link-button'
 import { CopyLinkButton } from '@/components/members/copy-link-button'
 import { DeleteLinkButton } from '@/components/members/delete-link-button'
+import { AddOrgMemberButton } from '@/components/members/add-org-member-button'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -87,6 +88,37 @@ export default async function PoolMembersPage({ params }: PageProps) {
     .eq('pool_id', id)
     .order('created_at', { ascending: false })
 
+  // Get org members who are NOT already pool members
+  const existingPoolMemberIds = new Set(memberships?.map(m => m.user_id) ?? [])
+
+  const { data: orgMembers } = await supabase
+    .from('org_memberships')
+    .select('user_id, role')
+    .eq('org_id', pool.org_id)
+
+  // Filter out users already in pool and get their profiles
+  const addableOrgMemberIds = orgMembers
+    ?.filter(om => !existingPoolMemberIds.has(om.user_id))
+    .map(om => om.user_id) ?? []
+
+  const { data: addableProfiles } = addableOrgMemberIds.length > 0
+    ? await supabase
+        .from('profiles')
+        .select('id, display_name')
+        .in('id', addableOrgMemberIds)
+    : { data: [] }
+
+  const addableProfileMap = new Map(addableProfiles?.map(p => [p.id, p.display_name]) ?? [])
+
+  const addableOrgMembers = orgMembers
+    ?.filter(om => !existingPoolMemberIds.has(om.user_id))
+    .map(om => ({
+      userId: om.user_id,
+      displayName: addableProfileMap.get(om.user_id) ?? null,
+      role: om.role,
+    }))
+    .sort((a, b) => (a.displayName ?? '').localeCompare(b.displayName ?? '')) ?? []
+
   return (
     <div>
       {/* Breadcrumb */}
@@ -127,6 +159,7 @@ export default async function PoolMembersPage({ params }: PageProps) {
             )}
           </p>
         </div>
+        <AddOrgMemberButton poolId={id} orgMembers={addableOrgMembers} />
       </div>
 
       {/* Pending Requests Section */}

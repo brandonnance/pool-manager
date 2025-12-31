@@ -158,6 +158,7 @@ export function PlayoffSquaresContent({
               canClaim={canClaim}
               isCommissioner={isCommissioner}
               winningSquareRounds={winningSquareRounds}
+              legendMode="full_playoff"
             />
           </CardContent>
         </Card>

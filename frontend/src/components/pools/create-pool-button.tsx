@@ -23,6 +23,8 @@ interface CreatePoolButtonProps {
 }
 
 type PoolType = 'bowl_buster' | 'playoff_squares'
+type SquaresMode = 'full_playoff' | 'single_game'
+type ScoringMode = 'quarter' | 'score_change'
 
 // NFL Playoff games template
 const NFL_PLAYOFF_GAMES = [
@@ -54,6 +56,13 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
   // Playoff Squares specific options
   const [reverseScoring, setReverseScoring] = useState(true)
   const [maxSquaresPerPlayer, setMaxSquaresPerPlayer] = useState('')
+
+  // Single Game Squares mode options
+  const [squaresMode, setSquaresMode] = useState<SquaresMode>('full_playoff')
+  const [scoringMode, setScoringMode] = useState<ScoringMode>('quarter')
+  const [gameName, setGameName] = useState('')
+  const [homeTeam, setHomeTeam] = useState('')
+  const [awayTeam, setAwayTeam] = useState('')
 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -121,6 +130,8 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
           pool_id: pool.id,
           reverse_scoring: reverseScoring,
           max_squares_per_player: maxSquares,
+          mode: squaresMode,
+          scoring_mode: squaresMode === 'single_game' ? scoringMode : null,
         })
         .select()
         .single()
@@ -131,26 +142,48 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
         return
       }
 
-      // Create the 13 NFL playoff games
-      const gamesToInsert = NFL_PLAYOFF_GAMES.map((game) => ({
-        sq_pool_id: sqPool.id,
-        game_name: game.game_name,
-        home_team: game.home_team,
-        away_team: game.away_team,
-        round: game.round,
-        display_order: game.display_order,
-        pays_halftime: game.pays_halftime ?? false,
-        status: 'scheduled',
-      }))
+      if (squaresMode === 'full_playoff') {
+        // Create the 13 NFL playoff games
+        const gamesToInsert = NFL_PLAYOFF_GAMES.map((game) => ({
+          sq_pool_id: sqPool.id,
+          game_name: game.game_name,
+          home_team: game.home_team,
+          away_team: game.away_team,
+          round: game.round,
+          display_order: game.display_order,
+          pays_halftime: game.pays_halftime ?? false,
+          status: 'scheduled',
+        }))
 
-      const { error: gamesError } = await supabase
-        .from('sq_games')
-        .insert(gamesToInsert)
+        const { error: gamesError } = await supabase
+          .from('sq_games')
+          .insert(gamesToInsert)
 
-      if (gamesError) {
-        setError(gamesError.message)
-        setIsLoading(false)
-        return
+        if (gamesError) {
+          setError(gamesError.message)
+          setIsLoading(false)
+          return
+        }
+      } else {
+        // Single Game mode - create just one game
+        const { error: gameError } = await supabase
+          .from('sq_games')
+          .insert({
+            sq_pool_id: sqPool.id,
+            game_name: gameName || 'Game',
+            home_team: homeTeam || 'TBD',
+            away_team: awayTeam || 'TBD',
+            round: 'single_game',
+            display_order: 1,
+            pays_halftime: scoringMode === 'quarter', // Quarter mode pays halftime
+            status: 'scheduled',
+          })
+
+        if (gameError) {
+          setError(gameError.message)
+          setIsLoading(false)
+          return
+        }
       }
     }
 
@@ -166,6 +199,11 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
     setPoolType('bowl_buster')
     setReverseScoring(true)
     setMaxSquaresPerPlayer('')
+    setSquaresMode('full_playoff')
+    setScoringMode('quarter')
+    setGameName('')
+    setHomeTeam('')
+    setAwayTeam('')
     setError(null)
   }
 
@@ -246,7 +284,107 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
             {/* Playoff Squares specific options */}
             {poolType === 'playoff_squares' && (
               <div className="space-y-4 border-t pt-4">
-                <div className="text-sm font-medium">Squares Options</div>
+                {/* Mode Selection */}
+                <div className="space-y-2">
+                  <Label>Squares Mode</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSquaresMode('full_playoff')}
+                      className={`p-3 rounded-lg border text-left transition-all ${
+                        squaresMode === 'full_playoff'
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border hover:border-muted-foreground'
+                      }`}
+                    >
+                      <div className="font-medium text-sm">Full Playoff</div>
+                      <div className="text-xs text-muted-foreground">13 NFL playoff games</div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSquaresMode('single_game')}
+                      className={`p-3 rounded-lg border text-left transition-all ${
+                        squaresMode === 'single_game'
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border hover:border-muted-foreground'
+                      }`}
+                    >
+                      <div className="font-medium text-sm">Single Game</div>
+                      <div className="text-xs text-muted-foreground">One game (Super Bowl, etc.)</div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Single Game Options */}
+                {squaresMode === 'single_game' && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="gameName">Game Name</Label>
+                      <Input
+                        id="gameName"
+                        value={gameName}
+                        onChange={(e) => setGameName(e.target.value)}
+                        placeholder="Super Bowl LIX"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="awayTeam">Away Team (optional)</Label>
+                        <Input
+                          id="awayTeam"
+                          value={awayTeam}
+                          onChange={(e) => setAwayTeam(e.target.value)}
+                          placeholder="TBD"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="homeTeam">Home Team (optional)</Label>
+                        <Input
+                          id="homeTeam"
+                          value={homeTeam}
+                          onChange={(e) => setHomeTeam(e.target.value)}
+                          placeholder="TBD"
+                        />
+                      </div>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Teams can be set later once matchups are known
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Scoring Mode</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setScoringMode('quarter')}
+                          className={`p-3 rounded-lg border text-left transition-all ${
+                            scoringMode === 'quarter'
+                              ? 'border-primary bg-primary/10'
+                              : 'border-border hover:border-muted-foreground'
+                          }`}
+                        >
+                          <div className="font-medium text-sm">Quarter Scoring</div>
+                          <div className="text-xs text-muted-foreground">Q1, Half, Q3, Final</div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setScoringMode('score_change')}
+                          className={`p-3 rounded-lg border text-left transition-all ${
+                            scoringMode === 'score_change'
+                              ? 'border-primary bg-primary/10'
+                              : 'border-border hover:border-muted-foreground'
+                          }`}
+                        >
+                          <div className="font-medium text-sm">Every Score</div>
+                          <div className="text-xs text-muted-foreground">Winner on each score change</div>
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                <div className="text-sm font-medium pt-2">Grid Options</div>
 
                 <div className="flex items-center justify-between">
                   <div>
