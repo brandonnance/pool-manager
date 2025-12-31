@@ -95,11 +95,21 @@ export default async function OrgDetailPage({ params }: PageProps) {
               {memberCount} member{memberCount !== 1 ? 's' : ''} &middot; Created {org.created_at ? new Date(org.created_at).toLocaleDateString() : ''}
             </p>
           </div>
-          {isCommissioner && (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-              {isSuperAdmin ? 'Super Admin' : 'Commissioner'}
-            </span>
-          )}
+          <div className="flex items-center gap-3">
+            {isCommissioner && (
+              <>
+                <Link
+                  href={`/orgs/${id}/members`}
+                  className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
+                >
+                  Manage Members
+                </Link>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  {isSuperAdmin ? 'Super Admin' : 'Commissioner'}
+                </span>
+              </>
+            )}
+          </div>
         </div>
       </div>
 

@@ -5,6 +5,7 @@ import { PoolSettings } from '@/components/pools/pool-settings'
 import { JoinPoolButton } from '@/components/pools/join-pool-button'
 import { CreateEntryButton } from '@/components/pools/create-entry-button'
 import { PoolStandings } from '@/components/standings/pool-standings'
+import { PlayoffSquaresContent } from '@/components/squares/playoff-squares-content'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -109,13 +110,121 @@ export default async function PoolDetailPage({ params }: PageProps) {
     .eq('pool_id', id)
     .eq('status', 'pending')
 
-  // Get user's entry if they have one
-  const { data: entry } = await supabase
-    .from('bb_entries')
-    .select('id')
-    .eq('pool_id', id)
-    .eq('user_id', user.id)
-    .single()
+  // Get user's entry if they have one (Bowl Buster only)
+  const { data: entry } = pool.type === 'bowl_buster'
+    ? await supabase
+        .from('bb_entries')
+        .select('id')
+        .eq('pool_id', id)
+        .eq('user_id', user.id)
+        .single()
+    : { data: null }
+
+  // ============================================
+  // PLAYOFF SQUARES DATA FETCHING
+  // ============================================
+  let sqPoolData = null
+  let sqSquaresData: Array<{
+    id: string
+    row_index: number
+    col_index: number
+    user_id: string | null
+  }> = []
+  let sqGamesData: Array<{
+    id: string
+    game_name: string
+    home_team: string
+    away_team: string
+    home_score: number | null
+    away_score: number | null
+    halftime_home_score: number | null
+    halftime_away_score: number | null
+    round: string
+    status: string | null
+    pays_halftime: boolean | null
+    display_order: number | null
+  }> = []
+  let sqWinnersData: Array<{
+    id: string
+    sq_game_id: string
+    square_id: string | null
+    win_type: string
+    payout: number | null
+  }> = []
+  let sqOwnerProfiles = new Map<string, string | null>()
+
+  if (pool.type === 'playoff_squares') {
+    // Get sq_pool config
+    const { data: sqPool } = await supabase
+      .from('sq_pools')
+      .select('*')
+      .eq('pool_id', id)
+      .single()
+    sqPoolData = sqPool
+
+    if (sqPool) {
+      // Get all squares
+      const { data: squares } = await supabase
+        .from('sq_squares')
+        .select('id, row_index, col_index, user_id')
+        .eq('sq_pool_id', sqPool.id)
+      sqSquaresData = squares ?? []
+
+      // Get owner profiles
+      const ownerIds = [...new Set(sqSquaresData.filter(s => s.user_id).map(s => s.user_id!))]
+      if (ownerIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, display_name')
+          .in('id', ownerIds)
+        profiles?.forEach(p => sqOwnerProfiles.set(p.id, p.display_name))
+      }
+
+      // Get all games
+      const { data: games } = await supabase
+        .from('sq_games')
+        .select('*')
+        .eq('sq_pool_id', sqPool.id)
+        .order('display_order', { ascending: true })
+      sqGamesData = games ?? []
+
+      // Get all winners
+      const gameIds = sqGamesData.map((g) => g.id)
+      if (gameIds.length > 0) {
+        const { data: winners } = await supabase
+          .from('sq_winners')
+          .select('*')
+          .in('sq_game_id', gameIds)
+        sqWinnersData = winners ?? []
+      }
+    }
+  }
+
+  // Transform squares data for component
+  const squaresForGrid = sqSquaresData.map((sq) => {
+    const displayName = sq.user_id ? sqOwnerProfiles.get(sq.user_id) : null
+    // Generate initials from display name (e.g., "John Doe" -> "JD")
+    const initials = displayName
+      ? displayName
+          .split(' ')
+          .map((n) => n[0])
+          .join('')
+          .toUpperCase()
+          .slice(0, 2)
+      : null
+    return {
+      id: sq.id,
+      row_index: sq.row_index,
+      col_index: sq.col_index,
+      user_id: sq.user_id,
+      owner_name: displayName ?? null,
+      owner_initials: initials,
+    }
+  })
+
+  // ============================================
+  // BOWL BUSTER DATA FETCHING
+  // ============================================
 
   // Calculate standings - get all entries with their picks and game results
   const { data: entriesData } = await supabase
@@ -259,7 +368,7 @@ export default async function PoolDetailPage({ params }: PageProps) {
                 </Badge>
               </div>
               <p className="text-muted-foreground mt-1">
-                {pool.type === 'bowl_buster' ? 'Bowl Buster' : pool.type}
+                {pool.type === 'bowl_buster' ? 'Bowl Buster' : pool.type === 'playoff_squares' ? 'Playoff Squares' : pool.type}
                 {pool.season_label && ` - ${pool.season_label}`}
               </p>
               <p className="text-sm text-muted-foreground mt-2">
@@ -268,9 +377,21 @@ export default async function PoolDetailPage({ params }: PageProps) {
             </div>
             <div className="flex items-center gap-3">
               {isCommissioner && (
-                <Badge variant="secondary" className="bg-primary/10 text-primary">
-                  Commissioner
-                </Badge>
+                <>
+                  <Link href={`/pools/${id}/members`}>
+                    <Button variant="outline" size="sm">
+                      Manage Members
+                      {(pendingMemberCount ?? 0) > 0 && (
+                        <span className="ml-1.5 inline-flex items-center justify-center size-5 rounded-full bg-amber-500 text-white text-xs font-medium">
+                          {pendingMemberCount}
+                        </span>
+                      )}
+                    </Button>
+                  </Link>
+                  <Badge variant="secondary" className="bg-primary/10 text-primary">
+                    Commissioner
+                  </Badge>
+                </>
               )}
               {!isMember && !isPending && !isCommissioner && <JoinPoolButton poolId={id} />}
               {isPending && (
@@ -283,7 +404,41 @@ export default async function PoolDetailPage({ params }: PageProps) {
         </CardContent>
       </Card>
 
-      {/* Main Content */}
+      {/* Main Content - Conditional based on pool type */}
+      {pool.type === 'playoff_squares' && sqPoolData ? (
+        <PlayoffSquaresContent
+          pool={{
+            id: pool.id,
+            name: pool.name,
+            status: pool.status,
+            visibility: pool.visibility,
+          }}
+          sqPool={{
+            id: sqPoolData.id,
+            pool_id: sqPoolData.pool_id,
+            reverse_scoring: sqPoolData.reverse_scoring,
+            max_squares_per_player: sqPoolData.max_squares_per_player,
+            numbers_locked: sqPoolData.numbers_locked,
+            row_numbers: sqPoolData.row_numbers,
+            col_numbers: sqPoolData.col_numbers,
+          }}
+          squares={squaresForGrid}
+          games={sqGamesData}
+          winners={sqWinnersData}
+          currentUserId={user.id}
+          isCommissioner={isCommissioner}
+          isMember={isMember}
+        />
+      ) : pool.type === 'playoff_squares' && !sqPoolData ? (
+        <Card>
+          <CardContent className="py-8 text-center">
+            <h2 className="text-lg font-semibold text-foreground mb-2">Pool Not Configured</h2>
+            <p className="text-muted-foreground">
+              This Playoff Squares pool hasn&apos;t been set up yet.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Left Column - Games/Picks */}
         <div className="lg:col-span-2 space-y-6">
@@ -436,6 +591,7 @@ export default async function PoolDetailPage({ params }: PageProps) {
           </Card>
         </div>
       </div>
+      )}
     </div>
   )
 }
