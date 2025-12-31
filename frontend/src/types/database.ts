@@ -771,6 +771,10 @@ export type Database = {
           id: string
           normal_payout: number | null
           pays_halftime: boolean | null
+          q1_away_score: number | null
+          q1_home_score: number | null
+          q3_away_score: number | null
+          q3_home_score: number | null
           reverse_payout: number | null
           round: string
           sq_pool_id: string
@@ -791,6 +795,10 @@ export type Database = {
           id?: string
           normal_payout?: number | null
           pays_halftime?: boolean | null
+          q1_away_score?: number | null
+          q1_home_score?: number | null
+          q3_away_score?: number | null
+          q3_home_score?: number | null
           reverse_payout?: number | null
           round: string
           sq_pool_id: string
@@ -811,6 +819,10 @@ export type Database = {
           id?: string
           normal_payout?: number | null
           pays_halftime?: boolean | null
+          q1_away_score?: number | null
+          q1_home_score?: number | null
+          q3_away_score?: number | null
+          q3_home_score?: number | null
           reverse_payout?: number | null
           round?: string
           sq_pool_id?: string
@@ -830,32 +842,56 @@ export type Database = {
         Row: {
           col_numbers: number[] | null
           created_at: string | null
+          final_bonus_payout: number | null
+          final_payout: number | null
+          halftime_payout: number | null
           id: string
           max_squares_per_player: number | null
+          mode: string | null
           numbers_locked: boolean | null
+          per_change_payout: number | null
           pool_id: string
+          q1_payout: number | null
+          q3_payout: number | null
           reverse_scoring: boolean | null
           row_numbers: number[] | null
+          scoring_mode: string | null
         }
         Insert: {
           col_numbers?: number[] | null
           created_at?: string | null
+          final_bonus_payout?: number | null
+          final_payout?: number | null
+          halftime_payout?: number | null
           id?: string
           max_squares_per_player?: number | null
+          mode?: string | null
           numbers_locked?: boolean | null
+          per_change_payout?: number | null
           pool_id: string
+          q1_payout?: number | null
+          q3_payout?: number | null
           reverse_scoring?: boolean | null
           row_numbers?: number[] | null
+          scoring_mode?: string | null
         }
         Update: {
           col_numbers?: number[] | null
           created_at?: string | null
+          final_bonus_payout?: number | null
+          final_payout?: number | null
+          halftime_payout?: number | null
           id?: string
           max_squares_per_player?: number | null
+          mode?: string | null
           numbers_locked?: boolean | null
+          per_change_payout?: number | null
           pool_id?: string
+          q1_payout?: number | null
+          q3_payout?: number | null
           reverse_scoring?: boolean | null
           row_numbers?: number[] | null
+          scoring_mode?: string | null
         }
         Relationships: [
           {
@@ -863,6 +899,41 @@ export type Database = {
             columns: ["pool_id"]
             isOneToOne: true
             referencedRelation: "pools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sq_score_changes: {
+        Row: {
+          away_score: number
+          change_order: number
+          created_at: string | null
+          home_score: number
+          id: string
+          sq_game_id: string | null
+        }
+        Insert: {
+          away_score: number
+          change_order: number
+          created_at?: string | null
+          home_score: number
+          id?: string
+          sq_game_id?: string | null
+        }
+        Update: {
+          away_score?: number
+          change_order?: number
+          created_at?: string | null
+          home_score?: number
+          id?: string
+          sq_game_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sq_score_changes_sq_game_id_fkey"
+            columns: ["sq_game_id"]
+            isOneToOne: false
+            referencedRelation: "sq_games"
             referencedColumns: ["id"]
           },
         ]

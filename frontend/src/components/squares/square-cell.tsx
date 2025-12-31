@@ -29,7 +29,58 @@ const winningColors = {
     currentUser: 'bg-violet-200 border-violet-400',
     text: 'text-violet-600',
   },
+  single_game: {
+    normal: 'bg-teal-100 border-teal-400',
+    currentUser: 'bg-teal-300 border-teal-500',
+    text: 'text-teal-700',
+  },
+  // Single game forward/reverse scoring colors
+  score_change_forward: {
+    normal: 'bg-emerald-100 border-emerald-400',
+    currentUser: 'bg-emerald-300 border-emerald-500',
+    text: 'text-emerald-700',
+  },
+  score_change_reverse: {
+    normal: 'bg-rose-100 border-rose-400',
+    currentUser: 'bg-rose-300 border-rose-500',
+    text: 'text-rose-700',
+  },
+  // Both forward and reverse - uses gradient (handled specially in getStateClasses)
+  score_change_both: {
+    normal: 'border-purple-400',
+    currentUser: 'border-purple-500',
+    text: 'text-purple-700',
+  },
+  // Final score winners (purple)
+  score_change_final: {
+    normal: 'bg-purple-100 border-purple-400',
+    currentUser: 'bg-purple-300 border-purple-500',
+    text: 'text-purple-700',
+  },
+  score_change_final_reverse: {
+    normal: 'bg-fuchsia-100 border-fuchsia-400',
+    currentUser: 'bg-fuchsia-300 border-fuchsia-500',
+    text: 'text-fuchsia-700',
+  },
+  // Both final forward and reverse - uses gradient
+  score_change_final_both: {
+    normal: 'border-violet-400',
+    currentUser: 'border-violet-500',
+    text: 'text-violet-700',
+  },
 } as const
+
+// Gradient backgrounds for "both" winning state (diagonal split)
+const bothGradient = {
+  normal: 'bg-gradient-to-br from-emerald-100 from-50% to-rose-100 to-50%',
+  currentUser: 'bg-gradient-to-br from-emerald-300 from-50% to-rose-300 to-50%',
+}
+
+// Gradient for final score "both" state (purple/fuchsia)
+const finalBothGradient = {
+  normal: 'bg-gradient-to-br from-purple-100 from-50% to-fuchsia-100 to-50%',
+  currentUser: 'bg-gradient-to-br from-purple-300 from-50% to-fuchsia-300 to-50%',
+}
 
 export type WinningRound = keyof typeof winningColors | null
 
@@ -92,6 +143,18 @@ export function SquareCell({
     if (isWinning && winningRound) {
       // Winning square - use round-specific colors
       const colors = winningColors[winningRound]
+      // Special handling for "both" state with diagonal gradient
+      if (winningRound === 'score_change_both') {
+        const gradient = isCurrentUser ? bothGradient.currentUser : bothGradient.normal
+        const border = isCurrentUser ? colors.currentUser : colors.normal
+        return cn(base, gradient, border)
+      }
+      // Special handling for final score "both" state with diagonal gradient
+      if (winningRound === 'score_change_final_both') {
+        const gradient = isCurrentUser ? finalBothGradient.currentUser : finalBothGradient.normal
+        const border = isCurrentUser ? colors.currentUser : colors.normal
+        return cn(base, gradient, border)
+      }
       return cn(base, isCurrentUser ? colors.currentUser : colors.normal)
     }
 
