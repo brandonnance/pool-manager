@@ -37,11 +37,19 @@ export default async function PoolMembersPage({ params }: PageProps) {
     notFound()
   }
 
-  // Check if commissioner
+  // Check if org admin
   const { data: orgMembership } = await supabase
     .from('org_memberships')
     .select('role')
     .eq('org_id', pool.org_id)
+    .eq('user_id', user.id)
+    .single()
+
+  // Check if pool commissioner
+  const { data: poolMembership } = await supabase
+    .from('pool_memberships')
+    .select('role')
+    .eq('pool_id', id)
     .eq('user_id', user.id)
     .single()
 
@@ -52,16 +60,17 @@ export default async function PoolMembersPage({ params }: PageProps) {
     .single()
 
   const isSuperAdmin = profile?.is_super_admin ?? false
-  const isCommissioner = orgMembership?.role === 'commissioner' || isSuperAdmin
+  const isOrgAdmin = orgMembership?.role === 'admin' || isSuperAdmin
+  const isPoolCommissioner = poolMembership?.role === 'commissioner' || isOrgAdmin
 
-  if (!isCommissioner) {
+  if (!isPoolCommissioner) {
     notFound()
   }
 
   // Get all pool memberships with user profiles
   const { data: memberships } = await supabase
     .from('pool_memberships')
-    .select('id, user_id, status, created_at, approved_at, approved_by')
+    .select('id, user_id, status, role, created_at, approved_at, approved_by')
     .eq('pool_id', id)
     .order('created_at', { ascending: false })
 
@@ -208,6 +217,9 @@ export default async function PoolMembersPage({ params }: PageProps) {
                           status={membership.status}
                           userName={userProfile?.display_name || 'this user'}
                           currentUserId={user.id}
+                          memberRole={membership.role}
+                          isOrgAdmin={isOrgAdmin}
+                          memberId={membership.user_id}
                         />
                       </td>
                     </tr>
@@ -238,6 +250,9 @@ export default async function PoolMembersPage({ params }: PageProps) {
                     User
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Role
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Joined
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -261,6 +276,15 @@ export default async function PoolMembersPage({ params }: PageProps) {
                           {userProfile?.display_name || 'Unknown User'}
                         </div>
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {membership.role === 'commissioner' ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            Commissioner
+                          </span>
+                        ) : (
+                          <span className="text-sm text-gray-500">Member</span>
+                        )}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {membership.approved_at
                           ? new Date(membership.approved_at).toLocaleDateString()
@@ -278,6 +302,9 @@ export default async function PoolMembersPage({ params }: PageProps) {
                           status={membership.status}
                           userName={userProfile?.display_name || 'this user'}
                           currentUserId={user.id}
+                          memberRole={membership.role}
+                          isOrgAdmin={isOrgAdmin}
+                          memberId={membership.user_id}
                         />
                       </td>
                     </tr>

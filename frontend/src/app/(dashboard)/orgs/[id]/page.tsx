@@ -44,7 +44,7 @@ export default async function OrgDetailPage({ params }: PageProps) {
     .single()
 
   const isSuperAdmin = profile?.is_super_admin ?? false
-  const isCommissioner = membership?.role === 'commissioner' || isSuperAdmin
+  const isOrgAdmin = membership?.role === 'admin' || isSuperAdmin
 
   // Get pools in this org
   const { data: pools } = await supabase
@@ -60,7 +60,8 @@ export default async function OrgDetailPage({ params }: PageProps) {
       pool_memberships (
         id,
         user_id,
-        status
+        status,
+        role
       )
     `)
     .eq('org_id', id)
@@ -97,7 +98,7 @@ export default async function OrgDetailPage({ params }: PageProps) {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            {isCommissioner && (
+            {isOrgAdmin && (
               <>
                 <Link
                   href={`/orgs/${id}/members`}
@@ -106,7 +107,7 @@ export default async function OrgDetailPage({ params }: PageProps) {
                   Manage Members
                 </Link>
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  {isSuperAdmin ? 'Super Admin' : 'Commissioner'}
+                  {isSuperAdmin ? 'Super Admin' : 'Admin'}
                 </span>
               </>
             )}
@@ -117,18 +118,18 @@ export default async function OrgDetailPage({ params }: PageProps) {
       {/* Pools Section */}
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-semibold text-gray-900">Pools</h2>
-        {isCommissioner && <CreatePoolButton orgId={id} />}
+        {isOrgAdmin && <CreatePoolButton orgId={id} />}
       </div>
 
       {!pools || pools.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-lg shadow">
           <h3 className="text-lg font-medium text-gray-900 mb-2">No pools yet</h3>
           <p className="text-gray-600 mb-4">
-            {isCommissioner
+            {isOrgAdmin
               ? 'Create your first pool to get started.'
-              : 'The commissioner hasn\'t created any pools yet.'}
+              : 'The admin hasn\'t created any pools yet.'}
           </p>
-          {isCommissioner && <CreatePoolButton orgId={id} />}
+          {isOrgAdmin && <CreatePoolButton orgId={id} />}
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -139,7 +140,8 @@ export default async function OrgDetailPage({ params }: PageProps) {
             const poolMemberCount = pool.pool_memberships?.filter(
               (pm) => pm.status === 'approved'
             ).length ?? 0
-            const isPoolCommissioner = isCommissioner || pool.created_by === user.id
+            // Pool commissioner = explicit pool role OR org admin (implicit rights)
+            const isPoolCommissioner = myMembership?.role === 'commissioner' || isOrgAdmin
 
             return (
               <Link
@@ -147,12 +149,13 @@ export default async function OrgDetailPage({ params }: PageProps) {
                 href={`/pools/${pool.id}`}
                 className="block bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6 relative"
               >
-                {isSuperAdmin && (
+                {isOrgAdmin && (
                   <div className="absolute top-2 right-2 z-10">
                     <DeletePoolButton
                       poolId={pool.id}
                       poolName={pool.name}
                       poolType={pool.type}
+                      orgId={id}
                     />
                   </div>
                 )}
@@ -166,7 +169,7 @@ export default async function OrgDetailPage({ params }: PageProps) {
                       : pool.status === 'draft'
                       ? 'bg-yellow-100 text-yellow-800'
                       : 'bg-gray-100 text-gray-800'
-                  } ${isSuperAdmin ? 'mr-6' : ''}`}>
+                  } ${isOrgAdmin ? 'mr-6' : ''}`}>
                     {pool.status}
                   </span>
                 </div>

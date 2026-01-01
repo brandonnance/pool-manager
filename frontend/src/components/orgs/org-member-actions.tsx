@@ -10,7 +10,7 @@ interface OrgMemberActionsProps {
   role: string
   userName: string
   isCurrentUser: boolean
-  commissionerCount: number
+  adminCount: number
 }
 
 export function OrgMemberActions({
@@ -19,14 +19,14 @@ export function OrgMemberActions({
   role,
   userName,
   isCurrentUser,
-  commissionerCount,
+  adminCount,
 }: OrgMemberActionsProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
   const handlePromote = async () => {
-    if (!confirm(`Are you sure you want to promote ${userName} to commissioner?`)) {
+    if (!confirm(`Are you sure you want to promote ${userName} to admin?`)) {
       return
     }
 
@@ -36,7 +36,7 @@ export function OrgMemberActions({
     const supabase = createClient()
     const { error: updateError } = await supabase
       .from('org_memberships')
-      .update({ role: 'commissioner' })
+      .update({ role: 'admin' })
       .eq('id', membershipId)
 
     if (updateError) {
@@ -49,8 +49,8 @@ export function OrgMemberActions({
   }
 
   const handleDemote = async () => {
-    if (commissionerCount <= 1) {
-      setError('Cannot demote the last commissioner')
+    if (adminCount <= 1) {
+      setError('Cannot demote the last admin')
       return
     }
 
@@ -77,8 +77,8 @@ export function OrgMemberActions({
   }
 
   const handleRemove = async () => {
-    if (role === 'commissioner' && commissionerCount <= 1) {
-      setError('Cannot remove the last commissioner')
+    if (role === 'admin' && adminCount <= 1) {
+      setError('Cannot remove the last admin')
       return
     }
 
@@ -152,22 +152,22 @@ export function OrgMemberActions({
     return <span className="text-xs text-gray-400">-</span>
   }
 
-  if (role === 'commissioner') {
+  if (role === 'admin') {
     return (
       <div className="flex gap-2">
         <button
           onClick={handleDemote}
-          disabled={isLoading || commissionerCount <= 1}
+          disabled={isLoading || adminCount <= 1}
           className="px-3 py-1 text-xs font-medium text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-          title={commissionerCount <= 1 ? 'Cannot demote the last commissioner' : ''}
+          title={adminCount <= 1 ? 'Cannot demote the last admin' : ''}
         >
           {isLoading ? '...' : 'Demote'}
         </button>
         <button
           onClick={handleRemove}
-          disabled={isLoading || commissionerCount <= 1}
+          disabled={isLoading || adminCount <= 1}
           className="px-3 py-1 text-xs font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-          title={commissionerCount <= 1 ? 'Cannot remove the last commissioner' : ''}
+          title={adminCount <= 1 ? 'Cannot remove the last admin' : ''}
         >
           {isLoading ? '...' : 'Remove'}
         </button>

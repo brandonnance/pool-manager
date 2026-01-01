@@ -42,9 +42,9 @@ export default async function OrgMembersPage({ params }: PageProps) {
     .single()
 
   const isSuperAdmin = profile?.is_super_admin ?? false
-  const isCommissioner = membership?.role === 'commissioner' || isSuperAdmin
+  const isOrgAdmin = membership?.role === 'admin' || isSuperAdmin
 
-  if (!isCommissioner) {
+  if (!isOrgAdmin) {
     notFound()
   }
 
@@ -66,7 +66,7 @@ export default async function OrgMembersPage({ params }: PageProps) {
   const profileMap = new Map(profiles?.map(p => [p.id, p]) ?? [])
 
   // Count by role
-  const commissionerCount = memberships?.filter(m => m.role === 'commissioner').length ?? 0
+  const adminCount = memberships?.filter(m => m.role === 'admin').length ?? 0
   const memberCount = memberships?.filter(m => m.role === 'member').length ?? 0
 
   return (
@@ -95,7 +95,7 @@ export default async function OrgMembersPage({ params }: PageProps) {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Manage Members</h1>
           <p className="text-gray-600 mt-1">
-            {commissionerCount} commissioner{commissionerCount !== 1 ? 's' : ''} &middot; {memberCount} member{memberCount !== 1 ? 's' : ''}
+            {adminCount} admin{adminCount !== 1 ? 's' : ''} &middot; {memberCount} member{memberCount !== 1 ? 's' : ''}
           </p>
         </div>
       </div>
@@ -108,17 +108,17 @@ export default async function OrgMembersPage({ params }: PageProps) {
         </p>
       </div>
 
-      {/* Commissioners Section */}
+      {/* Admins Section */}
       <div className="mb-8">
         <h2 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
-          Commissioners
+          Admins
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-            {commissionerCount}
+            {adminCount}
           </span>
         </h2>
-        {commissionerCount === 0 ? (
+        {adminCount === 0 ? (
           <div className="text-center py-8 bg-white rounded-lg shadow">
-            <p className="text-gray-600">No commissioners found.</p>
+            <p className="text-gray-600">No admins found.</p>
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow overflow-x-auto">
@@ -137,7 +137,7 @@ export default async function OrgMembersPage({ params }: PageProps) {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {memberships?.filter(m => m.role === 'commissioner').map((membership) => {
+                {memberships?.filter(m => m.role === 'admin').map((membership) => {
                   const userProfile = profileMap.get(membership.user_id)
                   const isCurrentUser = membership.user_id === user.id
                   return (
@@ -162,7 +162,7 @@ export default async function OrgMembersPage({ params }: PageProps) {
                           role={membership.role}
                           userName={userProfile?.display_name || 'this user'}
                           isCurrentUser={isCurrentUser}
-                          commissionerCount={commissionerCount}
+                          adminCount={adminCount}
                         />
                       </td>
                     </tr>
@@ -224,7 +224,7 @@ export default async function OrgMembersPage({ params }: PageProps) {
                           role={membership.role}
                           userName={userProfile?.display_name || 'this user'}
                           isCurrentUser={false}
-                          commissionerCount={commissionerCount}
+                          adminCount={adminCount}
                         />
                       </td>
                     </tr>

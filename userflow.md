@@ -283,42 +283,42 @@ const isPoolCommissioner = poolMembership?.role === 'commissioner' || isOrgAdmin
 
 ## Migration Checklist
 
-### Phase 1: Database Schema
-- [ ] Create migration: add `tier` column to organizations (default 'free')
-- [ ] Create migration: rename org role 'commissioner' → 'admin'
-- [ ] Create migration: add `role` column to pool_memberships
-- [ ] Create migration: set pool creators as commissioners
-- [ ] Create migration: add pool creation trigger (auto-commissioner)
-- [ ] Create migration: update RLS helper functions
-- [ ] Create migration: update RLS policies
-- [ ] Regenerate TypeScript types
+### Phase 1: Database Schema ✅
+- [x] Create migration: add `tier` column to organizations (default 'free')
+- [x] Create migration: rename org role 'commissioner' → 'admin'
+- [x] Create migration: add `role` column to pool_memberships
+- [x] Create migration: set pool creators as commissioners
+- [x] Create migration: add pool creation trigger (auto-commissioner)
+- [x] Create migration: update RLS helper functions
+- [x] Create migration: update RLS policies
+- [x] Regenerate TypeScript types
 
-### Phase 2: Frontend - Org Level
-- [ ] Update org member actions (admin terminology)
-- [ ] Add self-service org creation to dashboard
-- [ ] Update org creation to set creator as admin
-- [ ] Update org member list to show admin/member roles
+### Phase 2: Frontend - Org Level ✅
+- [x] Update org member actions (admin terminology)
+- [x] Add self-service org creation to dashboard
+- [x] Update org creation to set creator as admin
+- [x] Update org member list to show admin/member roles
 
-### Phase 3: Frontend - Pool Level
-- [ ] Update pool permission checks (isOrgAdmin + isPoolCommissioner)
-- [ ] Add commissioner promotion UI for org admins
-- [ ] Hide delete pool from pool commissioners (only admins)
-- [ ] Update member management to show commissioner role
+### Phase 3: Frontend - Pool Level ✅
+- [x] Update pool permission checks (isOrgAdmin + isPoolCommissioner)
+- [x] Add commissioner promotion UI for org admins
+- [x] Hide delete pool from pool commissioners (only admins)
+- [x] Update member management to show commissioner role
 
-### Phase 4: Onboarding Wizard
-- [ ] Create `/onboarding` route with step-based UI
-- [ ] Step 1: Create organization
-- [ ] Step 2: Create first pool
-- [ ] Step 3: Add games (skippable)
-- [ ] Step 4: Invite friends
-- [ ] Redirect logic: new users with no orgs → wizard
-- [ ] Store wizard state (URL params or localStorage)
+### Phase 4: Onboarding Wizard ✅
+- [x] Create `/onboarding` route with step-based UI
+- [x] Step 1: Create organization
+- [x] Step 2: Create first pool
+- [x] Step 3: Add games (skippable)
+- [x] Step 4: Invite friends
+- [x] Redirect logic: new users with no orgs → wizard
+- [x] Store wizard state (URL params)
 
 ### Phase 5: Testing & Docs
 - [ ] Test all permission scenarios
 - [ ] Test onboarding flow end-to-end
-- [ ] Update CLAUDE.md with new role structure
-- [ ] Document the permission model for users
+- [x] Update CLAUDE.md with new role structure
+- [x] Document the permission model for users
 
 ---
 

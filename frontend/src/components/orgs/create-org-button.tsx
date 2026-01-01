@@ -51,13 +51,13 @@ export function CreateOrgButton() {
       return
     }
 
-    // Add the creator as commissioner
+    // Add the creator as admin
     const { error: memberError } = await supabase
       .from('org_memberships')
       .insert({
         org_id: org.id,
         user_id: user.id,
-        role: 'commissioner'
+        role: 'admin'
       })
 
     if (memberError) {

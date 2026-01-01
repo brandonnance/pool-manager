@@ -49,7 +49,7 @@ export default async function PoolCfpPage({ params }: PageProps) {
     .single()
 
   const isSuperAdmin = profile?.is_super_admin ?? false
-  const isCommissioner = orgMembership?.role === 'commissioner' || isSuperAdmin
+  const isCommissioner = orgMembership?.role === 'admin' || isSuperAdmin
 
   if (!isCommissioner) {
     notFound()

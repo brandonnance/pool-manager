@@ -51,15 +51,15 @@ export default async function PoolDetailPage({ params }: PageProps) {
     notFound()
   }
 
-  // Check if user is pool member
-  const { data: membership } = await supabase
+  // Check if user is pool member (including role)
+  const { data: poolMembership } = await supabase
     .from('pool_memberships')
-    .select('id, status')
+    .select('id, status, role')
     .eq('pool_id', id)
     .eq('user_id', user.id)
     .single()
 
-  // Check if commissioner (org commissioner or pool creator)
+  // Check if org admin
   const { data: orgMembership } = await supabase
     .from('org_memberships')
     .select('role')
@@ -75,13 +75,14 @@ export default async function PoolDetailPage({ params }: PageProps) {
     .single()
 
   const isSuperAdmin = profile?.is_super_admin ?? false
-  const isCommissioner =
-    orgMembership?.role === 'commissioner' ||
-    pool.created_by === user.id ||
-    isSuperAdmin
+  const isOrgAdmin = orgMembership?.role === 'admin' || isSuperAdmin
+  // Pool commissioner = explicit pool role OR org admin (implicit commissioner rights)
+  const isPoolCommissioner = poolMembership?.role === 'commissioner' || isOrgAdmin
+  // Keep isCommissioner as alias for backward compatibility in this file
+  const isCommissioner = isPoolCommissioner
 
-  const isMember = membership?.status === 'approved'
-  const isPending = membership?.status === 'pending'
+  const isMember = poolMembership?.status === 'approved'
+  const isPending = poolMembership?.status === 'pending'
 
   // Get pool games with status for completion tracking
   const { data: poolGamesData, count: gamesCount } = await supabase

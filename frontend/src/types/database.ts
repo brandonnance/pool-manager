@@ -633,16 +633,19 @@ export type Database = {
           created_at: string | null
           id: string
           name: string
+          tier: string
         }
         Insert: {
           created_at?: string | null
           id?: string
           name: string
+          tier?: string
         }
         Update: {
           created_at?: string | null
           id?: string
           name?: string
+          tier?: string
         }
         Relationships: []
       }
@@ -653,6 +656,7 @@ export type Database = {
           created_at: string | null
           id: string
           pool_id: string
+          role: string
           status: string
           user_id: string
         }
@@ -662,6 +666,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           pool_id: string
+          role?: string
           status?: string
           user_id: string
         }
@@ -671,6 +676,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           pool_id?: string
+          role?: string
           status?: string
           user_id?: string
         }
@@ -1037,6 +1043,7 @@ export type Database = {
         Returns: boolean
       }
       is_cfp_locked: { Args: { p_pool_id: string }; Returns: boolean }
+      is_org_admin: { Args: { p_org_id: string }; Returns: boolean }
       is_org_commissioner: { Args: { p_org_id: string }; Returns: boolean }
       is_pool_commissioner: { Args: { p_pool_id: string }; Returns: boolean }
       is_pool_member: { Args: { p_pool_id: string }; Returns: boolean }

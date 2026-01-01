@@ -37,6 +37,9 @@ A multi-tenant bowl pool management application built with Next.js 16 and Supaba
 - [x] Pool visibility - Commissioners can set pools to "invite_only" or "open_to_org"
 - [x] Pool discovery - Org members can see and join "open_to_org" pools from dashboard
 - [x] CFP auto-population - When games are marked final, next round games auto-populate with winners (DB trigger)
+- [x] User management & permissions system (4-tier role hierarchy)
+- [x] Onboarding wizard for new users (create org → pool → games → invite)
+- [x] Self-service org creation for any authenticated user
 
 ### MVP Complete!
 
@@ -60,6 +63,7 @@ pool-manager/
 │   │   │   │           ├── cfp/       # CFP bracket management
 │   │   │   │           ├── cfp-picks/ # CFP bracket picker
 │   │   │   │           └── members/   # Members management
+│   │   │   ├── onboarding/   # New user wizard (org → pool → games → invite)
 │   │   │   ├── join/[token]/ # Public join link redemption
 │   │   │   └── auth/callback/
 │   │   ├── components/
@@ -80,10 +84,10 @@ pool-manager/
 
 ### Core/Shared
 - `profiles` - User profiles with `is_super_admin` flag
-- `organizations` - Multi-tenant orgs
-- `org_memberships` - User roles in orgs (commissioner/member)
+- `organizations` - Multi-tenant orgs with `tier` field (free/basic/pro)
+- `org_memberships` - User roles in orgs (admin/member)
 - `pools` - Bowl pools within orgs
-- `pool_memberships` - User membership in pools (pending/approved)
+- `pool_memberships` - User membership in pools with `role` (commissioner/member) and `status` (pending/approved)
 - `join_links` - Invite links for pools
 - `audit_log` - Commissioner actions
 
@@ -117,6 +121,47 @@ pool-manager/
 | `frontend/src/components/members/member-actions.tsx` | Approve/reject/remove buttons |
 | `frontend/src/components/members/generate-link-button.tsx` | Create invite link modal |
 | `frontend/src/app/join/[token]/page.tsx` | Public join link redemption |
+| `frontend/src/app/onboarding/page.tsx` | New user onboarding wizard |
+
+## Role & Permissions System
+
+### Role Hierarchy (Top to Bottom)
+
+1. **Super Admin** (`profiles.is_super_admin = true`)
+   - Full access across all orgs, bypasses RLS
+   - Can create organizations
+
+2. **Org Admin** (`org_memberships.role = 'admin'`)
+   - Full org control: settings, members, billing (future)
+   - Can create/delete pools
+   - Can appoint other admins
+   - Implicit commissioner on ALL pools in org
+   - Can appoint pool commissioners
+
+3. **Pool Commissioner** (`pool_memberships.role = 'commissioner'`)
+   - Pool-specific management (multiple commissioners allowed per pool)
+   - Manage pool members (approve/reject/remove)
+   - Pool settings (visibility, activation, completion)
+   - Enter scores, manage games
+   - **Cannot** delete pool (only org admin can)
+   - **Cannot** appoint other commissioners (only org admin can)
+
+4. **Member** (`org_memberships.role = 'member'` / `pool_memberships.role = 'member'`)
+   - Invited via pool join links
+   - Auto-added to org membership when joining pool
+   - Make picks, view standings
+
+### Permission Check Pattern (Frontend)
+
+```typescript
+const isOrgAdmin = orgMembership?.role === 'admin' || isSuperAdmin
+const isPoolCommissioner = poolMembership?.role === 'commissioner' || isOrgAdmin
+```
+
+### Key RLS Helper Functions
+
+- `is_org_admin(org_id)` - Check if user is org admin
+- `is_pool_commissioner(pool_id)` - Check if user is pool commissioner (direct OR via org admin)
 
 ## Scoring Logic
 
@@ -178,3 +223,8 @@ The MCP server is configured in `.mcp.json`. Use these tools:
   - SF winners → Final (when both SF games are final)
 - CFP seeds display on games page (seeds 1-12 shown next to team names for CFP games)
 - CFP bracket seeding: R1A=#8v#9→#1, R1B=#7v#10→#2, R1C=#6v#11→#3, R1D=#5v#12→#4
+- Onboarding wizard: New users with no org memberships are redirected to `/onboarding` (4-step wizard: org → pool → games → invite)
+- Pool creation auto-creates commissioner membership for the creator (DB trigger: `pool_commissioner_trigger`)
+- Self-service org creation: Any authenticated user can create organizations via dashboard or onboarding wizard
+- Org roles: `admin` (full control) or `member` (read-only) - note: renamed from previous "commissioner" terminology
+- Pool roles: `commissioner` (manage pool) or `member` (participate only) - stored in `pool_memberships.role`
