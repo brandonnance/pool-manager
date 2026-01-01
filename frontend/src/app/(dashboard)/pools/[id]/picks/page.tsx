@@ -57,7 +57,7 @@ export default async function PoolPicksPage({ params }: PageProps) {
     .single()
 
   const isSuperAdmin = profile?.is_super_admin ?? false
-  const isCommissioner = orgMembership?.role === 'commissioner' || isSuperAdmin
+  const isCommissioner = orgMembership?.role === 'admin' || isSuperAdmin
   const isMember = poolMembership?.status === 'approved'
 
   if (!isMember && !isCommissioner) {

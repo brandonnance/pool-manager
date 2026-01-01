@@ -20,9 +20,10 @@ interface DeletePoolButtonProps {
   poolId: string
   poolName: string
   poolType: string
+  orgId: string
 }
 
-export function DeletePoolButton({ poolId, poolName, poolType }: DeletePoolButtonProps) {
+export function DeletePoolButton({ poolId, poolName, poolType, orgId }: DeletePoolButtonProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [confirmText, setConfirmText] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
@@ -41,7 +42,7 @@ export function DeletePoolButton({ poolId, poolName, poolType }: DeletePoolButto
     const supabase = createClient()
 
     try {
-      // Verify user is super admin
+      // Verify user is org admin or super admin
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         throw new Error('Not authenticated')
@@ -53,8 +54,20 @@ export function DeletePoolButton({ poolId, poolName, poolType }: DeletePoolButto
         .eq('id', user.id)
         .single()
 
-      if (!profile?.is_super_admin) {
-        throw new Error('Only super admins can delete pools')
+      const isSuperAdmin = profile?.is_super_admin ?? false
+
+      // Check if user is org admin
+      const { data: orgMembership } = await supabase
+        .from('org_memberships')
+        .select('role')
+        .eq('org_id', orgId)
+        .eq('user_id', user.id)
+        .single()
+
+      const isOrgAdmin = orgMembership?.role === 'admin' || isSuperAdmin
+
+      if (!isOrgAdmin) {
+        throw new Error('Only org admins can delete pools')
       }
 
       // Delete based on pool type
@@ -212,7 +225,7 @@ export function DeletePoolButton({ poolId, poolName, poolType }: DeletePoolButto
             setIsOpen(true)
           }}
           className="p-1 rounded hover:bg-red-100 text-red-500 hover:text-red-700 transition-colors"
-          title="Delete pool (Super Admin only)"
+          title="Delete pool (Org Admin only)"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"

@@ -1,8 +1,10 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { CreateOrgButton } from '@/components/orgs/create-org-button'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -21,6 +23,20 @@ export default async function DashboardPage() {
       )
     `)
     .eq('user_id', user!.id)
+
+  // Redirect new users with no orgs to onboarding wizard
+  if (!orgMemberships || orgMemberships.length === 0) {
+    // Check if they have any pool memberships (from invite links)
+    const { count: poolCount } = await supabase
+      .from('pool_memberships')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user!.id)
+
+    // Only redirect if they truly have no orgs AND no pools
+    if (!poolCount || poolCount === 0) {
+      redirect('/onboarding')
+    }
+  }
 
   // Get user's pool memberships with org info
   const { data: poolMemberships } = await supabase
@@ -205,9 +221,7 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Your Pools</CardTitle>
-            <Button asChild>
-              <Link href="/orgs/new">Create Organization</Link>
-            </Button>
+            <CreateOrgButton />
           </CardHeader>
           <CardContent className="py-8 text-center text-muted-foreground">
             <p>You&apos;re not a member of any organizations yet.</p>
@@ -222,11 +236,11 @@ export default async function DashboardPage() {
                 <Link href={`/orgs/${org.id}`} className="text-lg font-semibold text-foreground hover:text-primary transition-colors">
                   {org.name}
                 </Link>
-                <Badge variant={org.role === 'commissioner' ? 'default' : 'secondary'}>
+                <Badge variant={org.role === 'admin' ? 'default' : 'secondary'}>
                   {org.role}
                 </Badge>
               </div>
-              {org.role === 'commissioner' && (
+              {org.role === 'admin' && (
                 <Button variant="ghost" size="sm" asChild>
                   <Link href={`/orgs/${org.id}`}>Manage</Link>
                 </Button>
