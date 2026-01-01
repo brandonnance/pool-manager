@@ -48,9 +48,9 @@ export function JoinPoolAction({ token, poolId }: JoinPoolActionProps) {
 
     setSuccess(true)
 
-    // Redirect to the pool page after a short delay
+    // Redirect to dashboard after a short delay (pending members can't view pool yet)
     setTimeout(() => {
-      router.push(`/pools/${poolId}`)
+      router.push('/dashboard')
     }, 2000)
   }
 
@@ -61,7 +61,7 @@ export function JoinPoolAction({ token, poolId }: JoinPoolActionProps) {
           <p className="font-medium">Request submitted!</p>
           <p className="text-sm mt-1">Your request to join is pending approval by a commissioner.</p>
         </div>
-        <p className="text-sm text-gray-500">Redirecting to the pool...</p>
+        <p className="text-sm text-gray-500">Redirecting to your dashboard...</p>
       </div>
     )
   }

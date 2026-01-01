@@ -315,10 +315,16 @@ const isPoolCommissioner = poolMembership?.role === 'commissioner' || isOrgAdmin
 - [x] Store wizard state (URL params)
 
 ### Phase 5: Testing & Docs
-- [ ] Test all permission scenarios
-- [ ] Test onboarding flow end-to-end
 - [x] Update CLAUDE.md with new role structure
 - [x] Document the permission model for users
+- [x] Fix RLS policies for organizations (allow any authenticated user to create/view)
+- [x] Fix RLS policies for org_memberships (add super admin bypass for viewing all members)
+- [x] Fix duplicate pool_membership insert in create-pool-button (trigger already handles it)
+- [x] Test organization creation with fresh user ✓
+- [ ] Test pool creation flow (in progress)
+- [ ] Test pool commissioner permissions
+- [ ] Test org admin vs pool commissioner delete restrictions
+- [ ] Test onboarding wizard flow end-to-end
 
 ---
 
