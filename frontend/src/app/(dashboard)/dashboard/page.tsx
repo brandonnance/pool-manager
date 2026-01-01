@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -24,19 +23,9 @@ export default async function DashboardPage() {
     `)
     .eq('user_id', user!.id)
 
-  // Redirect new users with no orgs to onboarding wizard
-  if (!orgMemberships || orgMemberships.length === 0) {
-    // Check if they have any pool memberships (from invite links)
-    const { count: poolCount } = await supabase
-      .from('pool_memberships')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user!.id)
-
-    // Only redirect if they truly have no orgs AND no pools
-    if (!poolCount || poolCount === 0) {
-      redirect('/onboarding')
-    }
-  }
+  // Note: We no longer auto-redirect to onboarding here.
+  // Users can click "Create Organization" from the empty state below,
+  // or manually go to /onboarding if they prefer the wizard.
 
   // Get user's pool memberships with org info
   const { data: poolMemberships } = await supabase
