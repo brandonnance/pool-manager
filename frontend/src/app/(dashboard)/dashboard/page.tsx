@@ -27,11 +27,12 @@ export default async function DashboardPage() {
   // Users can click "Create Organization" from the empty state below,
   // or manually go to /onboarding if they prefer the wizard.
 
-  // Get user's pool memberships with org info
+  // Get user's pool memberships with org info and role
   const { data: poolMemberships } = await supabase
     .from('pool_memberships')
     .select(`
       status,
+      role,
       pool_id,
       pools (
         id,
@@ -85,6 +86,28 @@ export default async function DashboardPage() {
     }
   })
 
+  // Get pools where user is commissioner or org admin (to show pending counts)
+  const commissionerPoolIds = poolMemberships
+    ?.filter(pm => pm.role === 'commissioner')
+    .map(pm => pm.pool_id) || []
+
+  const adminOrgIds = orgMemberships
+    ?.filter(m => m.role === 'admin')
+    .map(m => m.org_id) || []
+
+  // Get pending counts for pools user can manage
+  const { data: pendingCounts } = await supabase
+    .from('pool_memberships')
+    .select('pool_id')
+    .eq('status', 'pending')
+
+  // Build a map of pool_id -> pending count
+  const pendingCountMap = new Map<string, number>()
+  pendingCounts?.forEach(pc => {
+    const current = pendingCountMap.get(pc.pool_id) || 0
+    pendingCountMap.set(pc.pool_id, current + 1)
+  })
+
   // Group pools by org
   interface PoolInfo {
     id: string
@@ -92,6 +115,8 @@ export default async function DashboardPage() {
     status: string
     season_label: string | null
     membership_status: 'approved' | 'pending' | 'discoverable'
+    pending_count?: number
+    is_commissioner?: boolean
   }
 
   interface OrgWithPools {
@@ -131,12 +156,18 @@ export default async function DashboardPage() {
       }
 
       if (orgData) {
+        // Check if user can manage this pool (commissioner or org admin)
+        const isCommissioner = pm.role === 'commissioner' || adminOrgIds.includes(orgId)
+        const pendingCount = isCommissioner ? (pendingCountMap.get(pm.pools.id) || 0) : undefined
+
         orgData.pools.push({
           id: pm.pools.id,
           name: pm.pools.name,
           status: pm.pools.status,
           season_label: pm.pools.season_label,
-          membership_status: pm.status as 'approved' | 'pending'
+          membership_status: pm.status as 'approved' | 'pending',
+          pending_count: pendingCount,
+          is_commissioner: isCommissioner
         })
       }
     }
@@ -255,6 +286,11 @@ export default async function DashboardPage() {
                         )}
                       </div>
                       <div className="flex items-center gap-2">
+                        {pool.pending_count && pool.pending_count > 0 && (
+                          <Badge variant="outline" className="border-orange-500 bg-orange-50 text-orange-700">
+                            {pool.pending_count} pending
+                          </Badge>
+                        )}
                         {pool.membership_status === 'discoverable' && (
                           <Badge className="bg-accent text-accent-foreground">Join</Badge>
                         )}

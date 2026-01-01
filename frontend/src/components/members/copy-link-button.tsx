@@ -1,17 +1,23 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface CopyLinkButtonProps {
-  url: string
+  token: string
 }
 
-export function CopyLinkButton({ url }: CopyLinkButtonProps) {
+export function CopyLinkButton({ token }: CopyLinkButtonProps) {
   const [copied, setCopied] = useState(false)
+  const [fullUrl, setFullUrl] = useState('')
+
+  useEffect(() => {
+    // Construct full URL on client side
+    setFullUrl(`${window.location.origin}/join/${token}`)
+  }, [token])
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(url)
+      await navigator.clipboard.writeText(fullUrl)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {

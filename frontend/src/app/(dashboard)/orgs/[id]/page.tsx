@@ -140,6 +140,9 @@ export default async function OrgDetailPage({ params }: PageProps) {
             const poolMemberCount = pool.pool_memberships?.filter(
               (pm) => pm.status === 'approved'
             ).length ?? 0
+            const pendingCount = pool.pool_memberships?.filter(
+              (pm) => pm.status === 'pending'
+            ).length ?? 0
             // Pool commissioner = explicit pool role OR org admin (implicit rights)
             const isPoolCommissioner = myMembership?.role === 'commissioner' || isOrgAdmin
 
@@ -163,15 +166,22 @@ export default async function OrgDetailPage({ params }: PageProps) {
                   <h3 className="text-lg font-semibold text-gray-900">
                     {pool.name}
                   </h3>
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                    pool.status === 'active'
-                      ? 'bg-green-100 text-green-800'
-                      : pool.status === 'draft'
-                      ? 'bg-yellow-100 text-yellow-800'
-                      : 'bg-gray-100 text-gray-800'
-                  } ${isOrgAdmin ? 'mr-6' : ''}`}>
-                    {pool.status}
-                  </span>
+                  <div className={`flex items-center gap-2 ${isOrgAdmin ? 'mr-6' : ''}`}>
+                    {isPoolCommissioner && pendingCount > 0 && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-700 border border-orange-300">
+                        {pendingCount} pending
+                      </span>
+                    )}
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                      pool.status === 'active'
+                        ? 'bg-green-100 text-green-800'
+                        : pool.status === 'draft'
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {pool.status}
+                    </span>
+                  </div>
                 </div>
                 <p className="text-sm text-gray-600 mb-3">
                   {pool.type === 'bowl_buster' ? 'Bowl Buster' : pool.type === 'playoff_squares' ? 'Playoff Squares' : pool.type}

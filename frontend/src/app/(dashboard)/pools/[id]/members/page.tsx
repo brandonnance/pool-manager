@@ -354,9 +354,9 @@ export default async function PoolMembersPage({ params }: PageProps) {
 
                   return (
                     <tr key={link.id} className={!isActive ? 'bg-gray-50' : ''}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <code className="text-sm text-gray-600 bg-gray-100 px-2 py-1 rounded">
-                          /join/{link.token}
+                      <td className="px-6 py-4">
+                        <code className="text-sm text-gray-600 bg-gray-100 px-2 py-1 rounded break-all">
+                          {link.token}
                         </code>
                         {!isActive && (
                           <span className="ml-2 text-xs text-red-600">
@@ -375,7 +375,7 @@ export default async function PoolMembersPage({ params }: PageProps) {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex gap-2">
                           {isActive && (
-                            <CopyLinkButton url={`${process.env.NEXT_PUBLIC_BASE_URL || ''}/join/${link.token}`} />
+                            <CopyLinkButton token={link.token} />
                           )}
                           <DeleteLinkButton linkId={link.id} />
                         </div>
