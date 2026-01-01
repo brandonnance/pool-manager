@@ -102,22 +102,7 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
       return
     }
 
-    // Add the creator as an approved member
-    const { error: memberError } = await supabase
-      .from('pool_memberships')
-      .insert({
-        pool_id: pool.id,
-        user_id: user.id,
-        status: 'approved',
-        approved_by: user.id,
-        approved_at: new Date().toISOString()
-      })
-
-    if (memberError) {
-      setError(memberError.message)
-      setIsLoading(false)
-      return
-    }
+    // Note: pool_commissioner_trigger automatically creates commissioner membership
 
     // For Playoff Squares, create sq_pool and games
     if (poolType === 'playoff_squares') {
