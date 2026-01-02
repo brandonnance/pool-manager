@@ -51,20 +51,7 @@ export function CreateOrgButton() {
       return
     }
 
-    // Add the creator as admin
-    const { error: memberError } = await supabase
-      .from('org_memberships')
-      .insert({
-        org_id: org.id,
-        user_id: user.id,
-        role: 'admin'
-      })
-
-    if (memberError) {
-      setError(memberError.message)
-      setIsLoading(false)
-      return
-    }
+    // Admin membership is auto-created by database trigger
 
     setIsOpen(false)
     setName('')
