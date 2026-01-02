@@ -1,8 +1,7 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { LogoutButton } from '@/components/auth/logout-button'
-import { Badge } from '@/components/ui/badge'
+import { UserDropdown } from '@/components/auth/user-dropdown'
 
 export default async function DashboardLayout({
   children,
@@ -63,17 +62,11 @@ export default async function DashboardLayout({
                 )}
               </nav>
             </div>
-            <div className="flex items-center space-x-4">
-              <div className="text-sm flex items-center gap-2">
-                <span className="font-medium">{profile?.display_name || user.email}</span>
-                {profile?.is_super_admin && (
-                  <Badge variant="secondary" className="bg-accent text-accent-foreground">
-                    Admin
-                  </Badge>
-                )}
-              </div>
-              <LogoutButton />
-            </div>
+            <UserDropdown
+              displayName={profile?.display_name || null}
+              email={user.email || ''}
+              isSuperAdmin={profile?.is_super_admin || false}
+            />
           </div>
         </div>
       </header>

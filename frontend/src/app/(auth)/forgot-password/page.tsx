@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -9,15 +8,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
-export function LoginForm() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
+export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
-
-  const redirectTo = searchParams.get('next') || '/dashboard'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -26,9 +21,8 @@ export function LoginForm() {
 
     const supabase = createClient()
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
     })
 
     if (error) {
@@ -37,12 +31,33 @@ export function LoginForm() {
       return
     }
 
-    router.push(redirectTo)
-    router.refresh()
+    setSuccess(true)
+    setLoading(false)
+  }
+
+  if (success) {
+    return (
+      <div className="mt-8 space-y-6">
+        <Alert>
+          <AlertDescription>
+            Check your email for a password reset link. It may take a few minutes to arrive.
+          </AlertDescription>
+        </Alert>
+        <div className="text-center text-sm">
+          <Link href="/login" className="font-medium text-primary hover:text-primary/80">
+            Back to login
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (
     <form onSubmit={handleSubmit} className="mt-8 space-y-6">
+      <p className="text-sm text-muted-foreground text-center">
+        Enter your email address and we&apos;ll send you a link to reset your password.
+      </p>
+
       {error && (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
@@ -63,41 +78,16 @@ export function LoginForm() {
             placeholder="you@example.com"
           />
         </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
-          <Input
-            id="password"
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
-          />
-        </div>
       </div>
 
       <Button type="submit" className="w-full" disabled={loading}>
-        {loading ? 'Signing in...' : 'Sign in'}
+        {loading ? 'Sending...' : 'Send reset link'}
       </Button>
 
-      <div className="text-center text-sm space-y-2">
-        <div>
-          <Link href="/forgot-password" className="text-muted-foreground hover:text-primary">
-            Forgot your password?
-          </Link>
-        </div>
-        <div>
-          <span className="text-muted-foreground">Don&apos;t have an account?</span>{' '}
-          <Link
-            href={redirectTo !== '/dashboard' ? `/signup?next=${encodeURIComponent(redirectTo)}` : '/signup'}
-            className="font-medium text-primary hover:text-primary/80"
-          >
-            Sign up
-          </Link>
-        </div>
+      <div className="text-center text-sm">
+        <Link href="/login" className="font-medium text-primary hover:text-primary/80">
+          Back to login
+        </Link>
       </div>
     </form>
   )

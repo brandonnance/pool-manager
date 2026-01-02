@@ -40,6 +40,10 @@ A multi-tenant bowl pool management application built with Next.js 16 and Supaba
 - [x] User management & permissions system (4-tier role hierarchy)
 - [x] Onboarding wizard for new users (create org → pool → games → invite)
 - [x] Self-service org creation for any authenticated user
+- [x] User self-management (password reset, email change, display name)
+- [x] Forgot password flow (`/forgot-password`)
+- [x] Account settings page (`/settings`)
+- [x] User dropdown menu in header
 
 ### MVP Complete!
 
@@ -51,9 +55,10 @@ pool-manager/
 ├── frontend/
 │   ├── src/
 │   │   ├── app/
-│   │   │   ├── (auth)/       # Login, signup pages
+│   │   │   ├── (auth)/       # Login, signup, forgot/reset password pages
 │   │   │   ├── (dashboard)/  # Protected pages
 │   │   │   │   ├── dashboard/
+│   │   │   │   ├── settings/     # Account settings
 │   │   │   │   ├── orgs/
 │   │   │   │   │   └── [id]/
 │   │   │   │   └── pools/
@@ -73,6 +78,7 @@ pool-manager/
 │   │   │   ├── games/
 │   │   │   ├── cfp/           # CFP bracket components
 │   │   │   ├── members/       # Member management components
+│   │   │   ├── settings/      # Account settings forms
 │   │   │   └── standings/     # Pool standings component
 │   │   ├── lib/supabase/     # Client, server, middleware
 │   │   └── types/database.ts # Auto-generated types
@@ -122,6 +128,10 @@ pool-manager/
 | `frontend/src/components/members/generate-link-button.tsx` | Create invite link modal |
 | `frontend/src/app/join/[token]/page.tsx` | Public join link redemption |
 | `frontend/src/app/onboarding/page.tsx` | New user onboarding wizard |
+| `frontend/src/app/(auth)/forgot-password/page.tsx` | Forgot password page |
+| `frontend/src/app/(auth)/reset-password/page.tsx` | Reset password page |
+| `frontend/src/app/(dashboard)/settings/page.tsx` | Account settings page |
+| `frontend/src/components/auth/user-dropdown.tsx` | Header user dropdown |
 
 ## Role & Permissions System
 
