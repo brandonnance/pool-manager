@@ -164,6 +164,7 @@ export default async function PoolDetailPage({ params }: PageProps) {
     square_id: string | null
     win_type: string
     payout: number | null
+    winner_name: string | null
   }> = []
   let sqOwnerProfiles = new Map<string, string | null>()
 
@@ -392,11 +393,12 @@ export default async function PoolDetailPage({ params }: PageProps) {
                 </Badge>
               </div>
               <p className="text-muted-foreground mt-1">
-                {pool.type === 'bowl_buster' ? 'Bowl Buster' : pool.type === 'playoff_squares' ? 'Playoff Squares' : pool.type}
+                {pool.type === 'bowl_buster' ? 'Bowl Buster' : pool.type === 'playoff_squares' || pool.type === 'single_game_squares' ? 'Squares' : pool.type}
                 {pool.season_label && ` - ${pool.season_label}`}
               </p>
               <p className="text-sm text-muted-foreground mt-2">
-                {memberCount} member{memberCount !== 1 ? 's' : ''} &middot; {gamesCount ?? 0} games
+                {memberCount} member{memberCount !== 1 ? 's' : ''}
+                {pool.type === 'bowl_buster' && <> &middot; {gamesCount ?? 0} game{(gamesCount ?? 0) !== 1 ? 's' : ''}</>}
               </p>
             </div>
             <div className="flex items-center gap-3">

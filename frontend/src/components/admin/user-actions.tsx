@@ -67,19 +67,20 @@ export function UserActions({
       }
 
       // Update the user's deactivated_at status
-      const { error: updateError, count } = await supabase
+      const { data: updatedData, error: updateError } = await supabase
         .from('profiles')
         .update({
           deactivated_at: isDeactivated ? null : new Date().toISOString(),
         })
         .eq('id', userId)
-        .select('id', { count: 'exact', head: true })
+        .select('id')
+        .single()
 
       if (updateError) {
         throw updateError
       }
 
-      if (count === 0) {
+      if (!updatedData) {
         throw new Error('Update blocked by RLS policy. Super admin cannot update profiles - migration needed.')
       }
 

@@ -27,6 +27,7 @@ interface SqWinner {
   square_id: string | null
   win_type: string
   payout: number | null
+  winner_name: string | null
 }
 
 interface GameScoreCardProps {
@@ -246,7 +247,7 @@ export function GameScoreCard({
                     </div>
                     <div className="flex items-center gap-2">
                       <span className={isCurrentUser ? 'text-amber-700' : ''}>
-                        {sq?.owner_name || 'Unknown'}
+                        {winner.winner_name || 'Unknown'}
                       </span>
                       {isCurrentUser && <span className="text-amber-600 text-xs">🏆</span>}
                     </div>

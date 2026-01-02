@@ -19,6 +19,7 @@ interface SqWinner {
   square_id: string | null
   win_type: string
   payout: number | null
+  winner_name: string | null
 }
 
 interface ScoreChangeLogProps {
@@ -134,7 +135,7 @@ export function ScoreChangeLog({
                             {winner.win_type === 'score_change_reverse' && (
                               <span className="text-muted-foreground mr-1">(R)</span>
                             )}
-                            {sq?.owner_name || 'Unknown'}
+                            {winner.winner_name || 'Unknown'}
                           </div>
                         )
                       })}

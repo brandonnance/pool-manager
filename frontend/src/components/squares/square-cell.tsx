@@ -96,6 +96,7 @@ export interface SquareCellProps {
   canUnclaim: boolean
   isAdmin?: boolean
   isLoading?: boolean
+  isAbandoned?: boolean
   onClick?: () => void
   onUnclaim?: () => void
   onAdminClick?: () => void
@@ -123,6 +124,7 @@ export function SquareCell({
   canUnclaim,
   isAdmin = false,
   isLoading = false,
+  isAbandoned = false,
   onClick,
   onUnclaim,
   onAdminClick,
@@ -134,6 +136,11 @@ export function SquareCell({
   const getStateClasses = () => {
     const base =
       'flex items-center justify-center text-xs font-medium transition-all border aspect-square min-w-[36px] min-h-[36px]'
+
+    // Abandoned square - distinct styling (striped pattern via CSS)
+    if (isAbandoned) {
+      return cn(base, 'bg-amber-50 border-amber-300 border-dashed')
+    }
 
     if (!ownerId) {
       // Available
@@ -167,11 +174,12 @@ export function SquareCell({
     return cn(base, 'bg-card border-border')
   }
 
-  const displayInitials = ownerInitials || getInitials(ownerName)
-  const canClickToClaim = canClaim && !ownerId && !isLoading
+  const displayInitials = isAbandoned ? '—' : (ownerInitials || getInitials(ownerName))
+  const canClickToClaim = canClaim && !ownerId && !isAbandoned && !isLoading
   const canClickToUnclaim = canUnclaim && isCurrentUser && !isWinning && !isLoading
   // Admin can always click (when not loading and pool not locked for winners)
-  const canAdminClick = isAdmin && !isLoading && !isWinning
+  // Including clicking abandoned squares to reassign them
+  const canAdminClick = isAdmin && !isLoading && (!isWinning || isAbandoned)
   const isClickable = canClickToClaim || canClickToUnclaim || canAdminClick
 
   const handleClick = () => {
@@ -186,6 +194,10 @@ export function SquareCell({
 
   const getTitle = () => {
     if (isLoading) return 'Loading...'
+    if (isAbandoned) {
+      if (canAdminClick) return 'Abandoned - Click to reassign'
+      return 'Abandoned'
+    }
     if (canAdminClick) return ownerName ? `${ownerName} - Click to reassign` : 'Click to assign'
     if (canClickToUnclaim) return `${ownerName} - Click to unclaim`
     if (ownerName) return ownerName
@@ -195,6 +207,9 @@ export function SquareCell({
 
   // Get text color based on state
   const getTextClasses = () => {
+    if (isAbandoned) {
+      return 'truncate px-0.5 text-amber-600'
+    }
     if (isWinning && winningRound) {
       return cn('truncate px-0.5 font-semibold', winningColors[winningRound].text)
     }

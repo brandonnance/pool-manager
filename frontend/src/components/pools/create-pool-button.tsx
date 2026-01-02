@@ -239,7 +239,7 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
                       : 'border-border hover:border-muted-foreground'
                   }`}
                 >
-                  <div className="font-medium">Playoff Squares</div>
+                  <div className="font-medium">Squares</div>
                   <div className="text-xs text-muted-foreground">10x10 squares grid</div>
                 </button>
               </div>
@@ -251,7 +251,7 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder={poolType === 'bowl_buster' ? 'My Bowl Pool' : 'NFL Playoff Squares 2025'}
+                placeholder={poolType === 'bowl_buster' ? 'My Bowl Pool' : 'Super Bowl Squares 2025'}
                 required
               />
             </div>

@@ -112,19 +112,19 @@ export default async function OrgDetailPage({ params }: PageProps) {
               <CardDescription className="mt-1">
                 {memberCount} member{memberCount !== 1 ? 's' : ''} · Created {org.created_at ? new Date(org.created_at).toLocaleDateString() : ''}
               </CardDescription>
+              {isOrgAdmin && (
+                <Badge variant={isSuperAdmin ? 'default' : 'secondary'} className="mt-2">
+                  {isSuperAdmin ? 'Super Admin' : 'Admin'}
+                </Badge>
+              )}
             </div>
             <div className="flex items-center gap-3">
               {isOrgAdmin && (
-                <>
-                  <Button variant="outline" size="sm" asChild>
-                    <Link href={`/orgs/${id}/members`}>
-                      Manage Members
-                    </Link>
-                  </Button>
-                  <Badge variant={isSuperAdmin ? 'default' : 'secondary'}>
-                    {isSuperAdmin ? 'Super Admin' : 'Admin'}
-                  </Badge>
-                </>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={`/orgs/${id}/members`}>
+                    Manage Members
+                  </Link>
+                </Button>
               )}
               {isSuperAdmin && (
                 <DeleteOrgButton orgId={id} orgName={org.name} />
@@ -175,10 +175,8 @@ export default async function OrgDetailPage({ params }: PageProps) {
 
               const poolTypeLabel = pool.type === 'bowl_buster'
                 ? 'Bowl Buster'
-                : pool.type === 'playoff_squares'
-                ? 'Playoff Squares'
-                : pool.type === 'single_game_squares'
-                ? 'Single Game Squares'
+                : pool.type === 'playoff_squares' || pool.type === 'single_game_squares'
+                ? 'Squares'
                 : pool.type
 
               return (

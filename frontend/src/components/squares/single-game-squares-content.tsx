@@ -53,6 +53,7 @@ interface SqWinner {
   square_id: string | null
   win_type: string
   payout: number | null
+  winner_name: string | null
 }
 
 interface ScoreChange {
@@ -474,7 +475,7 @@ export function SingleGameSquaresContent({
                       {isCurrentUser && <span className="text-lg">🎉</span>}
                     </div>
                     <div className={`text-lg font-bold mt-1 ${isCurrentUser ? 'text-purple-800' : 'text-purple-700'}`}>
-                      {sq?.owner_name || 'Unknown'}
+                      {winner.winner_name || 'Unknown'}
                     </div>
                   </div>
                 )
@@ -503,7 +504,7 @@ export function SingleGameSquaresContent({
                       {isCurrentUser && <span className="text-lg">🎉</span>}
                     </div>
                     <div className={`text-lg font-bold mt-1 ${isCurrentUser ? 'text-fuchsia-800' : 'text-fuchsia-700'}`}>
-                      {sq?.owner_name || 'Unknown'}
+                      {winner.winner_name || 'Unknown'}
                     </div>
                   </div>
                 )
@@ -560,7 +561,7 @@ export function SingleGameSquaresContent({
                     </Badge>
                     <div className="flex items-center gap-2">
                       <span className={isCurrentUser ? 'text-amber-700' : ''}>
-                        {sq?.owner_name || 'Unknown'}
+                        {winner.winner_name || 'Unknown'}
                       </span>
                       {isCurrentUser && <span className="text-amber-600 text-xs">🏆</span>}
                     </div>

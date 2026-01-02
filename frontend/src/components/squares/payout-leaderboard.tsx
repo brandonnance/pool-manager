@@ -9,6 +9,7 @@ interface SqWinner {
   square_id: string | null
   win_type: string
   payout: number | null
+  winner_name: string | null
 }
 
 interface PayoutLeaderboardProps {

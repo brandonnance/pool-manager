@@ -13,9 +13,22 @@ interface MemberActionsProps {
   memberRole?: string
   isOrgAdmin?: boolean
   memberId: string
+  poolType?: string
+  isSquaresLocked?: boolean
 }
 
-export function MemberActions({ membershipId, poolId, status, userName, currentUserId, memberRole, isOrgAdmin, memberId }: MemberActionsProps) {
+export function MemberActions({
+  membershipId,
+  poolId,
+  status,
+  userName,
+  currentUserId,
+  memberRole,
+  isOrgAdmin,
+  memberId,
+  poolType,
+  isSquaresLocked
+}: MemberActionsProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [isPromoting, setIsPromoting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -68,7 +81,22 @@ export function MemberActions({ membershipId, poolId, status, userName, currentU
   }
 
   const handleRemove = async () => {
-    if (!confirm(`Are you sure you want to remove ${userName} from this pool?`)) {
+    // Build appropriate confirmation message based on pool type
+    let confirmMessage = `Are you sure you want to remove ${userName} from this pool?`
+
+    const isSquaresPool = poolType === 'squares' || poolType === 'playoff_squares' || poolType === 'single_game_squares'
+
+    if (poolType === 'bowl_buster') {
+      confirmMessage = `Are you sure you want to remove ${userName} from this pool?\n\nThis will permanently delete all their entries and picks.`
+    } else if (isSquaresPool) {
+      if (isSquaresLocked) {
+        confirmMessage = `Are you sure you want to remove ${userName} from this pool?\n\nTheir squares will be marked as "Abandoned" and can be reassigned by a commissioner. Past winners will retain the original owner's name.`
+      } else {
+        confirmMessage = `Are you sure you want to remove ${userName} from this pool?\n\nThis will delete all their claimed squares, making them available again.`
+      }
+    }
+
+    if (!confirm(confirmMessage)) {
       return
     }
 
@@ -76,18 +104,83 @@ export function MemberActions({ membershipId, poolId, status, userName, currentU
     setError(null)
 
     const supabase = createClient()
-    const { error: deleteError } = await supabase
-      .from('pool_memberships')
-      .delete()
-      .eq('id', membershipId)
 
-    if (deleteError) {
-      setError(deleteError.message)
+    try {
+      // Pool-type-specific removal logic
+      if (poolType === 'bowl_buster') {
+        // Bowl Buster: Cascade delete entries -> picks -> membership
+        // 1. Get all entries for this user in this pool
+        const { data: entries } = await supabase
+          .from('bb_entries')
+          .select('id')
+          .eq('pool_id', poolId)
+          .eq('user_id', memberId)
+
+        if (entries && entries.length > 0) {
+          const entryIds = entries.map(e => e.id)
+
+          // 2. Delete CFP picks
+          await supabase
+            .from('bb_cfp_entry_picks')
+            .delete()
+            .in('entry_id', entryIds)
+
+          // 3. Delete bowl picks
+          await supabase
+            .from('bb_bowl_picks')
+            .delete()
+            .in('entry_id', entryIds)
+
+          // 4. Delete entries
+          await supabase
+            .from('bb_entries')
+            .delete()
+            .in('id', entryIds)
+        }
+      } else if (isSquaresPool) {
+        // Get the sq_pool_id
+        const { data: sqPool } = await supabase
+          .from('sq_pools')
+          .select('id')
+          .eq('pool_id', poolId)
+          .single()
+
+        if (sqPool) {
+          if (isSquaresLocked) {
+            // Squares (locked): Abandon squares (set user_id = NULL)
+            await supabase
+              .from('sq_squares')
+              .update({ user_id: null })
+              .eq('sq_pool_id', sqPool.id)
+              .eq('user_id', memberId)
+          } else {
+            // Squares (unlocked): Delete squares
+            await supabase
+              .from('sq_squares')
+              .delete()
+              .eq('sq_pool_id', sqPool.id)
+              .eq('user_id', memberId)
+          }
+        }
+      }
+
+      // Finally, delete the pool membership
+      const { error: deleteError } = await supabase
+        .from('pool_memberships')
+        .delete()
+        .eq('id', membershipId)
+
+      if (deleteError) {
+        setError(deleteError.message)
+        setIsLoading(false)
+        return
+      }
+
+      router.refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
       setIsLoading(false)
-      return
     }
-
-    router.refresh()
   }
 
   const handlePromote = async () => {

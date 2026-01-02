@@ -833,6 +833,22 @@ export function SingleGameScoreEntry({ game, sqPool, scoreChanges }: SingleGameS
   )
 }
 
+// Helper function to get winner name from square
+async function getWinnerName(
+  supabase: ReturnType<typeof createClient>,
+  userId: string | null
+): Promise<string> {
+  if (!userId) return 'Abandoned'
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('display_name, email')
+    .eq('id', userId)
+    .single()
+
+  return profile?.display_name || profile?.email || 'Unknown'
+}
+
 // Helper: Calculate winners for quarter mode
 async function calculateQuarterWinners(
   supabase: ReturnType<typeof createClient>,
@@ -869,17 +885,19 @@ async function calculateQuarterWinners(
 
     const { data: normalSquare } = await supabase
       .from('sq_squares')
-      .select('id')
+      .select('id, user_id')
       .eq('sq_pool_id', sqPoolId)
       .eq('row_index', rowIndex)
       .eq('col_index', colIndex)
       .single()
 
     if (normalSquare) {
+      const winnerName = await getWinnerName(supabase, normalSquare.user_id)
       await supabase.from('sq_winners').insert({
         sq_game_id: gameId,
         square_id: normalSquare.id,
         win_type: winType,
+        winner_name: winnerName,
       })
     }
 
@@ -890,17 +908,19 @@ async function calculateQuarterWinners(
       if (reverseRowIndex !== rowIndex || reverseColIndex !== colIndex) {
         const { data: reverseSquare } = await supabase
           .from('sq_squares')
-          .select('id')
+          .select('id, user_id')
           .eq('sq_pool_id', sqPoolId)
           .eq('row_index', reverseRowIndex)
           .eq('col_index', reverseColIndex)
           .single()
 
         if (reverseSquare) {
+          const winnerName = await getWinnerName(supabase, reverseSquare.user_id)
           await supabase.from('sq_winners').insert({
             sq_game_id: gameId,
             square_id: reverseSquare.id,
             win_type: reverseWinType,
+            winner_name: winnerName,
           })
         }
       }
@@ -948,18 +968,20 @@ async function calculateScoreChangeWinner(
 
   const { data: normalSquare } = await supabase
     .from('sq_squares')
-    .select('id')
+    .select('id, user_id')
     .eq('sq_pool_id', sqPoolId)
     .eq('row_index', rowIndex)
     .eq('col_index', colIndex)
     .single()
 
   if (normalSquare) {
+    const winnerName = await getWinnerName(supabase, normalSquare.user_id)
     await supabase.from('sq_winners').insert({
       sq_game_id: gameId,
       square_id: normalSquare.id,
       win_type: 'score_change',
       payout: changeOrder, // Store change_order in payout for reference
+      winner_name: winnerName,
     })
   }
 
@@ -971,18 +993,20 @@ async function calculateScoreChangeWinner(
     // This allows the UI to show the "both" gradient for squares that win both ways
     const { data: reverseSquare } = await supabase
       .from('sq_squares')
-      .select('id')
+      .select('id, user_id')
       .eq('sq_pool_id', sqPoolId)
       .eq('row_index', reverseRowIndex)
       .eq('col_index', reverseColIndex)
       .single()
 
     if (reverseSquare) {
+      const winnerName = await getWinnerName(supabase, reverseSquare.user_id)
       await supabase.from('sq_winners').insert({
         sq_game_id: gameId,
         square_id: reverseSquare.id,
         win_type: 'score_change_reverse',
         payout: changeOrder,
+        winner_name: winnerName,
       })
     }
   }
@@ -1007,17 +1031,19 @@ async function calculateFinalScoreWinner(
 
   const { data: normalSquare } = await supabase
     .from('sq_squares')
-    .select('id')
+    .select('id, user_id')
     .eq('sq_pool_id', sqPoolId)
     .eq('row_index', rowIndex)
     .eq('col_index', colIndex)
     .single()
 
   if (normalSquare) {
+    const winnerName = await getWinnerName(supabase, normalSquare.user_id)
     await supabase.from('sq_winners').insert({
       sq_game_id: gameId,
       square_id: normalSquare.id,
       win_type: 'score_change_final',
+      winner_name: winnerName,
     })
   }
 
@@ -1028,17 +1054,19 @@ async function calculateFinalScoreWinner(
     // Always create reverse winner (even if same square as forward)
     const { data: reverseSquare } = await supabase
       .from('sq_squares')
-      .select('id')
+      .select('id, user_id')
       .eq('sq_pool_id', sqPoolId)
       .eq('row_index', reverseRowIndex)
       .eq('col_index', reverseColIndex)
       .single()
 
     if (reverseSquare) {
+      const winnerName = await getWinnerName(supabase, reverseSquare.user_id)
       await supabase.from('sq_winners').insert({
         sq_game_id: gameId,
         square_id: reverseSquare.id,
         win_type: 'score_change_final_reverse',
+        winner_name: winnerName,
       })
     }
   }

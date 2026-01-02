@@ -214,8 +214,8 @@ export function SquaresGrid({
     router.refresh()
   }
 
-  // Admin can assign when pool is open and numbers not locked (before game starts)
-  const canAdminAssign = isCommissioner && !numbersLocked
+  // Commissioners can always assign/reassign squares (even after lock for abandoned squares)
+  const canAdminAssign = isCommissioner
 
   const handleSquareClaim = async (rowIndex: number, colIndex: number) => {
     if (!currentUserId || !canClaim || !canClaimMore) return
@@ -367,6 +367,7 @@ export function SquaresGrid({
                       canUnclaim={canUnclaim}
                       isAdmin={canAdminAssign}
                       isLoading={isLoading}
+                      isAbandoned={!!square?.id && !square?.user_id}
                       onClick={() => handleSquareClaim(rowIdx, colIdx)}
                       onUnclaim={() => handleSquareUnclaim(rowIdx, colIdx)}
                       onAdminClick={() => handleAdminClick(rowIdx, colIdx)}
@@ -392,6 +393,10 @@ export function SquaresGrid({
         <div className="flex items-center gap-1.5">
           <div className="size-4 rounded border border-border bg-card" />
           <span>Claimed</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="size-4 rounded border border-dashed border-amber-300 bg-amber-50" />
+          <span>Abandoned</span>
         </div>
         {legendMode === 'full_playoff' ? (
           <>

@@ -993,6 +993,7 @@ export type Database = {
           sq_game_id: string
           square_id: string | null
           win_type: string
+          winner_name: string | null
         }
         Insert: {
           created_at?: string | null
@@ -1001,6 +1002,7 @@ export type Database = {
           sq_game_id: string
           square_id?: string | null
           win_type: string
+          winner_name?: string | null
         }
         Update: {
           created_at?: string | null
@@ -1009,6 +1011,7 @@ export type Database = {
           sq_game_id?: string
           square_id?: string | null
           win_type?: string
+          winner_name?: string | null
         }
         Relationships: [
           {

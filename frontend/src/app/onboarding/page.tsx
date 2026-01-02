@@ -333,7 +333,7 @@ function OnboardingContent() {
                               : 'border-gray-200 hover:border-gray-300'
                           }`}
                         >
-                          <div className="font-medium">Playoff Squares</div>
+                          <div className="font-medium">Squares</div>
                           <div className="text-sm text-gray-500 mt-1">10x10 squares grid</div>
                         </button>
                       </div>
@@ -345,7 +345,7 @@ function OnboardingContent() {
                         id="poolName"
                         value={poolName}
                         onChange={(e) => setPoolName(e.target.value)}
-                        placeholder={selectedPoolType === 'bowl_buster' ? 'Bowl Pool 2024' : 'Playoff Squares 2025'}
+                        placeholder={selectedPoolType === 'bowl_buster' ? 'Bowl Pool 2024' : 'Super Bowl Squares 2025'}
                         required
                       />
                     </div>

@@ -286,7 +286,7 @@ export default async function DashboardPage() {
                         )}
                       </div>
                       <div className="flex items-center gap-2">
-                        {pool.pending_count && pool.pending_count > 0 && (
+                        {pool.pending_count !== undefined && pool.pending_count > 0 && (
                           <Badge variant="outline" className="border-orange-500 bg-orange-50 text-orange-700">
                             {pool.pending_count} pending
                           </Badge>

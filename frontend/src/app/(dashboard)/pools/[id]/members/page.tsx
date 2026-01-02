@@ -28,6 +28,7 @@ export default async function PoolMembersPage({ params }: PageProps) {
       name,
       org_id,
       status,
+      type,
       organizations (name)
     `)
     .eq('id', id)
@@ -35,6 +36,18 @@ export default async function PoolMembersPage({ params }: PageProps) {
 
   if (!pool) {
     notFound()
+  }
+
+  // For squares pools (any type), get the lock status
+  const isSquaresPool = pool.type === 'squares' || pool.type === 'playoff_squares' || pool.type === 'single_game_squares'
+  let isSquaresLocked = false
+  if (isSquaresPool) {
+    const { data: sqPool } = await supabase
+      .from('sq_pools')
+      .select('numbers_locked')
+      .eq('pool_id', id)
+      .single()
+    isSquaresLocked = sqPool?.numbers_locked ?? false
   }
 
   // Check if org admin
@@ -220,6 +233,8 @@ export default async function PoolMembersPage({ params }: PageProps) {
                           memberRole={membership.role}
                           isOrgAdmin={isOrgAdmin}
                           memberId={membership.user_id}
+                          poolType={pool.type}
+                          isSquaresLocked={isSquaresLocked}
                         />
                       </td>
                     </tr>
@@ -305,6 +320,8 @@ export default async function PoolMembersPage({ params }: PageProps) {
                           memberRole={membership.role}
                           isOrgAdmin={isOrgAdmin}
                           memberId={membership.user_id}
+                          poolType={pool.type}
+                          isSquaresLocked={isSquaresLocked}
                         />
                       </td>
                     </tr>
