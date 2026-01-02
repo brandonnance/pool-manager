@@ -745,6 +745,7 @@ export type Database = {
           created_at: string | null
           deactivated_at: string | null
           display_name: string | null
+          email: string | null
           id: string
           is_super_admin: boolean | null
         }
@@ -752,6 +753,7 @@ export type Database = {
           created_at?: string | null
           deactivated_at?: string | null
           display_name?: string | null
+          email?: string | null
           id: string
           is_super_admin?: boolean | null
         }
@@ -759,6 +761,7 @@ export type Database = {
           created_at?: string | null
           deactivated_at?: string | null
           display_name?: string | null
+          email?: string | null
           id?: string
           is_super_admin?: boolean | null
         }

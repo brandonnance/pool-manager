@@ -26,7 +26,7 @@ export default async function AdminUsersPage() {
   // Get all users with their profiles
   const { data: users } = await supabase
     .from('profiles')
-    .select('id, display_name, is_super_admin, deactivated_at, created_at')
+    .select('id, display_name, email, is_super_admin, deactivated_at, created_at')
     .order('created_at', { ascending: false })
 
   // Get org membership counts for each user
@@ -89,6 +89,7 @@ export default async function AdminUsersPage() {
               <thead>
                 <tr className="border-b">
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">User</th>
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Email</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Role</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Orgs</th>
@@ -104,6 +105,9 @@ export default async function AdminUsersPage() {
                         <div className="font-medium">{u.display_name || 'No name'}</div>
                         <div className="text-sm text-muted-foreground font-mono">{u.id.slice(0, 8)}...</div>
                       </div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="text-sm">{u.email || '-'}</span>
                     </td>
                     <td className="py-3 px-4">
                       {u.deactivated_at ? (

@@ -81,7 +81,7 @@ Then for the org:
 
 ## 3. Database Changes
 
-### Migration: Add deactivated_at to profiles
+### Migration 1: Add deactivated_at to profiles
 
 ```sql
 ALTER TABLE profiles
@@ -89,6 +89,31 @@ ADD COLUMN deactivated_at timestamptz DEFAULT NULL;
 
 COMMENT ON COLUMN profiles.deactivated_at IS
   'When set, user cannot access the app. NULL = active.';
+```
+
+### Migration 2: Super admin profile updates + email column
+
+```sql
+-- Allow super admins to update any profile
+CREATE POLICY "Super admins can update any profile"
+ON profiles FOR UPDATE
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM profiles
+    WHERE id = auth.uid()
+    AND is_super_admin = true
+  )
+);
+
+-- Add email column to profiles (for admin display)
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS email text;
+
+-- Backfill emails from auth.users
+UPDATE profiles p
+SET email = u.email
+FROM auth.users u
+WHERE p.id = u.id AND p.email IS NULL;
 ```
 
 ---
@@ -116,7 +141,7 @@ COMMENT ON COLUMN profiles.deactivated_at IS
 
 ### Testing
 - [ ] Test org deletion cascade
-- [ ] Test user deactivation blocks access
+- [x] Test user deactivation blocks access
 - [ ] Test user reactivation restores access
 - [ ] Test deactivated user sees correct message
 
@@ -138,7 +163,9 @@ COMMENT ON COLUMN profiles.deactivated_at IS
 | `frontend/src/lib/supabase/middleware.ts` | Added deactivation check |
 | `frontend/src/app/(dashboard)/layout.tsx` | Added deactivated_at to profile select + redirect |
 | `frontend/src/app/(dashboard)/orgs/[id]/page.tsx` | Added DeleteOrgButton for super admin |
-| `frontend/src/types/database.ts` | Regenerated with deactivated_at column |
+| `frontend/src/app/(dashboard)/admin/users/page.tsx` | Added email column to user table |
+| `frontend/src/components/admin/user-actions.tsx` | Added RLS error detection for failed updates |
+| `frontend/src/types/database.ts` | Regenerated with deactivated_at and email columns |
 
 ---
 
