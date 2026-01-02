@@ -81,6 +81,32 @@ export function SquaresGrid({
   const [loadingCell, setLoadingCell] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  // Realtime subscription for live grid updates
+  useEffect(() => {
+    const supabase = createClient()
+
+    const channel = supabase
+      .channel(`squares-${sqPoolId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'sq_squares',
+          filter: `sq_pool_id=eq.${sqPoolId}`,
+        },
+        () => {
+          // When any square changes, refresh the page to get updated data
+          router.refresh()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [sqPoolId, router])
+
   // Admin assignment dialog state
   const [assignDialogOpen, setAssignDialogOpen] = useState(false)
   const [selectedSquare, setSelectedSquare] = useState<{
@@ -237,10 +263,17 @@ export function SquaresGrid({
       console.error('Error claiming square:', insertError)
       // Handle unique constraint violation (race condition - someone else claimed it)
       if (insertError.code === '23505') {
-        setError('This square was just claimed by someone else. Please choose another.')
+        setError('This square was just claimed by someone else. Refreshing grid...')
+        // Auto-refresh after a brief delay so user sees the message
+        setTimeout(() => {
+          setError(null)
+          router.refresh()
+        }, 1500)
       } else {
         setError(insertError.message)
       }
+      setLoadingCell(null)
+      return
     }
 
     setLoadingCell(null)
