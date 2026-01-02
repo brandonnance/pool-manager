@@ -15,6 +15,8 @@ interface MemberActionsProps {
   memberId: string
   poolType?: string
   isSquaresLocked?: boolean
+  isMemberSuperAdmin?: boolean
+  isCurrentUserSuperAdmin?: boolean
 }
 
 export function MemberActions({
@@ -27,7 +29,9 @@ export function MemberActions({
   isOrgAdmin,
   memberId,
   poolType,
-  isSquaresLocked
+  isSquaresLocked,
+  isMemberSuperAdmin,
+  isCurrentUserSuperAdmin
 }: MemberActionsProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [isPromoting, setIsPromoting] = useState(false)
@@ -260,6 +264,13 @@ export function MemberActions({
 
   if (status === 'approved') {
     const isCommissioner = memberRole === 'commissioner'
+
+    // Super admins can only be managed by other super admins
+    const canManageMember = !isMemberSuperAdmin || isCurrentUserSuperAdmin
+
+    if (!canManageMember) {
+      return <span className="text-xs text-muted-foreground">Protected</span>
+    }
 
     return (
       <div className="flex gap-2">

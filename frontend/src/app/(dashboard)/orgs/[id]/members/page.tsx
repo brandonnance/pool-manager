@@ -60,7 +60,7 @@ export default async function OrgMembersPage({ params }: PageProps) {
 
   const { data: profiles } = await supabase
     .from('profiles')
-    .select('id, display_name')
+    .select('id, display_name, is_super_admin')
     .in('id', userIds)
 
   const profileMap = new Map(profiles?.map(p => [p.id, p]) ?? [])
@@ -163,6 +163,8 @@ export default async function OrgMembersPage({ params }: PageProps) {
                           userName={userProfile?.display_name || 'this user'}
                           isCurrentUser={isCurrentUser}
                           adminCount={adminCount}
+                          isMemberSuperAdmin={userProfile?.is_super_admin ?? false}
+                          isCurrentUserSuperAdmin={isSuperAdmin}
                         />
                       </td>
                     </tr>
@@ -225,6 +227,8 @@ export default async function OrgMembersPage({ params }: PageProps) {
                           userName={userProfile?.display_name || 'this user'}
                           isCurrentUser={false}
                           adminCount={adminCount}
+                          isMemberSuperAdmin={userProfile?.is_super_admin ?? false}
+                          isCurrentUserSuperAdmin={isSuperAdmin}
                         />
                       </td>
                     </tr>

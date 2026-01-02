@@ -11,6 +11,8 @@ interface OrgMemberActionsProps {
   userName: string
   isCurrentUser: boolean
   adminCount: number
+  isMemberSuperAdmin?: boolean
+  isCurrentUserSuperAdmin?: boolean
 }
 
 export function OrgMemberActions({
@@ -20,6 +22,8 @@ export function OrgMemberActions({
   userName,
   isCurrentUser,
   adminCount,
+  isMemberSuperAdmin,
+  isCurrentUserSuperAdmin,
 }: OrgMemberActionsProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -205,6 +209,11 @@ export function OrgMemberActions({
   // Don't show any actions for current user (can't remove yourself)
   if (isCurrentUser) {
     return <span className="text-xs text-gray-400">-</span>
+  }
+
+  // Super admins can only be managed by other super admins
+  if (isMemberSuperAdmin && !isCurrentUserSuperAdmin) {
+    return <span className="text-xs text-muted-foreground">Protected</span>
   }
 
   if (role === 'admin') {

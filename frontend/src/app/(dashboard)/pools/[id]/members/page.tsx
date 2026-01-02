@@ -38,16 +38,35 @@ export default async function PoolMembersPage({ params }: PageProps) {
     notFound()
   }
 
-  // For squares pools (any type), get the lock status
+  // For squares pools (any type), get the lock status and square counts
   const isSquaresPool = pool.type === 'squares' || pool.type === 'playoff_squares' || pool.type === 'single_game_squares'
   let isSquaresLocked = false
+  let squareCountsByUser = new Map<string, number>()
+
   if (isSquaresPool) {
     const { data: sqPool } = await supabase
       .from('sq_pools')
-      .select('numbers_locked')
+      .select('id, numbers_locked')
       .eq('pool_id', id)
       .single()
     isSquaresLocked = sqPool?.numbers_locked ?? false
+
+    // Get square counts per user
+    if (sqPool) {
+      const { data: squares } = await supabase
+        .from('sq_squares')
+        .select('user_id')
+        .eq('sq_pool_id', sqPool.id)
+        .not('user_id', 'is', null)
+
+      if (squares) {
+        for (const sq of squares) {
+          if (sq.user_id) {
+            squareCountsByUser.set(sq.user_id, (squareCountsByUser.get(sq.user_id) ?? 0) + 1)
+          }
+        }
+      }
+    }
   }
 
   // Check if org admin
@@ -94,7 +113,7 @@ export default async function PoolMembersPage({ params }: PageProps) {
 
   const { data: profiles } = await supabase
     .from('profiles')
-    .select('id, display_name')
+    .select('id, display_name, is_super_admin')
     .in('id', allUserIds)
 
   const profileMap = new Map(profiles?.map(p => [p.id, p]) ?? [])
@@ -235,6 +254,8 @@ export default async function PoolMembersPage({ params }: PageProps) {
                           memberId={membership.user_id}
                           poolType={pool.type}
                           isSquaresLocked={isSquaresLocked}
+                          isMemberSuperAdmin={userProfile?.is_super_admin ?? false}
+                          isCurrentUserSuperAdmin={isSuperAdmin}
                         />
                       </td>
                     </tr>
@@ -267,6 +288,11 @@ export default async function PoolMembersPage({ params }: PageProps) {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Role
                   </th>
+                  {isSquaresPool && (
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Squares
+                    </th>
+                  )}
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Joined
                   </th>
@@ -300,6 +326,13 @@ export default async function PoolMembersPage({ params }: PageProps) {
                           <span className="text-sm text-gray-500">Member</span>
                         )}
                       </td>
+                      {isSquaresPool && (
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="text-sm font-medium text-gray-900">
+                            {squareCountsByUser.get(membership.user_id) ?? 0}
+                          </span>
+                        </td>
+                      )}
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {membership.approved_at
                           ? new Date(membership.approved_at).toLocaleDateString()
@@ -322,6 +355,8 @@ export default async function PoolMembersPage({ params }: PageProps) {
                           memberId={membership.user_id}
                           poolType={pool.type}
                           isSquaresLocked={isSquaresLocked}
+                          isMemberSuperAdmin={userProfile?.is_super_admin ?? false}
+                          isCurrentUserSuperAdmin={isSuperAdmin}
                         />
                       </td>
                     </tr>
