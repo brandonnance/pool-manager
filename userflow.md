@@ -122,24 +122,24 @@ EXECUTE FUNCTION create_pool_commissioner_membership();
 
 ## Permissions Matrix
 
-| Action | Super Admin | Org Admin | Pool Commissioner | Pool Member |
-|--------|:-----------:|:---------:|:-----------------:|:-----------:|
-| Create org | ✓ | ✓ (self-service) | - | - |
-| Delete org | ✓ | ✓ (own) | - | - |
-| Org settings | ✓ | ✓ | - | - |
-| View org members | ✓ | ✓ | - | - |
-| Add/remove org members | ✓ | ✓ | - | - |
-| Promote to admin | ✓ | ✓ | - | - |
-| Create pool | ✓ | ✓ | - | - |
-| **Delete pool** | ✓ | ✓ | ❌ | - |
-| Pool settings | ✓ | ✓ | ✓ | - |
-| Manage pool members | ✓ | ✓ | ✓ | - |
-| Appoint pool commissioner | ✓ | ✓ | ❌ | - |
-| Add/manage games | ✓ | ✓ | ✓ | - |
-| Enter scores | ✓ | ✓ | ✓ | - |
-| Generate join links | ✓ | ✓ | ✓ | - |
-| Make picks | ✓ | ✓ | ✓ | ✓ |
-| View standings | ✓ | ✓ | ✓ | ✓ |
+| Action                    | Super Admin |    Org Admin     | Pool Commissioner | Pool Member |
+| ------------------------- | :---------: | :--------------: | :---------------: | :---------: |
+| Create org                |      ✓      | ✓ (self-service) |         -         |      -      |
+| Delete org                |      ✓      |     ✓ (own)      |         -         |      -      |
+| Org settings              |      ✓      |        ✓         |         -         |      -      |
+| View org members          |      ✓      |        ✓         |         -         |      -      |
+| Add/remove org members    |      ✓      |        ✓         |         -         |      -      |
+| Promote to admin          |      ✓      |        ✓         |         -         |      -      |
+| Create pool               |      ✓      |        ✓         |         -         |      -      |
+| **Delete pool**           |      ✓      |        ✓         |        ❌         |      -      |
+| Pool settings             |      ✓      |        ✓         |         ✓         |      -      |
+| Manage pool members       |      ✓      |        ✓         |         ✓         |      -      |
+| Appoint pool commissioner |      ✓      |        ✓         |        ❌         |      -      |
+| Add/manage games          |      ✓      |        ✓         |         ✓         |      -      |
+| Enter scores              |      ✓      |        ✓         |         ✓         |      -      |
+| Generate join links       |      ✓      |        ✓         |         ✓         |      -      |
+| Make picks                |      ✓      |        ✓         |         ✓         |      ✓      |
+| View standings            |      ✓      |        ✓         |         ✓         |      ✓      |
 
 ---
 
@@ -179,6 +179,7 @@ Step 5: Invite Friends (Wizard Step 4)
 ```
 
 **Wizard Implementation Notes:**
+
 - Store wizard state in URL or localStorage
 - Allow skipping steps (can complete later)
 - Show progress indicator (Step 2 of 4, etc.)
@@ -234,6 +235,7 @@ $$ LANGUAGE sql SECURITY DEFINER;
 ### Policies to Update
 
 All policies currently using `is_org_commissioner()` need to be updated:
+
 - `is_org_commissioner(org_id)` → `is_org_admin(org_id)`
 - `is_pool_commissioner(pool_id)` → Updated function above
 
@@ -254,14 +256,14 @@ USING (
 
 ### Files to Modify
 
-| File | Changes |
-|------|---------|
-| `frontend/src/app/(dashboard)/pools/[id]/page.tsx` | Check pool commissioner role, hide delete for non-admins |
-| `frontend/src/app/(dashboard)/orgs/[id]/members/page.tsx` | Update role options (admin/member) |
-| `frontend/src/components/orgs/org-member-actions.tsx` | Rename "commissioner" → "admin" |
-| `frontend/src/components/pools/pool-settings.tsx` | Add commissioner role management |
-| `frontend/src/components/members/member-actions.tsx` | Add "Promote to Commissioner" option |
-| `frontend/src/app/(dashboard)/dashboard/page.tsx` | Add "Create Organization" for users with no orgs |
+| File                                                      | Changes                                                  |
+| --------------------------------------------------------- | -------------------------------------------------------- |
+| `frontend/src/app/(dashboard)/pools/[id]/page.tsx`        | Check pool commissioner role, hide delete for non-admins |
+| `frontend/src/app/(dashboard)/orgs/[id]/members/page.tsx` | Update role options (admin/member)                       |
+| `frontend/src/components/orgs/org-member-actions.tsx`     | Rename "commissioner" → "admin"                          |
+| `frontend/src/components/pools/pool-settings.tsx`         | Add commissioner role management                         |
+| `frontend/src/components/members/member-actions.tsx`      | Add "Promote to Commissioner" option                     |
+| `frontend/src/app/(dashboard)/dashboard/page.tsx`         | Add "Create Organization" for users with no orgs         |
 
 ### New Components Needed
 
@@ -272,11 +274,12 @@ USING (
 
 ```typescript
 // Old pattern
-const isCommissioner = orgMembership?.role === 'commissioner' || isSuperAdmin
+const isCommissioner = orgMembership?.role === "commissioner" || isSuperAdmin;
 
 // New pattern
-const isOrgAdmin = orgMembership?.role === 'admin' || isSuperAdmin
-const isPoolCommissioner = poolMembership?.role === 'commissioner' || isOrgAdmin
+const isOrgAdmin = orgMembership?.role === "admin" || isSuperAdmin;
+const isPoolCommissioner =
+  poolMembership?.role === "commissioner" || isOrgAdmin;
 ```
 
 ---
@@ -284,6 +287,7 @@ const isPoolCommissioner = poolMembership?.role === 'commissioner' || isOrgAdmin
 ## Migration Checklist
 
 ### Phase 1: Database Schema ✅
+
 - [x] Create migration: add `tier` column to organizations (default 'free')
 - [x] Create migration: rename org role 'commissioner' → 'admin'
 - [x] Create migration: add `role` column to pool_memberships
@@ -294,18 +298,21 @@ const isPoolCommissioner = poolMembership?.role === 'commissioner' || isOrgAdmin
 - [x] Regenerate TypeScript types
 
 ### Phase 2: Frontend - Org Level ✅
+
 - [x] Update org member actions (admin terminology)
 - [x] Add self-service org creation to dashboard
 - [x] Update org creation to set creator as admin
 - [x] Update org member list to show admin/member roles
 
 ### Phase 3: Frontend - Pool Level ✅
+
 - [x] Update pool permission checks (isOrgAdmin + isPoolCommissioner)
 - [x] Add commissioner promotion UI for org admins
 - [x] Hide delete pool from pool commissioners (only admins)
 - [x] Update member management to show commissioner role
 
 ### Phase 4: Onboarding Wizard ✅
+
 - [x] Create `/onboarding` route with step-based UI
 - [x] Step 1: Create organization
 - [x] Step 2: Create first pool
@@ -315,14 +322,20 @@ const isPoolCommissioner = poolMembership?.role === 'commissioner' || isOrgAdmin
 - [x] Store wizard state (URL params)
 
 ### Phase 5: Testing & Docs
+
 - [x] Update CLAUDE.md with new role structure
 - [x] Document the permission model for users
 - [x] Fix RLS policies for organizations (allow any authenticated user to create/view)
 - [x] Fix RLS policies for org_memberships (add super admin bypass for viewing all members)
 - [x] Fix duplicate pool_membership insert in create-pool-button (trigger already handles it)
+- [x] Fix join flow: redirect to dashboard (pending members can't view pool), add `is_pool_member_any_status()` for pending members to see pool data
+- [x] Fix invite link copy to include full URL (uses `window.location.origin` client-side)
+- [x] Add pending request badges (iPhone-style notification circles on org page, inline badges on dashboard)
+- [x] Redesign org page with ShadCN components (Card, Badge, Button)
 - [x] Test organization creation with fresh user ✓
-- [ ] Test pool creation flow (in progress)
-- [ ] Test pool commissioner permissions
+- [x] Test pool creation flow ✓
+- [x] Test join flow with invite link ✓
+- [x] Test pool commissioner permissions
 - [ ] Test org admin vs pool commissioner delete restrictions
 - [ ] Test onboarding wizard flow end-to-end
 
