@@ -43,16 +43,8 @@ export function CreateEntryButton({ poolId }: CreateEntryButtonProps) {
       return
     }
 
-    // Also ensure user has an approved membership in this pool
-    await supabase
-      .from('pool_memberships')
-      .upsert({
-        pool_id: poolId,
-        user_id: user.id,
-        status: 'approved'
-      }, {
-        onConflict: 'pool_id,user_id'
-      })
+    // Note: User must already be an approved pool member to reach this page.
+    // RLS on bb_entries enforces this. No need to manipulate pool_memberships here.
 
     router.refresh()
   }

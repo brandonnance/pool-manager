@@ -22,12 +22,8 @@ interface GenerateLinkButtonProps {
 }
 
 function generateToken(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-  let token = ''
-  for (let i = 0; i < 16; i++) {
-    token += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return token
+  // Use cryptographically secure random via Web Crypto API
+  return crypto.randomUUID().replace(/-/g, '').slice(0, 16)
 }
 
 export function GenerateLinkButton({ poolId }: GenerateLinkButtonProps) {
