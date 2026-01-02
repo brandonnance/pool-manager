@@ -42,17 +42,19 @@ export default async function PoolMembersPage({ params }: PageProps) {
   const isSquaresPool = pool.type === 'squares' || pool.type === 'playoff_squares' || pool.type === 'single_game_squares'
   let isSquaresLocked = false
   let squareCountsByUser = new Map<string, number>()
+  let isNoAccountMode = false
 
   if (isSquaresPool) {
     const { data: sqPool } = await supabase
       .from('sq_pools')
-      .select('id, numbers_locked')
+      .select('id, numbers_locked, no_account_mode')
       .eq('pool_id', id)
       .single()
     isSquaresLocked = sqPool?.numbers_locked ?? false
+    isNoAccountMode = sqPool?.no_account_mode ?? false
 
-    // Get square counts per user
-    if (sqPool) {
+    // Get square counts per user (only for non-no-account mode)
+    if (sqPool && !isNoAccountMode) {
       const { data: squares } = await supabase
         .from('sq_squares')
         .select('user_id')
@@ -118,11 +120,17 @@ export default async function PoolMembersPage({ params }: PageProps) {
 
   const profileMap = new Map(profiles?.map(p => [p.id, p]) ?? [])
 
-  // Count by status
-  const pendingCount = memberships?.filter(m => m.status === 'pending').length ?? 0
-  const approvedCount = memberships?.filter(m => m.status === 'approved').length ?? 0
+  // For no-account mode, only show commissioners
+  const filteredMemberships = isNoAccountMode
+    ? memberships?.filter(m => m.role === 'commissioner')
+    : memberships
 
-  // Get join links
+  // Count by status
+  const pendingCount = filteredMemberships?.filter(m => m.status === 'pending').length ?? 0
+  const approvedCount = filteredMemberships?.filter(m => m.status === 'approved').length ?? 0
+  const commissionerCount = memberships?.filter(m => m.role === 'commissioner' && m.status === 'approved').length ?? 0
+
+  // Get join links (skip for no-account mode)
   const { data: joinLinks } = await supabase
     .from('join_links')
     .select('id, token, expires_at, max_uses, uses, created_at')
@@ -190,21 +198,36 @@ export default async function PoolMembersPage({ params }: PageProps) {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Manage Members</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {isNoAccountMode ? 'Manage Commissioners' : 'Manage Members'}
+          </h1>
           <p className="text-gray-600 mt-1">
-            {approvedCount} approved member{approvedCount !== 1 ? 's' : ''}
-            {pendingCount > 0 && (
-              <span className="ml-2 text-yellow-600">
-                ({pendingCount} pending)
-              </span>
+            {isNoAccountMode ? (
+              <>
+                {commissionerCount} commissioner{commissionerCount !== 1 ? 's' : ''}
+                <span className="text-muted-foreground ml-2">
+                  (No-account mode - participants don&apos;t need accounts)
+                </span>
+              </>
+            ) : (
+              <>
+                {approvedCount} approved member{approvedCount !== 1 ? 's' : ''}
+                {pendingCount > 0 && (
+                  <span className="ml-2 text-yellow-600">
+                    ({pendingCount} pending)
+                  </span>
+                )}
+              </>
             )}
           </p>
         </div>
-        <AddOrgMemberButton poolId={id} orgMembers={addableOrgMembers} />
+        {!isNoAccountMode && (
+          <AddOrgMemberButton poolId={id} orgMembers={addableOrgMembers} />
+        )}
       </div>
 
-      {/* Pending Requests Section */}
-      {pendingCount > 0 && (
+      {/* Pending Requests Section - hide for no-account mode */}
+      {!isNoAccountMode && pendingCount > 0 && (
         <div className="mb-8">
           <h2 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
             Pending Requests
@@ -267,15 +290,21 @@ export default async function PoolMembersPage({ params }: PageProps) {
         </div>
       )}
 
-      {/* Approved Members Section */}
+      {/* Approved Members Section (Commissioners for no-account mode) */}
       <div>
         <h2 className="text-lg font-semibold text-gray-900 mb-3">
-          Approved Members
+          {isNoAccountMode ? 'Commissioners' : 'Approved Members'}
         </h2>
         {approvedCount === 0 ? (
           <div className="text-center py-12 bg-white rounded-lg shadow">
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No members yet</h3>
-            <p className="text-gray-600">Share a join link to invite people to this pool.</p>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              {isNoAccountMode ? 'No commissioners yet' : 'No members yet'}
+            </h3>
+            <p className="text-gray-600">
+              {isNoAccountMode
+                ? 'Add org members as commissioners to help manage this pool.'
+                : 'Share a join link to invite people to this pool.'}
+            </p>
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow overflow-x-auto">
@@ -288,7 +317,7 @@ export default async function PoolMembersPage({ params }: PageProps) {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Role
                   </th>
-                  {isSquaresPool && (
+                  {isSquaresPool && !isNoAccountMode && (
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Squares
                     </th>
@@ -305,7 +334,7 @@ export default async function PoolMembersPage({ params }: PageProps) {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {memberships?.filter(m => m.status === 'approved').map((membership) => {
+                {filteredMemberships?.filter(m => m.status === 'approved').map((membership) => {
                   const userProfile = profileMap.get(membership.user_id)
                   const approverProfile = membership.approved_by
                     ? profileMap.get(membership.approved_by)
@@ -326,7 +355,7 @@ export default async function PoolMembersPage({ params }: PageProps) {
                           <span className="text-sm text-gray-500">Member</span>
                         )}
                       </td>
-                      {isSquaresPool && (
+                      {isSquaresPool && !isNoAccountMode && (
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="text-sm font-medium text-gray-900">
                             {squareCountsByUser.get(membership.user_id) ?? 0}
@@ -368,78 +397,80 @@ export default async function PoolMembersPage({ params }: PageProps) {
         )}
       </div>
 
-      {/* Invite Links Section */}
-      <div className="mt-8">
-        <div className="flex justify-between items-center mb-3">
-          <h2 className="text-lg font-semibold text-gray-900">Invite Links</h2>
-          <GenerateLinkButton poolId={id} />
-        </div>
-
-        {!joinLinks || joinLinks.length === 0 ? (
-          <div className="text-center py-8 bg-white rounded-lg shadow">
-            <p className="text-gray-600">No invite links yet. Generate one to share with others.</p>
+      {/* Invite Links Section - hide for no-account mode */}
+      {!isNoAccountMode && (
+        <div className="mt-8">
+          <div className="flex justify-between items-center mb-3">
+            <h2 className="text-lg font-semibold text-gray-900">Invite Links</h2>
+            <GenerateLinkButton poolId={id} />
           </div>
-        ) : (
-          <div className="bg-white rounded-lg shadow overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Link
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Uses
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Expires
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {joinLinks.map((link) => {
-                  const isExpired = link.expires_at && new Date(link.expires_at) < new Date()
-                  const isMaxedOut = link.max_uses && (link.uses ?? 0) >= link.max_uses
-                  const isActive = !isExpired && !isMaxedOut
 
-                  return (
-                    <tr key={link.id} className={!isActive ? 'bg-gray-50' : ''}>
-                      <td className="px-6 py-4">
-                        <code className="text-sm text-gray-600 bg-gray-100 px-2 py-1 rounded break-all">
-                          {link.token}
-                        </code>
-                        {!isActive && (
-                          <span className="ml-2 text-xs text-red-600">
-                            {isExpired ? 'Expired' : 'Max uses reached'}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {link.uses ?? 0}{link.max_uses ? ` / ${link.max_uses}` : ''}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {link.expires_at
-                          ? new Date(link.expires_at).toLocaleDateString()
-                          : 'Never'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex gap-2">
-                          {isActive && (
-                            <CopyLinkButton token={link.token} />
+          {!joinLinks || joinLinks.length === 0 ? (
+            <div className="text-center py-8 bg-white rounded-lg shadow">
+              <p className="text-gray-600">No invite links yet. Generate one to share with others.</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-lg shadow overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Link
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Uses
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Expires
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {joinLinks.map((link) => {
+                    const isExpired = link.expires_at && new Date(link.expires_at) < new Date()
+                    const isMaxedOut = link.max_uses && (link.uses ?? 0) >= link.max_uses
+                    const isActive = !isExpired && !isMaxedOut
+
+                    return (
+                      <tr key={link.id} className={!isActive ? 'bg-gray-50' : ''}>
+                        <td className="px-6 py-4">
+                          <code className="text-sm text-gray-600 bg-gray-100 px-2 py-1 rounded break-all">
+                            {link.token}
+                          </code>
+                          {!isActive && (
+                            <span className="ml-2 text-xs text-red-600">
+                              {isExpired ? 'Expired' : 'Max uses reached'}
+                            </span>
                           )}
-                          <DeleteLinkButton linkId={link.id} />
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {link.uses ?? 0}{link.max_uses ? ` / ${link.max_uses}` : ''}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {link.expires_at
+                            ? new Date(link.expires_at).toLocaleDateString()
+                            : 'Never'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex gap-2">
+                            {isActive && (
+                              <CopyLinkButton token={link.token} />
+                            )}
+                            <DeleteLinkButton linkId={link.id} />
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Back to Pool */}
       <div className="mt-6">

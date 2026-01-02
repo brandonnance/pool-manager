@@ -860,9 +860,11 @@ export type Database = {
           id: string
           max_squares_per_player: number | null
           mode: string | null
+          no_account_mode: boolean
           numbers_locked: boolean | null
           per_change_payout: number | null
           pool_id: string
+          public_slug: string | null
           q1_payout: number | null
           q3_payout: number | null
           reverse_scoring: boolean | null
@@ -878,9 +880,11 @@ export type Database = {
           id?: string
           max_squares_per_player?: number | null
           mode?: string | null
+          no_account_mode?: boolean
           numbers_locked?: boolean | null
           per_change_payout?: number | null
           pool_id: string
+          public_slug?: string | null
           q1_payout?: number | null
           q3_payout?: number | null
           reverse_scoring?: boolean | null
@@ -896,9 +900,11 @@ export type Database = {
           id?: string
           max_squares_per_player?: number | null
           mode?: string | null
+          no_account_mode?: boolean
           numbers_locked?: boolean | null
           per_change_payout?: number | null
           pool_id?: string
+          public_slug?: string | null
           q1_payout?: number | null
           q3_payout?: number | null
           reverse_scoring?: boolean | null
@@ -955,25 +961,31 @@ export type Database = {
           claimed_at: string | null
           col_index: number
           id: string
+          participant_name: string | null
           row_index: number
           sq_pool_id: string
           user_id: string | null
+          verified: boolean | null
         }
         Insert: {
           claimed_at?: string | null
           col_index: number
           id?: string
+          participant_name?: string | null
           row_index: number
           sq_pool_id: string
           user_id?: string | null
+          verified?: boolean | null
         }
         Update: {
           claimed_at?: string | null
           col_index?: number
           id?: string
+          participant_name?: string | null
           row_index?: number
           sq_pool_id?: string
           user_id?: string | null
+          verified?: boolean | null
         }
         Relationships: [
           {

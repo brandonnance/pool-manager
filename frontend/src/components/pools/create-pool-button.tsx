@@ -64,6 +64,11 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
   const [homeTeam, setHomeTeam] = useState('')
   const [awayTeam, setAwayTeam] = useState('')
 
+  // No-Account mode options
+  const [noAccountMode, setNoAccountMode] = useState(false)
+  const [publicSlug, setPublicSlug] = useState('')
+  const [slugError, setSlugError] = useState<string | null>(null)
+
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
@@ -106,7 +111,21 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
 
     // For Playoff Squares, create sq_pool and games
     if (poolType === 'playoff_squares') {
-      const maxSquares = maxSquaresPerPlayer ? parseInt(maxSquaresPerPlayer) : null
+      const maxSquares = noAccountMode ? null : (maxSquaresPerPlayer ? parseInt(maxSquaresPerPlayer) : null)
+
+      // Validate slug format for no-account mode
+      if (noAccountMode && publicSlug) {
+        if (!/^[a-z0-9-]+$/.test(publicSlug)) {
+          setError('Slug can only contain lowercase letters, numbers, and hyphens')
+          setIsLoading(false)
+          return
+        }
+        if (publicSlug.length < 3 || publicSlug.length > 50) {
+          setError('Slug must be between 3 and 50 characters')
+          setIsLoading(false)
+          return
+        }
+      }
 
       // Create sq_pools record
       const { data: sqPool, error: sqPoolError } = await supabase
@@ -117,6 +136,8 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
           max_squares_per_player: maxSquares,
           mode: squaresMode,
           scoring_mode: squaresMode === 'single_game' ? scoringMode : null,
+          no_account_mode: noAccountMode,
+          public_slug: noAccountMode && publicSlug ? publicSlug : null,
         })
         .select()
         .single()
@@ -189,7 +210,32 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
     setGameName('')
     setHomeTeam('')
     setAwayTeam('')
+    setNoAccountMode(false)
+    setPublicSlug('')
+    setSlugError(null)
     setError(null)
+  }
+
+  // Generate slug from name
+  const generateSlug = (name: string) => {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 50)
+  }
+
+  const handleSlugChange = (value: string) => {
+    const formatted = value.toLowerCase().replace(/[^a-z0-9-]/g, '')
+    setPublicSlug(formatted)
+
+    if (formatted && formatted.length < 3) {
+      setSlugError('Slug must be at least 3 characters')
+    } else if (formatted && formatted.length > 50) {
+      setSlugError('Slug must be 50 characters or less')
+    } else {
+      setSlugError(null)
+    }
   }
 
   const handleOpenChange = (open: boolean) => {
@@ -369,6 +415,50 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
                   </>
                 )}
 
+                <div className="text-sm font-medium pt-2">Management Mode</div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="noAccountMode" className="text-sm font-normal">No-Account Mode</Label>
+                    <div className="text-xs text-muted-foreground">
+                      Commissioner assigns squares to names (no user accounts)
+                    </div>
+                  </div>
+                  <Switch
+                    id="noAccountMode"
+                    checked={noAccountMode}
+                    onCheckedChange={(checked) => {
+                      setNoAccountMode(checked)
+                      if (checked && name && !publicSlug) {
+                        setPublicSlug(generateSlug(name))
+                      }
+                    }}
+                  />
+                </div>
+
+                {noAccountMode && (
+                  <div className="space-y-2 ml-4 border-l-2 pl-4">
+                    <Label htmlFor="publicSlug">Public URL Slug</Label>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">/view/</span>
+                      <Input
+                        id="publicSlug"
+                        value={publicSlug}
+                        onChange={(e) => handleSlugChange(e.target.value)}
+                        placeholder="my-pool-name"
+                        className="font-mono text-sm"
+                      />
+                    </div>
+                    {slugError ? (
+                      <div className="text-xs text-destructive">{slugError}</div>
+                    ) : (
+                      <div className="text-xs text-muted-foreground">
+                        Share this link for anyone to view the grid
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="text-sm font-medium pt-2">Grid Options</div>
 
                 <div className="flex items-center justify-between">
@@ -385,21 +475,23 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="maxSquares">Max Squares per Player (optional)</Label>
-                  <Input
-                    id="maxSquares"
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={maxSquaresPerPlayer}
-                    onChange={(e) => setMaxSquaresPerPlayer(e.target.value)}
-                    placeholder="Unlimited"
-                  />
-                  <div className="text-xs text-muted-foreground">
-                    Leave blank for no limit
+                {!noAccountMode && (
+                  <div className="space-y-2">
+                    <Label htmlFor="maxSquares">Max Squares per Player (optional)</Label>
+                    <Input
+                      id="maxSquares"
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={maxSquaresPerPlayer}
+                      onChange={(e) => setMaxSquaresPerPlayer(e.target.value)}
+                      placeholder="Unlimited"
+                    />
+                    <div className="text-xs text-muted-foreground">
+                      Leave blank for no limit
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
 
