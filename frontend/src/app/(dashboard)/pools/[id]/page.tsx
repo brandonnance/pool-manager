@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { PoolSettings } from '@/components/pools/pool-settings'
 import { JoinPoolButton } from '@/components/pools/join-pool-button'
+import { SuperAdminJoinPoolButton } from '@/components/pools/super-admin-join-pool-button'
 import { CreateEntryButton } from '@/components/pools/create-entry-button'
 import { PoolStandings } from '@/components/standings/pool-standings'
 import { PlayoffSquaresContent } from '@/components/squares/playoff-squares-content'
@@ -419,7 +420,16 @@ export default async function PoolDetailPage({ params }: PageProps) {
                   </Badge>
                 </>
               )}
-              {!isMember && !isPending && !isCommissioner && <JoinPoolButton poolId={id} />}
+              {/* Super admin not yet a member - show special join button */}
+              {isSuperAdmin && !poolMembership && (
+                <SuperAdminJoinPoolButton
+                  poolId={id}
+                  orgId={pool.org_id}
+                  hasOrgMembership={!!orgMembership}
+                />
+              )}
+              {/* Regular users can request to join */}
+              {!isSuperAdmin && !isMember && !isPending && !isCommissioner && <JoinPoolButton poolId={id} />}
               {isPending && (
                 <Badge variant="outline" className="border-amber-500 text-amber-600">
                   Pending Approval

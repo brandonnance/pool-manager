@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { CreatePoolButton } from '@/components/pools/create-pool-button'
 import { DeletePoolButton } from '@/components/pools/delete-pool-button'
 import { DeleteOrgButton } from '@/components/orgs/delete-org-button'
+import { SuperAdminJoinOrgButton } from '@/components/orgs/super-admin-join-org-button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -119,6 +120,10 @@ export default async function OrgDetailPage({ params }: PageProps) {
               )}
             </div>
             <div className="flex items-center gap-3">
+              {/* Super admin not yet a member - show join button */}
+              {isSuperAdmin && !membership && (
+                <SuperAdminJoinOrgButton orgId={id} orgName={org.name} />
+              )}
               {isOrgAdmin && (
                 <Button variant="outline" size="sm" asChild>
                   <Link href={`/orgs/${id}/members`}>
