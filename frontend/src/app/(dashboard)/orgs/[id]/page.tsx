@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { CreatePoolButton } from '@/components/pools/create-pool-button'
 import { DeletePoolButton } from '@/components/pools/delete-pool-button'
+import { DeleteOrgButton } from '@/components/orgs/delete-org-button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -50,13 +51,14 @@ export default async function OrgDetailPage({ params }: PageProps) {
   const isOrgAdmin = membership?.role === 'admin' || isSuperAdmin
 
   // Get pools in this org
-  const { data: pools } = await supabase
+  const { data: allPools } = await supabase
     .from('pools')
     .select(`
       id,
       name,
       type,
       status,
+      visibility,
       season_label,
       created_at,
       created_by,
@@ -69,6 +71,16 @@ export default async function OrgDetailPage({ params }: PageProps) {
     `)
     .eq('org_id', id)
     .order('created_at', { ascending: false })
+
+  // Filter pools based on visibility:
+  // - Admins see all pools
+  // - Regular members see: pools they're a member of OR open_to_org pools
+  const pools = isOrgAdmin
+    ? allPools
+    : allPools?.filter((pool) => {
+        const isMember = pool.pool_memberships?.some((pm) => pm.user_id === user.id)
+        return isMember || pool.visibility === 'open_to_org'
+      })
 
   // Get member count for the org
   const { count: memberCount } = await supabase
@@ -113,6 +125,9 @@ export default async function OrgDetailPage({ params }: PageProps) {
                     {isSuperAdmin ? 'Super Admin' : 'Admin'}
                   </Badge>
                 </>
+              )}
+              {isSuperAdmin && (
+                <DeleteOrgButton orgId={id} orgName={org.name} />
               )}
             </div>
           </div>

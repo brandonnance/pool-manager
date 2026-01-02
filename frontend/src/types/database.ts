@@ -743,18 +743,21 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string | null
+          deactivated_at: string | null
           display_name: string | null
           id: string
           is_super_admin: boolean | null
         }
         Insert: {
           created_at?: string | null
+          deactivated_at?: string | null
           display_name?: string | null
           id: string
           is_super_admin?: boolean | null
         }
         Update: {
           created_at?: string | null
+          deactivated_at?: string | null
           display_name?: string | null
           id?: string
           is_super_admin?: boolean | null
@@ -1047,6 +1050,10 @@ export type Database = {
       is_org_commissioner: { Args: { p_org_id: string }; Returns: boolean }
       is_pool_commissioner: { Args: { p_pool_id: string }; Returns: boolean }
       is_pool_member: { Args: { p_pool_id: string }; Returns: boolean }
+      is_pool_member_any_status: {
+        Args: { p_pool_id: string }
+        Returns: boolean
+      }
       is_super_admin: { Args: never; Returns: boolean }
       pool_lock_time_for_bowl: {
         Args: { p_pool_game_id: string }

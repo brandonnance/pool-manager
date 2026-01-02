@@ -30,7 +30,31 @@ export async function updateSession(request: NextRequest) {
   )
 
   // Refresh session if expired
-  await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  // Check if user is deactivated
+  if (user) {
+    const pathname = request.nextUrl.pathname
+
+    // Skip deactivation check for these paths
+    const skipPaths = ['/account-deactivated', '/login', '/signup', '/auth']
+    const shouldSkip = skipPaths.some(path => pathname.startsWith(path))
+
+    if (!shouldSkip) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('deactivated_at')
+        .eq('id', user.id)
+        .single()
+
+      if (profile?.deactivated_at) {
+        // User is deactivated - redirect to deactivated page
+        const url = request.nextUrl.clone()
+        url.pathname = '/account-deactivated'
+        return NextResponse.redirect(url)
+      }
+    }
+  }
 
   return supabaseResponse
 }

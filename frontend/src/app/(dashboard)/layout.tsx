@@ -20,9 +20,14 @@ export default async function DashboardLayout({
   // Get user profile
   const { data: profile } = await supabase
     .from('profiles')
-    .select('display_name, is_super_admin')
+    .select('display_name, is_super_admin, deactivated_at')
     .eq('id', user.id)
     .single()
+
+  // Backup deactivation check (defense in depth)
+  if (profile?.deactivated_at) {
+    redirect('/account-deactivated')
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -48,6 +53,14 @@ export default async function DashboardLayout({
                 >
                   Organizations
                 </Link>
+                {profile?.is_super_admin && (
+                  <Link
+                    href="/admin/users"
+                    className="text-primary-foreground/80 hover:text-primary-foreground hover:bg-white/10 px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                  >
+                    Users
+                  </Link>
+                )}
               </nav>
             </div>
             <div className="flex items-center space-x-4">
