@@ -66,6 +66,7 @@ export interface NoAccountSquareCellProps {
   verified: boolean
   isCommissioner: boolean
   winningRound: WinningRound
+  isLiveWinning?: boolean // Pulsing animation for in-progress game
   isLoading?: boolean
   onClick?: () => void
   className?: string
@@ -78,6 +79,7 @@ export function NoAccountSquareCell({
   verified,
   isCommissioner,
   winningRound,
+  isLiveWinning = false,
   isLoading = false,
   onClick,
   className,
@@ -161,6 +163,7 @@ export function NoAccountSquareCell({
         isClickable && 'cursor-pointer hover:opacity-80',
         !isClickable && 'cursor-default',
         isLoading && 'animate-pulse cursor-wait',
+        isLiveWinning && 'animate-live-winner',
         className
       )}
       data-row={rowIndex}

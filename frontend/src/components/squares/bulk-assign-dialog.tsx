@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -47,6 +47,12 @@ export function BulkAssignDialog({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Autocomplete state
+  const [existingNames, setExistingNames] = useState<string[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [selectedIndex, setSelectedIndex] = useState(-1)
+  const inputRef = useRef<HTMLInputElement>(null)
+
   // Build set of claimed squares
   const claimedSquares = useMemo(() => {
     const set = new Set<string>()
@@ -58,14 +64,110 @@ export function BulkAssignDialog({
     return set
   }, [existingSquares])
 
-  // Reset form when dialog opens
-  const handleOpenChange = (isOpen: boolean) => {
-    if (isOpen) {
+  // Fetch existing participant names for autocomplete and case normalization
+  useEffect(() => {
+    if (open) {
+      const fetchNames = async () => {
+        const supabase = createClient()
+        const { data } = await supabase
+          .from('sq_squares')
+          .select('participant_name')
+          .eq('sq_pool_id', sqPoolId)
+          .not('participant_name', 'is', null)
+
+        if (data) {
+          // Get unique names (case-insensitive), preserving first occurrence casing
+          const nameMap = new Map<string, string>()
+          data.forEach(s => {
+            if (s.participant_name) {
+              const lowerName = s.participant_name.toLowerCase()
+              if (!nameMap.has(lowerName)) {
+                nameMap.set(lowerName, s.participant_name)
+              }
+            }
+          })
+          const uniqueNames = Array.from(nameMap.values())
+          uniqueNames.sort((a, b) => a.localeCompare(b))
+          setExistingNames(uniqueNames)
+        }
+      }
+      fetchNames()
+    }
+  }, [open, sqPoolId])
+
+  // Filter suggestions based on input
+  const filteredSuggestions = name.trim()
+    ? existingNames.filter(n =>
+        n.toLowerCase().includes(name.toLowerCase()) &&
+        n.toLowerCase() !== name.toLowerCase()
+      )
+    : []
+
+  // Handle keyboard navigation in suggestions
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (!showSuggestions || filteredSuggestions.length === 0) {
+      if (e.key === 'ArrowDown' && filteredSuggestions.length > 0) {
+        setShowSuggestions(true)
+        setSelectedIndex(0)
+        e.preventDefault()
+      }
+      return
+    }
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setSelectedIndex(prev =>
+          prev < filteredSuggestions.length - 1 ? prev + 1 : prev
+        )
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setSelectedIndex(prev => prev > 0 ? prev - 1 : -1)
+        break
+      case 'Enter':
+        if (selectedIndex >= 0 && selectedIndex < filteredSuggestions.length) {
+          e.preventDefault()
+          setName(filteredSuggestions[selectedIndex])
+          setShowSuggestions(false)
+          setSelectedIndex(-1)
+        }
+        break
+      case 'Escape':
+        setShowSuggestions(false)
+        setSelectedIndex(-1)
+        break
+    }
+  }, [showSuggestions, filteredSuggestions, selectedIndex])
+
+  const handleSelectSuggestion = (suggestion: string) => {
+    setName(suggestion)
+    setShowSuggestions(false)
+    setSelectedIndex(-1)
+    inputRef.current?.focus()
+  }
+
+  // Find the canonical (first-used) casing for a name
+  const getCanonicalName = (inputName: string): string => {
+    const lowerInput = inputName.toLowerCase()
+    const existingMatch = existingNames.find(n => n.toLowerCase() === lowerInput)
+    return existingMatch ?? inputName
+  }
+
+  // Reset form when dialog opens (via prop change)
+  useEffect(() => {
+    if (open) {
       setName('')
       setVerified(false)
       setSelectedSquares(new Set())
       setError(null)
+      setShowSuggestions(false)
+      setSelectedIndex(-1)
     }
+  }, [open])
+
+  // Handle dialog close
+  const handleOpenChange = (isOpen: boolean) => {
     onOpenChange(isOpen)
   }
 
@@ -112,6 +214,9 @@ export function BulkAssignDialog({
       return
     }
 
+    // Normalize to existing casing if a case-insensitive match exists
+    const normalizedName = getCanonicalName(trimmedName)
+
     setIsSubmitting(true)
     setError(null)
 
@@ -124,7 +229,7 @@ export function BulkAssignDialog({
         sq_pool_id: sqPoolId,
         row_index: row,
         col_index: col,
-        participant_name: trimmedName,
+        participant_name: normalizedName,
         verified,
       }
     })
@@ -164,13 +269,53 @@ export function BulkAssignDialog({
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label htmlFor="bulk-name">Participant Name</Label>
-            <Input
-              id="bulk-name"
-              placeholder="e.g., John Smith or Team Alpha"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              disabled={isSubmitting}
-            />
+            <div className="relative">
+              <Input
+                ref={inputRef}
+                id="bulk-name"
+                placeholder="e.g., John Smith or Team Alpha"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value)
+                  setShowSuggestions(true)
+                  setSelectedIndex(-1)
+                }}
+                onKeyDown={handleKeyDown}
+                onFocus={() => name.trim() && setShowSuggestions(true)}
+                onBlur={() => {
+                  // Delay hiding to allow click on suggestion
+                  setTimeout(() => setShowSuggestions(false), 150)
+                }}
+                disabled={isSubmitting}
+                autoComplete="off"
+              />
+              {/* Autocomplete suggestions dropdown */}
+              {showSuggestions && filteredSuggestions.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                  {filteredSuggestions.map((suggestion, index) => (
+                    <button
+                      key={suggestion}
+                      type="button"
+                      className={cn(
+                        'w-full px-3 py-2 text-left text-sm hover:bg-gray-100 focus:bg-gray-100 focus:outline-none',
+                        index === selectedIndex && 'bg-gray-100'
+                      )}
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        handleSelectSuggestion(suggestion)
+                      }}
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {existingNames.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Suggestions will appear as you type
+              </p>
+            )}
           </div>
 
           <div className="flex items-center justify-between">

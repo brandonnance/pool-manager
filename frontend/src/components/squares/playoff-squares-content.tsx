@@ -87,6 +87,15 @@ export function PlayoffSquaresContent({
     ? squares.filter((sq) => sq.user_id === currentUserId).length
     : 0
 
+  // Round hierarchy for playoff mode (higher number = higher tier)
+  const roundHierarchy: Record<string, number> = {
+    wild_card: 1,
+    divisional: 2,
+    conference: 3,
+    super_bowl_halftime: 4,
+    super_bowl: 5,
+  }
+
   // Build winning square rounds map (squareId -> round)
   const gameById = new Map(games.map((g) => [g.id, g]))
   const winningSquareRounds = new Map<string, WinningRound>()
@@ -100,7 +109,17 @@ export function PlayoffSquaresContent({
           game.round === 'super_bowl' && isHalftime
             ? 'super_bowl_halftime'
             : (game.round as WinningRound)
-        winningSquareRounds.set(w.square_id, round)
+
+        // Only set if new round is higher in hierarchy than existing
+        if (round) {
+          const existing = winningSquareRounds.get(w.square_id)
+          const existingRank = existing ? roundHierarchy[existing] ?? 0 : 0
+          const newRank = roundHierarchy[round] ?? 0
+
+          if (newRank > existingRank) {
+            winningSquareRounds.set(w.square_id, round)
+          }
+        }
       }
     }
   })

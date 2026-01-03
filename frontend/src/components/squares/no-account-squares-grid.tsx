@@ -23,6 +23,7 @@ export interface NoAccountSquaresGridProps {
   numbersLocked: boolean
   isCommissioner: boolean
   winningSquareRounds?: Map<string, WinningRound>
+  liveWinningSquareIds?: Set<string> // Square IDs currently winning from in-progress games
   homeTeamLabel?: string
   awayTeamLabel?: string
   legendMode?: LegendMode
@@ -38,6 +39,7 @@ export function NoAccountSquaresGrid({
   numbersLocked,
   isCommissioner,
   winningSquareRounds = new Map(),
+  liveWinningSquareIds = new Set(),
   homeTeamLabel = 'Home',
   awayTeamLabel = 'Away',
   legendMode = 'full_playoff',
@@ -82,7 +84,7 @@ export function NoAccountSquaresGrid({
         )}
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto overflow-y-visible pb-2">
         {/* Away team axis label */}
         <div className="flex items-center justify-center mb-2 ml-10">
           <div className="flex items-center gap-2 px-4 py-1 bg-primary/10 rounded-full">
@@ -160,6 +162,7 @@ export function NoAccountSquaresGrid({
                       verified={square?.verified ?? false}
                       isCommissioner={isCommissioner}
                       winningRound={square?.id ? winningSquareRounds.get(square.id) ?? null : null}
+                      isLiveWinning={square?.id ? liveWinningSquareIds.has(square.id) : false}
                       isLoading={isLoading}
                       onClick={() => handleSquareClick(rowIdx, colIdx)}
                     />

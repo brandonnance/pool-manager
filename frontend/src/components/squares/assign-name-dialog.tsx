@@ -17,6 +17,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import { CheckCircle2, XCircle } from 'lucide-react'
+
+interface ParticipantStats {
+  totalSquares: number
+  verifiedCount: number
+  unverifiedCount: number
+  squareIds: string[]
+}
 
 export interface AssignNameDialogProps {
   open: boolean
@@ -54,27 +62,63 @@ export function AssignNameDialog({
   const inputRef = useRef<HTMLInputElement>(null)
   const suggestionsRef = useRef<HTMLDivElement>(null)
 
-  // Fetch existing participant names for autocomplete
+  // Participant stats for "Verify All" feature
+  const [participantStats, setParticipantStats] = useState<ParticipantStats | null>(null)
+  const [allSquaresData, setAllSquaresData] = useState<Array<{ id: string; participant_name: string | null; verified: boolean }>>([])
+
+  // Fetch all squares data for autocomplete and participant stats
   useEffect(() => {
     if (open) {
-      const fetchNames = async () => {
+      const fetchSquares = async () => {
         const supabase = createClient()
         const { data } = await supabase
           .from('sq_squares')
-          .select('participant_name')
+          .select('id, participant_name, verified')
           .eq('sq_pool_id', sqPoolId)
-          .not('participant_name', 'is', null)
 
         if (data) {
-          // Get unique names, sorted alphabetically
-          const uniqueNames = [...new Set(data.map(s => s.participant_name).filter(Boolean) as string[])]
+          // Normalize verified to boolean (null -> false)
+          setAllSquaresData(data.map(s => ({
+            ...s,
+            verified: s.verified ?? false
+          })))
+          // Get unique names (case-insensitive), preserving first occurrence casing
+          const nameMap = new Map<string, string>()
+          data.forEach(s => {
+            if (s.participant_name) {
+              const lowerName = s.participant_name.toLowerCase()
+              if (!nameMap.has(lowerName)) {
+                nameMap.set(lowerName, s.participant_name)
+              }
+            }
+          })
+          const uniqueNames = Array.from(nameMap.values())
           uniqueNames.sort((a, b) => a.localeCompare(b))
           setExistingNames(uniqueNames)
         }
       }
-      fetchNames()
+      fetchSquares()
     }
   }, [open, sqPoolId])
+
+  // Calculate participant stats when we have a current name
+  useEffect(() => {
+    if (currentName && allSquaresData.length > 0) {
+      const lowerCurrentName = currentName.toLowerCase()
+      const participantSquares = allSquaresData.filter(
+        s => s.participant_name?.toLowerCase() === lowerCurrentName
+      )
+      const verifiedCount = participantSquares.filter(s => s.verified).length
+      setParticipantStats({
+        totalSquares: participantSquares.length,
+        verifiedCount,
+        unverifiedCount: participantSquares.length - verifiedCount,
+        squareIds: participantSquares.map(s => s.id),
+      })
+    } else {
+      setParticipantStats(null)
+    }
+  }, [currentName, allSquaresData])
 
   // Filter suggestions based on input
   const filteredSuggestions = name.trim()
@@ -142,12 +186,47 @@ export function AssignNameDialog({
   const gridNumber = `${rowIndex}${colIndex}`
   const isAssigned = currentName !== null
 
+  // Find the canonical (first-used) casing for a name
+  const getCanonicalName = (inputName: string): string => {
+    const lowerInput = inputName.toLowerCase()
+    const existingMatch = existingNames.find(n => n.toLowerCase() === lowerInput)
+    return existingMatch ?? inputName
+  }
+
+  // Verify or unverify all squares for the current participant
+  const handleBulkVerify = async (setVerified: boolean) => {
+    if (!participantStats || participantStats.squareIds.length === 0) return
+
+    setIsSubmitting(true)
+    setError(null)
+
+    const supabase = createClient()
+    const { error: updateError } = await supabase
+      .from('sq_squares')
+      .update({ verified: setVerified })
+      .in('id', participantStats.squareIds)
+
+    if (updateError) {
+      setError(updateError.message)
+      setIsSubmitting(false)
+      return
+    }
+
+    setIsSubmitting(false)
+    onOpenChange(false)
+    onSaved()
+    router.refresh()
+  }
+
   const handleSave = async () => {
     const trimmedName = name.trim()
     if (!trimmedName) {
       setError('Please enter a name')
       return
     }
+
+    // Normalize to existing casing if a case-insensitive match exists
+    const normalizedName = getCanonicalName(trimmedName)
 
     setIsSubmitting(true)
     setError(null)
@@ -159,7 +238,7 @@ export function AssignNameDialog({
       const { error: updateError } = await supabase
         .from('sq_squares')
         .update({
-          participant_name: trimmedName,
+          participant_name: normalizedName,
           verified,
         })
         .eq('id', squareId)
@@ -175,7 +254,7 @@ export function AssignNameDialog({
         sq_pool_id: sqPoolId,
         row_index: rowIndex,
         col_index: colIndex,
-        participant_name: trimmedName,
+        participant_name: normalizedName,
         verified,
       })
 
@@ -308,6 +387,52 @@ export function AssignNameDialog({
               disabled={isSubmitting}
             />
           </div>
+
+          {/* Participant stats and bulk verify - only show for assigned squares */}
+          {isAssigned && participantStats && participantStats.totalSquares > 1 && (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">
+                  {currentName} has {participantStats.totalSquares} squares
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  <span className="text-green-600">{participantStats.verifiedCount}</span>
+                  {' / '}
+                  <span className="text-red-600">{participantStats.unverifiedCount}</span>
+                  {' '}
+                  verified/unverified
+                </span>
+              </div>
+              <div className="flex gap-2">
+                {participantStats.unverifiedCount > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 text-green-600 border-green-300 hover:bg-green-50"
+                    onClick={() => handleBulkVerify(true)}
+                    disabled={isSubmitting}
+                  >
+                    <CheckCircle2 className="size-4 mr-1" />
+                    Verify All ({participantStats.totalSquares})
+                  </Button>
+                )}
+                {participantStats.verifiedCount > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 text-red-600 border-red-300 hover:bg-red-50"
+                    onClick={() => handleBulkVerify(false)}
+                    disabled={isSubmitting}
+                  >
+                    <XCircle className="size-4 mr-1" />
+                    Unverify All ({participantStats.totalSquares})
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
 
           {error && (
             <Alert variant="destructive">

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -68,6 +68,8 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
   const [noAccountMode, setNoAccountMode] = useState(false)
   const [publicSlug, setPublicSlug] = useState('')
   const [slugError, setSlugError] = useState<string | null>(null)
+  const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null)
+  const [checkingSlug, setCheckingSlug] = useState(false)
 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -213,8 +215,50 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
     setNoAccountMode(false)
     setPublicSlug('')
     setSlugError(null)
+    setSlugAvailable(null)
+    setCheckingSlug(false)
     setError(null)
   }
+
+  // Check if slug is available
+  const checkSlugAvailability = useCallback(async (slug: string) => {
+    if (!slug || slug.length < 3) {
+      setSlugAvailable(null)
+      return
+    }
+
+    setCheckingSlug(true)
+    const supabase = createClient()
+
+    const { data, error } = await supabase
+      .from('sq_pools')
+      .select('id')
+      .eq('public_slug', slug)
+      .maybeSingle()
+
+    setCheckingSlug(false)
+
+    if (error) {
+      setSlugAvailable(null)
+      return
+    }
+
+    setSlugAvailable(data === null)
+  }, [])
+
+  // Debounced slug availability check
+  useEffect(() => {
+    if (!noAccountMode || !publicSlug || slugError) {
+      setSlugAvailable(null)
+      return
+    }
+
+    const timeoutId = setTimeout(() => {
+      checkSlugAvailability(publicSlug)
+    }, 500)
+
+    return () => clearTimeout(timeoutId)
+  }, [publicSlug, noAccountMode, slugError, checkSlugAvailability])
 
   // Generate slug from name
   const generateSlug = (name: string) => {
@@ -446,11 +490,26 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
                         value={publicSlug}
                         onChange={(e) => handleSlugChange(e.target.value)}
                         placeholder="my-pool-name"
-                        className="font-mono text-sm"
+                        className={`font-mono text-sm ${
+                          slugError ? 'border-destructive' :
+                          slugAvailable === false ? 'border-destructive' :
+                          slugAvailable === true ? 'border-green-500' : ''
+                        }`}
                       />
+                      {checkingSlug && (
+                        <div className="text-xs text-muted-foreground animate-pulse">...</div>
+                      )}
                     </div>
                     {slugError ? (
                       <div className="text-xs text-destructive">{slugError}</div>
+                    ) : slugAvailable === false ? (
+                      <div className="text-xs text-destructive">
+                        This slug is already taken. Try a different one.
+                      </div>
+                    ) : slugAvailable === true ? (
+                      <div className="text-xs text-green-600">
+                        This slug is available!
+                      </div>
                     ) : (
                       <div className="text-xs text-muted-foreground">
                         Share this link for anyone to view the grid
@@ -510,7 +569,14 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading || !name.trim()}>
+            <Button
+              type="submit"
+              disabled={
+                isLoading ||
+                !name.trim() ||
+                (noAccountMode && (!!slugError || slugAvailable === false || checkingSlug))
+              }
+            >
               {isLoading ? 'Creating...' : 'Create Pool'}
             </Button>
           </DialogFooter>

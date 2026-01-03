@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { PublicRealtimeGrid } from '@/components/squares/public-realtime-grid'
+import { PublicRealtimeGames } from '@/components/squares/public-realtime-games'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import type { WinningRound } from '@/components/squares/square-cell'
@@ -130,6 +131,24 @@ export default async function PublicViewPage({ params }: PageProps) {
     }
   }
 
+  // Round hierarchy for playoff mode (higher number = higher tier)
+  const roundHierarchy: Record<string, number> = {
+    wild_card: 1,
+    divisional: 2,
+    conference: 3,
+    super_bowl_halftime: 4,
+    super_bowl: 5,
+    // Single game mode
+    single_game: 1,
+    // Score change mode
+    score_change_forward: 1,
+    score_change_reverse: 1,
+    score_change_both: 2,
+    score_change_final: 3,
+    score_change_final_reverse: 3,
+    score_change_final_both: 4,
+  }
+
   // Build winning squares map for grid highlighting
   // Use an array of tuples for serialization (Maps can't be passed to client components)
   const winningSquareRoundsMap = new Map<string, WinningRound>()
@@ -169,9 +188,12 @@ export default async function PublicViewPage({ params }: PageProps) {
         }
 
         if (round) {
-          // Don't overwrite with a lesser win type
+          // Only set if new round is higher in hierarchy than existing
           const existing = winningSquareRoundsMap.get(winner.square_id)
-          if (!existing) {
+          const existingRank = existing ? roundHierarchy[existing] ?? 0 : 0
+          const newRank = roundHierarchy[round] ?? 0
+
+          if (newRank > existingRank) {
             winningSquareRoundsMap.set(winner.square_id, round)
           }
         }
@@ -182,23 +204,12 @@ export default async function PublicViewPage({ params }: PageProps) {
   // Convert Map to array for serialization to client component
   const winningSquareRoundsArray = Array.from(winningSquareRoundsMap.entries())
 
-  // Calculate wins by participant name for leaderboard
-  const winsByName = new Map<string, number>()
-  for (const winner of winners) {
-    if (winner.winner_name) {
-      const current = winsByName.get(winner.winner_name) ?? 0
-      winsByName.set(winner.winner_name, current + 1)
-    }
-  }
-
-  const leaderboardEntries = Array.from(winsByName.entries())
-    .map(([name, total]) => ({ name, total }))
-    .sort((a, b) => b.total - a.total)
-
-  // Get first game for team labels
+  // Get team labels - only use team names for single game mode
+  // For playoff mode, teams change per game so use generic labels
   const firstGame = games[0] ?? null
-  const homeTeamLabel = firstGame?.home_team ?? 'Home'
-  const awayTeamLabel = firstGame?.away_team ?? 'Away'
+  const isSingleGame = sqPool.mode === 'single_game'
+  const homeTeamLabel = isSingleGame && firstGame?.home_team ? firstGame.home_team : 'Home'
+  const awayTeamLabel = isSingleGame && firstGame?.away_team ? firstGame.away_team : 'Away'
 
   // Determine legend mode based on pool settings
   const legendMode = sqPool.mode === 'single_game'
@@ -206,18 +217,6 @@ export default async function PublicViewPage({ params }: PageProps) {
       ? 'score_change'
       : 'single_game'
     : 'full_playoff'
-
-  // Group winners by change_order for score change log
-  const winnersByChangeOrder = new Map<number, typeof winners>()
-  for (const w of winners) {
-    if (w.win_type === 'score_change' || w.win_type === 'score_change_reverse') {
-      const order = w.payout ?? 0
-      if (!winnersByChangeOrder.has(order)) {
-        winnersByChangeOrder.set(order, [])
-      }
-      winnersByChangeOrder.get(order)!.push(w)
-    }
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -261,9 +260,16 @@ export default async function PublicViewPage({ params }: PageProps) {
                 participant_name: s.participant_name,
                 verified: false, // Public view never shows verified status
               }))}
+              initialGames={games.map((g) => ({
+                id: g.id,
+                home_score: g.home_score,
+                away_score: g.away_score,
+                status: g.status,
+              }))}
               rowNumbers={sqPool.row_numbers}
               colNumbers={sqPool.col_numbers}
               numbersLocked={sqPool.numbers_locked ?? false}
+              reverseScoring={sqPool.reverse_scoring ?? false}
               winningSquareRoundsArray={winningSquareRoundsArray}
               homeTeamLabel={homeTeamLabel}
               awayTeamLabel={awayTeamLabel}
@@ -274,163 +280,22 @@ export default async function PublicViewPage({ params }: PageProps) {
 
         {/* Games and Scores - only show after lock */}
         {sqPool.numbers_locked && games.length > 0 && (
-          <div className="grid gap-6 lg:grid-cols-3">
-            {/* Games Column */}
-            <div className="lg:col-span-2 space-y-4">
-              <h2 className="text-lg font-semibold">Games</h2>
-              <div className="grid gap-4 sm:grid-cols-2">
-                {games.map((game) => {
-                  const hasScores = game.home_score !== null && game.away_score !== null
-                  const isFinal = game.status === 'final'
-
-                  return (
-                    <div key={game.id} className="bg-white rounded-lg border p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-sm font-medium">{game.game_name}</span>
-                        <Badge variant={isFinal ? 'secondary' : game.status === 'in_progress' ? 'default' : 'outline'}>
-                          {isFinal ? 'Final' : game.status === 'in_progress' ? 'Live' : 'Scheduled'}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center justify-center gap-4">
-                        <div className="text-center flex-1">
-                          <div className="text-sm font-medium truncate">{game.away_team}</div>
-                          <div className="text-3xl font-bold tabular-nums mt-1">
-                            {hasScores ? game.away_score : '-'}
-                          </div>
-                        </div>
-                        <div className="text-muted-foreground">@</div>
-                        <div className="text-center flex-1">
-                          <div className="text-sm font-medium truncate">{game.home_team}</div>
-                          <div className="text-3xl font-bold tabular-nums mt-1">
-                            {hasScores ? game.home_score : '-'}
-                          </div>
-                        </div>
-                      </div>
-                      {/* Quarter scores for quarter mode */}
-                      {sqPool.scoring_mode === 'quarter' && (
-                        <div className="mt-3 pt-3 border-t grid grid-cols-4 gap-2 text-xs text-center">
-                          <div>
-                            <div className="text-muted-foreground">Q1</div>
-                            <div className="font-mono">
-                              {game.q1_away_score ?? '-'} - {game.q1_home_score ?? '-'}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-muted-foreground">Half</div>
-                            <div className="font-mono">
-                              {game.halftime_away_score ?? '-'} - {game.halftime_home_score ?? '-'}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-muted-foreground">Q3</div>
-                            <div className="font-mono">
-                              {game.q3_away_score ?? '-'} - {game.q3_home_score ?? '-'}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-muted-foreground">Final</div>
-                            <div className="font-mono font-bold">
-                              {game.away_score ?? '-'} - {game.home_score ?? '-'}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* Score Change Log for score_change mode */}
-              {sqPool.scoring_mode === 'score_change' && scoreChanges.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Score Changes</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {scoreChanges
-                        .filter((sc) => sc.sq_game_id === games[0]?.id)
-                        .sort((a, b) => b.change_order - a.change_order)
-                        .map((change) => {
-                          const changeWinners = winnersByChangeOrder.get(change.change_order) || []
-                          const homeDigit = change.home_score % 10
-                          const awayDigit = change.away_score % 10
-
-                          return (
-                            <div key={change.id} className="p-3 rounded-lg border bg-muted/30">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                  <Badge variant="outline" className="text-xs">
-                                    #{change.change_order}
-                                  </Badge>
-                                  <div className="font-mono text-lg font-bold">
-                                    {change.away_score} - {change.home_score}
-                                  </div>
-                                  <span className="text-xs text-muted-foreground font-mono">
-                                    [{awayDigit}-{homeDigit}]
-                                  </span>
-                                </div>
-                              </div>
-
-                              {changeWinners.length > 0 && (
-                                <div className="mt-2 pt-2 border-t border-dashed flex flex-wrap gap-2">
-                                  {changeWinners.map((winner) => (
-                                    <div
-                                      key={winner.id}
-                                      className={`text-xs px-2 py-1 rounded ${
-                                        winner.win_type === 'score_change_reverse'
-                                          ? 'bg-rose-100 text-rose-700'
-                                          : 'bg-emerald-100 text-emerald-700'
-                                      }`}
-                                    >
-                                      {winner.win_type === 'score_change_reverse' && <span className="mr-1">(R)</span>}
-                                      {winner.winner_name || 'Unclaimed'}
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-
-            {/* Leaderboard Column */}
-            <div className="space-y-4">
-              <h2 className="text-lg font-semibold">Wins</h2>
-              {leaderboardEntries.length > 0 ? (
-                <Card>
-                  <CardContent className="pt-4">
-                    <div className="space-y-1">
-                      {leaderboardEntries.map((entry, index) => (
-                        <div
-                          key={entry.name}
-                          className="flex items-center justify-between text-sm px-2 py-1.5 rounded hover:bg-muted/50"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="w-6 font-medium">
-                              {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`}
-                            </span>
-                            <span className="truncate">{entry.name}</span>
-                          </div>
-                          <span className="font-bold tabular-nums">{entry.total}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : (
-                <Card>
-                  <CardContent className="py-8 text-center text-muted-foreground">
-                    No winners yet
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          </div>
+          <PublicRealtimeGames
+            sqPoolId={sqPool.id}
+            initialGames={games}
+            initialWinners={winners}
+            initialScoreChanges={scoreChanges}
+            initialSquares={squares.map((s) => ({
+              id: s.id,
+              row_index: s.row_index,
+              col_index: s.col_index,
+              participant_name: s.participant_name,
+            }))}
+            rowNumbers={sqPool.row_numbers}
+            colNumbers={sqPool.col_numbers}
+            reverseScoring={sqPool.reverse_scoring ?? false}
+            scoringMode={sqPool.scoring_mode}
+          />
         )}
 
         {/* Info when not locked */}

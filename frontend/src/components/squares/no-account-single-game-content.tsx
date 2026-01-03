@@ -8,6 +8,8 @@ import { NoAccountSquaresGrid, type NoAccountSquare } from './no-account-squares
 import { NoAccountPoolSettings } from './no-account-pool-settings'
 import { AssignNameDialog } from './assign-name-dialog'
 import { BulkAssignDialog } from './bulk-assign-dialog'
+import { EditGameTeamsButton } from './edit-game-teams-button'
+import { ParticipantSummaryPanel } from './participant-summary-panel'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -75,6 +77,7 @@ interface NoAccountSingleGameContentProps {
   winners: SqWinner[]
   scoreChanges: ScoreChange[]
   isCommissioner: boolean
+  isSuperAdmin?: boolean
 }
 
 // Simple Game Score Display Component
@@ -173,14 +176,38 @@ function NoAccountScoreEntry({
   const [newScoreHome, setNewScoreHome] = useState('')
   const [newScoreAway, setNewScoreAway] = useState('')
 
+  // Quarter mode state
+  const [q1Home, setQ1Home] = useState(game.q1_home_score?.toString() ?? '')
+  const [q1Away, setQ1Away] = useState(game.q1_away_score?.toString() ?? '')
+  const [halfHome, setHalfHome] = useState(game.halftime_home_score?.toString() ?? '')
+  const [halfAway, setHalfAway] = useState(game.halftime_away_score?.toString() ?? '')
+  const [q3Home, setQ3Home] = useState(game.q3_home_score?.toString() ?? '')
+  const [q3Away, setQ3Away] = useState(game.q3_away_score?.toString() ?? '')
+  const [finalHome, setFinalHome] = useState(game.home_score?.toString() ?? '')
+  const [finalAway, setFinalAway] = useState(game.away_score?.toString() ?? '')
+  const [status, setStatus] = useState(game.status ?? 'scheduled')
+
   const sortedScoreChanges = [...scoreChanges].sort((a, b) => a.change_order - b.change_order)
   const lastScoreChange = sortedScoreChanges[sortedScoreChanges.length - 1]
   const lastHomeScore = lastScoreChange?.home_score ?? 0
   const lastAwayScore = lastScoreChange?.away_score ?? 0
 
   const handleOpen = () => {
-    setNewScoreHome(lastHomeScore.toString())
-    setNewScoreAway(lastAwayScore.toString())
+    if (scoringMode === 'score_change') {
+      setNewScoreHome(lastHomeScore.toString())
+      setNewScoreAway(lastAwayScore.toString())
+    } else {
+      // Quarter mode - reset to current values
+      setQ1Home(game.q1_home_score?.toString() ?? '')
+      setQ1Away(game.q1_away_score?.toString() ?? '')
+      setHalfHome(game.halftime_home_score?.toString() ?? '')
+      setHalfAway(game.halftime_away_score?.toString() ?? '')
+      setQ3Home(game.q3_home_score?.toString() ?? '')
+      setQ3Away(game.q3_away_score?.toString() ?? '')
+      setFinalHome(game.home_score?.toString() ?? '')
+      setFinalAway(game.away_score?.toString() ?? '')
+      setStatus(game.status ?? 'scheduled')
+    }
     setError(null)
     setIsOpen(true)
   }
@@ -202,6 +229,25 @@ function NoAccountScoreEntry({
 
     const square = squares.find((s) => s.row_index === rowIndex && s.col_index === colIndex)
     return square?.participant_name ?? 'Unclaimed'
+  }
+
+  const getSquareId = (homeScore: number, awayScore: number, isReverse: boolean) => {
+    const homeDigit = homeScore % 10
+    const awayDigit = awayScore % 10
+
+    let rowIndex: number
+    let colIndex: number
+
+    if (isReverse) {
+      rowIndex = rowNumbers.findIndex((n) => n === awayDigit)
+      colIndex = colNumbers.findIndex((n) => n === homeDigit)
+    } else {
+      rowIndex = rowNumbers.findIndex((n) => n === homeDigit)
+      colIndex = colNumbers.findIndex((n) => n === awayDigit)
+    }
+
+    const square = squares.find((s) => s.row_index === rowIndex && s.col_index === colIndex)
+    return square?.id ?? null
   }
 
   const handleAddScoreChange = async () => {
@@ -403,11 +449,97 @@ function NoAccountScoreEntry({
     router.refresh()
   }
 
-  const isFinal = game.status === 'final'
+  // Quarter mode submit handler
+  const handleQuarterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+    setError(null)
 
-  if (scoringMode !== 'score_change') {
-    return null // Quarter mode not yet implemented for no-account
+    const supabase = createClient()
+
+    // Update game with quarter scores
+    const updates: Record<string, unknown> = {
+      status,
+      q1_home_score: q1Home !== '' ? parseInt(q1Home, 10) : null,
+      q1_away_score: q1Away !== '' ? parseInt(q1Away, 10) : null,
+      halftime_home_score: halfHome !== '' ? parseInt(halfHome, 10) : null,
+      halftime_away_score: halfAway !== '' ? parseInt(halfAway, 10) : null,
+      q3_home_score: q3Home !== '' ? parseInt(q3Home, 10) : null,
+      q3_away_score: q3Away !== '' ? parseInt(q3Away, 10) : null,
+      home_score: finalHome !== '' ? parseInt(finalHome, 10) : null,
+      away_score: finalAway !== '' ? parseInt(finalAway, 10) : null,
+    }
+
+    const { error: updateError } = await supabase
+      .from('sq_games')
+      .update(updates)
+      .eq('id', game.id)
+
+    if (updateError) {
+      setError(updateError.message)
+      setIsLoading(false)
+      return
+    }
+
+    // Delete existing winners for this game before recalculating
+    await supabase.from('sq_winners').delete().eq('sq_game_id', game.id)
+
+    // Helper to record a winner for a quarter
+    const recordWinner = async (
+      homeScore: number,
+      awayScore: number,
+      winType: string,
+      reverseWinType: string
+    ) => {
+      const forwardSquareId = getSquareId(homeScore, awayScore, false)
+      const forwardWinnerName = getWinnerName(homeScore, awayScore, false)
+
+      if (forwardSquareId) {
+        await supabase.from('sq_winners').insert({
+          sq_game_id: game.id,
+          square_id: forwardSquareId,
+          win_type: winType,
+          winner_name: forwardWinnerName,
+        })
+      }
+
+      if (reverseScoring) {
+        const reverseSquareId = getSquareId(homeScore, awayScore, true)
+        const reverseWinnerName = getWinnerName(homeScore, awayScore, true)
+
+        // Only add reverse if different from forward
+        if (reverseSquareId && reverseSquareId !== forwardSquareId) {
+          await supabase.from('sq_winners').insert({
+            sq_game_id: game.id,
+            square_id: reverseSquareId,
+            win_type: reverseWinType,
+            winner_name: reverseWinnerName,
+          })
+        }
+      }
+    }
+
+    // Calculate winners for each quarter that has scores
+    if (q1Home !== '' && q1Away !== '') {
+      await recordWinner(parseInt(q1Home, 10), parseInt(q1Away, 10), 'q1', 'q1_reverse')
+    }
+    if (halfHome !== '' && halfAway !== '') {
+      await recordWinner(parseInt(halfHome, 10), parseInt(halfAway, 10), 'halftime', 'halftime_reverse')
+    }
+    if (q3Home !== '' && q3Away !== '') {
+      await recordWinner(parseInt(q3Home, 10), parseInt(q3Away, 10), 'q3', 'q3_reverse')
+    }
+    if (status === 'final' && finalHome !== '' && finalAway !== '') {
+      await recordWinner(parseInt(finalHome, 10), parseInt(finalAway, 10), 'final', 'final_reverse')
+    }
+
+    setIsLoading(false)
+    setIsOpen(false)
+    router.refresh()
   }
+
+  const isFinal = game.status === 'final'
+  const isQuarterMode = scoringMode === 'quarter'
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -424,83 +556,232 @@ function NoAccountScoreEntry({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          {/* Current score */}
-          <div className="text-center py-2 bg-muted rounded-md">
-            <div className="text-xs text-muted-foreground">Current Score</div>
-            <div className="text-2xl font-bold">
-              {game.away_score ?? 0} - {game.home_score ?? 0}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {scoreChanges.length} score change{scoreChanges.length !== 1 ? 's' : ''}
-            </div>
-          </div>
-
-          {scoreChanges.length === 0 && !isFinal && (
-            <Button onClick={handleAddZeroZero} disabled={isLoading} className="w-full" variant="outline">
-              Start Game (0-0)
-            </Button>
-          )}
-
-          {scoreChanges.length > 0 && !isFinal && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>Add Score Change</Label>
-                <span className="text-xs text-muted-foreground">Only one team can score at a time</span>
-              </div>
+        {isQuarterMode ? (
+          <form onSubmit={handleQuarterSubmit}>
+            <div className="space-y-4 py-4">
+              {/* Team labels row */}
               <div className="grid grid-cols-3 gap-2 items-center">
-                <div className="text-center">
-                  <div className="text-xs text-muted-foreground mb-1">{game.away_team}</div>
+                <div className="text-center text-xs text-muted-foreground truncate">{game.away_team}</div>
+                <div></div>
+                <div className="text-center text-xs text-muted-foreground truncate">{game.home_team}</div>
+              </div>
+
+              {/* Q1 */}
+              <div>
+                <Label className="text-sm font-medium mb-2 block">End of Q1</Label>
+                <div className="grid grid-cols-3 gap-2 items-center">
                   <Input
                     type="number"
-                    min={lastAwayScore}
-                    value={newScoreAway}
-                    onChange={(e) => setNewScoreAway(e.target.value)}
-                    className="text-center text-lg font-bold"
+                    min="0"
+                    value={q1Away}
+                    onChange={(e) => setQ1Away(e.target.value)}
+                    className="text-center"
+                  />
+                  <div className="text-center text-muted-foreground text-sm">-</div>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={q1Home}
+                    onChange={(e) => setQ1Home(e.target.value)}
+                    className="text-center"
                   />
                 </div>
-                <div className="text-center text-muted-foreground pt-5">-</div>
-                <div className="text-center">
-                  <div className="text-xs text-muted-foreground mb-1">{game.home_team}</div>
+              </div>
+
+              {/* Halftime */}
+              <div>
+                <Label className="text-sm font-medium mb-2 block">Halftime</Label>
+                <div className="grid grid-cols-3 gap-2 items-center">
                   <Input
                     type="number"
-                    min={lastHomeScore}
-                    value={newScoreHome}
-                    onChange={(e) => setNewScoreHome(e.target.value)}
+                    min="0"
+                    value={halfAway}
+                    onChange={(e) => setHalfAway(e.target.value)}
+                    className="text-center"
+                  />
+                  <div className="text-center text-muted-foreground text-sm">-</div>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={halfHome}
+                    onChange={(e) => setHalfHome(e.target.value)}
+                    className="text-center"
+                  />
+                </div>
+              </div>
+
+              {/* Q3 */}
+              <div>
+                <Label className="text-sm font-medium mb-2 block">End of Q3</Label>
+                <div className="grid grid-cols-3 gap-2 items-center">
+                  <Input
+                    type="number"
+                    min="0"
+                    value={q3Away}
+                    onChange={(e) => setQ3Away(e.target.value)}
+                    className="text-center"
+                  />
+                  <div className="text-center text-muted-foreground text-sm">-</div>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={q3Home}
+                    onChange={(e) => setQ3Home(e.target.value)}
+                    className="text-center"
+                  />
+                </div>
+              </div>
+
+              {/* Final */}
+              <div>
+                <Label className="text-sm font-medium mb-2 block">Final Score</Label>
+                <div className="grid grid-cols-3 gap-2 items-center">
+                  <Input
+                    type="number"
+                    min="0"
+                    value={finalAway}
+                    onChange={(e) => setFinalAway(e.target.value)}
+                    className="text-center text-lg font-bold"
+                  />
+                  <div className="text-center text-muted-foreground">-</div>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={finalHome}
+                    onChange={(e) => setFinalHome(e.target.value)}
                     className="text-center text-lg font-bold"
                   />
                 </div>
               </div>
-              <Button onClick={handleAddScoreChange} disabled={isLoading} className="w-full">
-                Add Score Change
+
+              {/* Status */}
+              <div className="space-y-2 pt-2">
+                <Label>Game Status</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  <Button
+                    type="button"
+                    variant={status === 'scheduled' ? 'default' : 'outline'}
+                    onClick={() => setStatus('scheduled')}
+                    size="sm"
+                  >
+                    Scheduled
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={status === 'in_progress' ? 'default' : 'outline'}
+                    onClick={() => setStatus('in_progress')}
+                    className={status === 'in_progress' ? 'bg-amber-500 hover:bg-amber-600' : ''}
+                    size="sm"
+                  >
+                    In Progress
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={status === 'final' ? 'default' : 'outline'}
+                    onClick={() => setStatus('final')}
+                    size="sm"
+                  >
+                    Final
+                  </Button>
+                </div>
+              </div>
+
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setIsOpen(false)} disabled={isLoading}>
+                Cancel
               </Button>
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? 'Saving...' : 'Save Scores'}
+              </Button>
+            </DialogFooter>
+          </form>
+        ) : (
+          /* Score Change Mode */
+          <div className="space-y-4 py-4">
+            {/* Current score */}
+            <div className="text-center py-2 bg-muted rounded-md">
+              <div className="text-xs text-muted-foreground">Current Score</div>
+              <div className="text-2xl font-bold">
+                {game.away_score ?? 0} - {game.home_score ?? 0}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {scoreChanges.length} score change{scoreChanges.length !== 1 ? 's' : ''}
+              </div>
             </div>
-          )}
 
-          {scoreChanges.length > 0 && !isFinal && (
-            <Button onClick={handleMarkFinal} disabled={isLoading} variant="secondary" className="w-full">
-              Mark Game Final
-            </Button>
-          )}
+            {scoreChanges.length === 0 && !isFinal && (
+              <Button onClick={handleAddZeroZero} disabled={isLoading} className="w-full" variant="outline">
+                Start Game (0-0)
+              </Button>
+            )}
 
-          {isFinal && (
-            <div className="text-center py-4 text-muted-foreground">
-              Game is final. No more score changes can be added.
-            </div>
-          )}
+            {scoreChanges.length > 0 && !isFinal && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>Add Score Change</Label>
+                  <span className="text-xs text-muted-foreground">Only one team can score at a time</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 items-center">
+                  <div className="text-center">
+                    <div className="text-xs text-muted-foreground mb-1">{game.away_team}</div>
+                    <Input
+                      type="number"
+                      min={lastAwayScore}
+                      value={newScoreAway}
+                      onChange={(e) => setNewScoreAway(e.target.value)}
+                      className="text-center text-lg font-bold"
+                    />
+                  </div>
+                  <div className="text-center text-muted-foreground pt-5">-</div>
+                  <div className="text-center">
+                    <div className="text-xs text-muted-foreground mb-1">{game.home_team}</div>
+                    <Input
+                      type="number"
+                      min={lastHomeScore}
+                      value={newScoreHome}
+                      onChange={(e) => setNewScoreHome(e.target.value)}
+                      className="text-center text-lg font-bold"
+                    />
+                  </div>
+                </div>
+                <Button onClick={handleAddScoreChange} disabled={isLoading} className="w-full">
+                  Add Score Change
+                </Button>
+              </div>
+            )}
 
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+            {scoreChanges.length > 0 && !isFinal && (
+              <Button onClick={handleMarkFinal} disabled={isLoading} variant="secondary" className="w-full">
+                Mark Game Final
+              </Button>
+            )}
 
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </div>
+            {isFinal && (
+              <div className="text-center py-4 text-muted-foreground">
+                Game is final. No more score changes can be added.
+              </div>
+            )}
+
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   )
@@ -605,6 +886,7 @@ export function NoAccountSingleGameContent({
   winners,
   scoreChanges,
   isCommissioner,
+  isSuperAdmin = false,
 }: NoAccountSingleGameContentProps) {
   // Local state for squares with realtime updates
   const [squares, setSquares] = useState<NoAccountSquare[]>(initialSquares)
@@ -715,16 +997,22 @@ export function NoAccountSingleGameContent({
   }
 
   // Calculate payouts by participant name (count wins, not payout amounts)
-  const winsByName = new Map<string, number>()
+  // Track forward vs reverse wins separately
+  const winsByName = new Map<string, { total: number; forward: number; reverse: number }>()
   for (const winner of winners) {
     if (winner.winner_name) {
-      const current = winsByName.get(winner.winner_name) ?? 0
-      winsByName.set(winner.winner_name, current + 1)
+      const current = winsByName.get(winner.winner_name) ?? { total: 0, forward: 0, reverse: 0 }
+      const isReverse = winner.win_type.includes('reverse')
+      winsByName.set(winner.winner_name, {
+        total: current.total + 1,
+        forward: current.forward + (isReverse ? 0 : 1),
+        reverse: current.reverse + (isReverse ? 1 : 0),
+      })
     }
   }
 
   const leaderboardEntries = Array.from(winsByName.entries())
-    .map(([name, total]) => ({ name, total }))
+    .map(([name, stats]) => ({ name, ...stats }))
     .sort((a, b) => b.total - a.total)
 
   // Get first game for labels
@@ -772,11 +1060,26 @@ export function NoAccountSingleGameContent({
             </CardContent>
           </Card>
 
+          {/* Participant Summary - Commissioner only */}
+          {isCommissioner && (
+            <ParticipantSummaryPanel sqPoolId={sqPoolId} />
+          )}
+
           {/* Game - only show after numbers locked */}
           {numbersLocked && firstGame && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Game</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">Game</CardTitle>
+                  {isCommissioner && (
+                    <EditGameTeamsButton
+                      gameId={firstGame.id}
+                      gameName={firstGame.game_name}
+                      homeTeam={firstGame.home_team}
+                      awayTeam={firstGame.away_team}
+                    />
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <SimpleGameScoreCard
@@ -784,12 +1087,50 @@ export function NoAccountSingleGameContent({
                   scoringMode={scoringMode ?? 'quarter'}
                 />
 
+                {/* Final Winner Display */}
+                {firstGame.status === 'final' && (() => {
+                  const finalWinner = winners.find(w => w.win_type === 'score_change_final')
+                  const finalReverseWinner = winners.find(w => w.win_type === 'score_change_final_reverse')
+
+                  if (!finalWinner && !finalReverseWinner) return null
+
+                  return (
+                    <div className="rounded-lg border-2 border-purple-300 bg-purple-50 p-4">
+                      <div className="text-center space-y-2">
+                        <div className="text-xs font-medium text-purple-600 uppercase tracking-wide">
+                          Final Winner{reverseScoring ? 's' : ''}
+                        </div>
+                        <div className="flex items-center justify-center gap-6">
+                          {finalWinner && (
+                            <div className="text-center">
+                              {reverseScoring && (
+                                <div className="text-xs text-muted-foreground mb-1">Forward</div>
+                              )}
+                              <div className="text-xl font-bold text-purple-700">
+                                {finalWinner.winner_name || 'Unclaimed'}
+                              </div>
+                            </div>
+                          )}
+                          {reverseScoring && finalReverseWinner && (
+                            <div className="text-center">
+                              <div className="text-xs text-muted-foreground mb-1">Reverse</div>
+                              <div className="text-xl font-bold text-fuchsia-700">
+                                {finalReverseWinner.winner_name || 'Unclaimed'}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
+
                 {/* Commissioner score entry */}
-                {isCommissioner && scoringMode === 'score_change' && (
+                {isCommissioner && (
                   <NoAccountScoreEntry
                     game={firstGame}
                     sqPoolId={sqPoolId}
-                    scoringMode={scoringMode}
+                    scoringMode={scoringMode ?? 'quarter'}
                     reverseScoring={reverseScoring}
                     squares={squares}
                     rowNumbers={rowNumbers ?? []}
@@ -831,6 +1172,7 @@ export function NoAccountSingleGameContent({
               scoringMode={scoringMode}
               poolStatus={poolStatus}
               onBulkAssignClick={() => setBulkDialogOpen(true)}
+              isSuperAdmin={isSuperAdmin}
             />
           )}
 
@@ -854,7 +1196,14 @@ export function NoAccountSingleGameContent({
                           </span>
                           <span className="truncate">{entry.name}</span>
                         </div>
-                        <span className="font-bold tabular-nums">{entry.total}</span>
+                        <div className="text-right">
+                          <span className="font-bold tabular-nums">{entry.total}</span>
+                          {reverseScoring && (
+                            <span className="text-xs text-muted-foreground ml-1">
+                              ({entry.forward}F, {entry.reverse}R)
+                            </span>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>

@@ -22,7 +22,17 @@ interface NoAccountPoolSettingsProps {
   scoringMode: string | null
   poolStatus: string
   onBulkAssignClick: () => void
+  isSuperAdmin?: boolean
 }
+
+// Random first names for auto-fill
+const RANDOM_NAMES = [
+  'Alice', 'Bob', 'Charlie', 'Diana', 'Eve', 'Frank', 'Grace', 'Henry',
+  'Ivy', 'Jack', 'Kate', 'Leo', 'Maya', 'Noah', 'Olivia', 'Paul',
+  'Quinn', 'Ruby', 'Sam', 'Tina', 'Uma', 'Victor', 'Wendy', 'Xavier',
+  'Yara', 'Zack', 'Anna', 'Ben', 'Chloe', 'Dan', 'Emma', 'Finn',
+  'Gina', 'Hugo', 'Iris', 'Jake', 'Kim', 'Liam', 'Mia', 'Nick'
+]
 
 export function NoAccountPoolSettings({
   sqPoolId,
@@ -34,11 +44,13 @@ export function NoAccountPoolSettings({
   scoringMode,
   poolStatus,
   onBulkAssignClick,
+  isSuperAdmin = false,
 }: NoAccountPoolSettingsProps) {
   const router = useRouter()
   const [isLocking, setIsLocking] = useState(false)
   const [isUpdatingSlug, setIsUpdatingSlug] = useState(false)
   const [isUpdatingReverse, setIsUpdatingReverse] = useState(false)
+  const [isAutoFilling, setIsAutoFilling] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
@@ -82,6 +94,7 @@ export function NoAccountPoolSettings({
     const rowNumbers = shuffleArray([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
     const colNumbers = shuffleArray([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
 
+    // Update sq_pools with locked numbers
     const { error: updateError } = await supabase
       .from('sq_pools')
       .update({
@@ -97,7 +110,20 @@ export function NoAccountPoolSettings({
       return
     }
 
-    setIsLocking(false)
+    // Update pool status to 'open'
+    const { error: poolError } = await supabase
+      .from('pools')
+      .update({ status: 'open' })
+      .eq('id', poolId)
+
+    if (poolError) {
+      setError(poolError.message)
+      setIsLocking(false)
+      return
+    }
+
+    // Don't set isLocking to false - let the page refresh with new numbersLocked state
+    // which will show the "Locked" badge instead of the button
     router.refresh()
   }
 
@@ -161,6 +187,68 @@ export function NoAccountPoolSettings({
     }
 
     setIsUpdatingReverse(false)
+    router.refresh()
+  }
+
+  // Auto-fill all empty squares with random names (super admin only)
+  const handleAutoFill = async () => {
+    setIsAutoFilling(true)
+    setError(null)
+
+    const supabase = createClient()
+
+    // Get existing squares
+    const { data: existingSquares } = await supabase
+      .from('sq_squares')
+      .select('row_index, col_index')
+      .eq('sq_pool_id', sqPoolId)
+
+    const existingSet = new Set(
+      (existingSquares ?? []).map((sq) => `${sq.row_index}-${sq.col_index}`)
+    )
+
+    // Build inserts for all empty squares
+    const inserts: Array<{
+      sq_pool_id: string
+      row_index: number
+      col_index: number
+      participant_name: string
+      verified: boolean
+    }> = []
+
+    for (let row = 0; row < 10; row++) {
+      for (let col = 0; col < 10; col++) {
+        const key = `${row}-${col}`
+        if (!existingSet.has(key)) {
+          const randomName = RANDOM_NAMES[Math.floor(Math.random() * RANDOM_NAMES.length)]
+          inserts.push({
+            sq_pool_id: sqPoolId,
+            row_index: row,
+            col_index: col,
+            participant_name: randomName,
+            verified: true,
+          })
+        }
+      }
+    }
+
+    if (inserts.length === 0) {
+      setError('All squares are already assigned')
+      setIsAutoFilling(false)
+      return
+    }
+
+    const { error: insertError } = await supabase
+      .from('sq_squares')
+      .insert(inserts)
+
+    if (insertError) {
+      setError(insertError.message)
+      setIsAutoFilling(false)
+      return
+    }
+
+    setIsAutoFilling(false)
     router.refresh()
   }
 
@@ -339,6 +427,24 @@ export function NoAccountPoolSettings({
             Bulk Assign Squares
           </Button>
         </div>
+
+        {/* Super Admin Auto-Fill (testing) */}
+        {isSuperAdmin && (
+          <div className="pt-2 border-t border-dashed">
+            <Button
+              variant="destructive"
+              size="sm"
+              className="w-full"
+              onClick={handleAutoFill}
+              disabled={isAutoFilling}
+            >
+              {isAutoFilling ? 'Filling...' : '🧪 Auto-Fill (Super Admin)'}
+            </Button>
+            <p className="text-xs text-muted-foreground mt-1 text-center">
+              Fills empty squares with random names
+            </p>
+          </div>
+        )}
 
         {error && (
           <Alert variant="destructive">
