@@ -135,7 +135,7 @@ export function SquareCell({
   // Build class list based on state
   const getStateClasses = () => {
     const base =
-      'flex items-center justify-center text-[10px] sm:text-xs font-medium transition-all border aspect-square'
+      'flex items-center justify-center text-[8px] sm:text-[10px] font-medium transition-all border aspect-square'
 
     // Abandoned square - distinct styling (striped pattern via CSS)
     if (isAbandoned) {
@@ -205,18 +205,18 @@ export function SquareCell({
     return undefined
   }
 
-  // Get text color based on state
+  // Get text color based on state - no truncate since initials are 1-2 chars
   const getTextClasses = () => {
     if (isAbandoned) {
-      return 'truncate px-0.5 text-amber-600'
+      return 'text-amber-600'
     }
     if (isWinning && winningRound) {
-      return cn('truncate px-0.5 font-semibold', winningColors[winningRound].text)
+      return cn('font-semibold', winningColors[winningRound].text)
     }
     if (isCurrentUser) {
-      return 'truncate px-0.5 text-sky-700 font-semibold'
+      return 'text-sky-700 font-semibold'
     }
-    return 'truncate px-0.5'
+    return ''
   }
 
   return (

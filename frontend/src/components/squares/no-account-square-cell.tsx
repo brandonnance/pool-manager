@@ -91,7 +91,7 @@ export function NoAccountSquareCell({
   // Build class list based on state
   const getStateClasses = () => {
     const base =
-      'flex items-center justify-center text-[10px] sm:text-xs font-medium transition-all border aspect-square relative overflow-hidden'
+      'flex items-center justify-center text-[8px] sm:text-[10px] font-medium transition-all border aspect-square relative overflow-hidden'
 
     if (isWinning && winningRound) {
       const colors = winningColors[winningRound]
@@ -128,18 +128,20 @@ export function NoAccountSquareCell({
   // Get text classes based on state
   const getTextClasses = () => {
     if (isWinning && winningRound) {
-      return cn('truncate px-0.5 font-semibold', winningColors[winningRound].text)
+      return cn('truncate font-semibold', winningColors[winningRound].text)
     }
     if (!isAssigned) {
-      return 'text-gray-400 text-[8px] sm:text-[10px]'
+      // Grid numbers like "00" - no truncation needed
+      return 'text-gray-400 text-[6px] sm:text-[8px]'
     }
+    // Names need truncation but no padding to maximize space
     if (isCommissioner && !verified) {
-      return 'truncate px-0.5 text-red-600'
+      return 'truncate text-red-600'
     }
     if (isCommissioner && verified) {
-      return 'truncate px-0.5 text-green-700'
+      return 'truncate text-green-700'
     }
-    return 'truncate px-0.5 text-gray-700'
+    return 'truncate text-gray-700'
   }
 
   const displayText = isAssigned ? participantName : gridNumber
