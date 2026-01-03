@@ -14,7 +14,7 @@
 | **Critical Security** | **RESOLVED** | 3 critical - all fixed |
 | **High Priority** | **RESOLVED** | 2 high - all verified/fixed |
 | **Medium Priority** | **RESOLVED** | 2 medium - all fixed |
-| **RLS Performance** | Needs Optimization | 15+ unindexed FKs, 26 inefficient policies |
+| **RLS Performance** | Partially Optimized | 15 FK indexes added, 26 inefficient policies remaining |
 | **Testing Infrastructure** | **IMPLEMENTED** | 276 tests passing |
 
 ---
@@ -821,7 +821,8 @@ frontend/
 
 - [x] **Fix #6:** Replaced `Math.random()` with `crypto.randomUUID()` in `generate-link-button.tsx`
 - [x] **Fix #7:** Added RLS policy to hide picks until lock (migration applied)
-- [ ] **Perf #1:** Add missing foreign key indexes (apply migration)
+- [x] **Perf #1:** Add missing foreign key indexes ✅ (January 3, 2026)
+  - Migration `add_missing_fk_indexes` applied with 15 indexes
 - [ ] **Perf #2:** Optimize RLS policies to use `(select auth.uid())`
 - [ ] **Perf #3:** Consolidate duplicate permissive policies
 
