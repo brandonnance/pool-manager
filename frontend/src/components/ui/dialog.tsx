@@ -75,9 +75,10 @@ function DialogContent({
         data-slot="dialog-content"
         onOpenAutoFocus={handleOpenAutoFocus}
         className={cn(
-          // Mobile: positioned near top to avoid keyboard overlap, with safe area padding for iOS URL bar
-          // Desktop: centered as usual
-          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] gap-4 rounded-lg border p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-lg duration-200 outline-none sm:max-w-lg sm:pb-6 max-h-[calc(100vh-2rem)] overflow-y-auto top-[10%] sm:top-[50%] sm:translate-y-[-50%]",
+          // Mobile: positioned near top (5%) with max-height that accounts for position + safe area
+          // Leaves 5% margin at top, 5% + safe-area at bottom = modal can be ~90% of viewport
+          // Desktop: centered as usual with standard max-height
+          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 outline-none sm:max-w-lg top-[5%] max-h-[calc(90vh-env(safe-area-inset-bottom))] sm:top-[50%] sm:translate-y-[-50%] sm:max-h-[85vh] overflow-y-auto",
           className
         )}
         {...props}
