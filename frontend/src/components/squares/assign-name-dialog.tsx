@@ -339,7 +339,6 @@ export function AssignNameDialog({
                   setTimeout(() => setShowSuggestions(false), 150)
                 }}
                 disabled={isSubmitting}
-                autoFocus
                 autoComplete="off"
               />
               {/* Autocomplete suggestions dropdown */}
