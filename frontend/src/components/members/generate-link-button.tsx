@@ -3,10 +3,12 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Copy } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -31,7 +33,6 @@ export function GenerateLinkButton({ poolId }: GenerateLinkButtonProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
 
   const [maxUses, setMaxUses] = useState<string>('')
   const [expiresIn, setExpiresIn] = useState<string>('never')
@@ -86,9 +87,12 @@ export function GenerateLinkButton({ poolId }: GenerateLinkButtonProps) {
 
   const handleCopy = async () => {
     if (generatedUrl) {
-      await navigator.clipboard.writeText(generatedUrl)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      try {
+        await navigator.clipboard.writeText(generatedUrl)
+        toast.success('Link copied to clipboard')
+      } catch {
+        toast.error('Failed to copy link')
+      }
     }
   }
 
@@ -99,7 +103,6 @@ export function GenerateLinkButton({ poolId }: GenerateLinkButtonProps) {
       setError(null)
       setMaxUses('')
       setExpiresIn('never')
-      setCopied(false)
     }
   }
 
@@ -135,10 +138,11 @@ export function GenerateLinkButton({ poolId }: GenerateLinkButtonProps) {
                 <Input
                   readOnly
                   value={generatedUrl}
-                  className="bg-muted"
+                  className="bg-muted text-sm"
                 />
-                <Button onClick={handleCopy} variant="secondary">
-                  {copied ? 'Copied!' : 'Copy'}
+                <Button onClick={handleCopy} variant="secondary" className="gap-1 shrink-0">
+                  <Copy className="h-4 w-4" />
+                  Copy
                 </Button>
               </div>
             </div>

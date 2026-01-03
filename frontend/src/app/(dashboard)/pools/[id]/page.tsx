@@ -171,7 +171,7 @@ export default async function PoolDetailPage({ params }: PageProps) {
     payout: number | null
     winner_name: string | null
   }> = []
-  let sqOwnerProfiles = new Map<string, string | null>()
+  const sqOwnerProfiles = new Map<string, string | null>()
 
   if (pool.type === 'playoff_squares') {
     // Get sq_pool config

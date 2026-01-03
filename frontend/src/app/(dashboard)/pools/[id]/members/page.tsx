@@ -41,7 +41,7 @@ export default async function PoolMembersPage({ params }: PageProps) {
   // For squares pools (any type), get the lock status and square counts
   const isSquaresPool = pool.type === 'squares' || pool.type === 'playoff_squares' || pool.type === 'single_game_squares'
   let isSquaresLocked = false
-  let squareCountsByUser = new Map<string, number>()
+  const squareCountsByUser = new Map<string, number>()
   let isNoAccountMode = false
 
   if (isSquaresPool) {
@@ -235,7 +235,44 @@ export default async function PoolMembersPage({ params }: PageProps) {
               {pendingCount}
             </span>
           </h2>
-          <div className="bg-white rounded-lg shadow overflow-x-auto">
+
+          {/* Mobile Card View */}
+          <div className="md:hidden space-y-3">
+            {memberships?.filter(m => m.status === 'pending').map((membership) => {
+              const userProfile = profileMap.get(membership.user_id)
+              return (
+                <div key={membership.id} className="bg-white rounded-lg shadow p-4">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="font-medium text-gray-900">
+                      {userProfile?.display_name || 'Unknown User'}
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {membership.created_at
+                        ? new Date(membership.created_at).toLocaleDateString()
+                        : '-'}
+                    </span>
+                  </div>
+                  <MemberActions
+                    membershipId={membership.id}
+                    poolId={id}
+                    status={membership.status}
+                    userName={userProfile?.display_name || 'this user'}
+                    currentUserId={user.id}
+                    memberRole={membership.role}
+                    isOrgAdmin={isOrgAdmin}
+                    memberId={membership.user_id}
+                    poolType={pool.type}
+                    isSquaresLocked={isSquaresLocked}
+                    isMemberSuperAdmin={userProfile?.is_super_admin ?? false}
+                    isCurrentUserSuperAdmin={isSuperAdmin}
+                  />
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden md:block bg-white rounded-lg shadow overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -307,93 +344,153 @@ export default async function PoolMembersPage({ params }: PageProps) {
             </p>
           </div>
         ) : (
-          <div className="bg-white rounded-lg shadow overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    User
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Role
-                  </th>
-                  {isSquaresPool && !isNoAccountMode && (
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Squares
-                    </th>
-                  )}
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Joined
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Approved By
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredMemberships?.filter(m => m.status === 'approved').map((membership) => {
-                  const userProfile = profileMap.get(membership.user_id)
-                  const approverProfile = membership.approved_by
-                    ? profileMap.get(membership.approved_by)
-                    : null
-                  return (
-                    <tr key={membership.id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {userProfile?.display_name || 'Unknown User'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {membership.role === 'commissioner' ? (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            Commissioner
-                          </span>
-                        ) : (
-                          <span className="text-sm text-gray-500">Member</span>
-                        )}
-                      </td>
-                      {isSquaresPool && !isNoAccountMode && (
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm font-medium text-gray-900">
-                            {squareCountsByUser.get(membership.user_id) ?? 0}
-                          </span>
-                        </td>
+          <>
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-3">
+              {filteredMemberships?.filter(m => m.status === 'approved').map((membership) => {
+                const userProfile = profileMap.get(membership.user_id)
+                const approverProfile = membership.approved_by
+                  ? profileMap.get(membership.approved_by)
+                  : null
+                return (
+                  <div key={membership.id} className="bg-white rounded-lg shadow p-4 space-y-3">
+                    <div className="flex justify-between items-start">
+                      <div className="font-medium text-gray-900">
+                        {userProfile?.display_name || 'Unknown User'}
+                      </div>
+                      {membership.role === 'commissioner' ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          Commissioner
+                        </span>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">Member</span>
                       )}
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {membership.approved_at
+                    </div>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      {isSquaresPool && !isNoAccountMode && (
+                        <span>{squareCountsByUser.get(membership.user_id) ?? 0} squares</span>
+                      )}
+                      <span>
+                        Joined {membership.approved_at
                           ? new Date(membership.approved_at).toLocaleDateString()
                           : membership.created_at
                           ? new Date(membership.created_at).toLocaleDateString()
                           : '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {approverProfile?.display_name || '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <MemberActions
-                          membershipId={membership.id}
-                          poolId={id}
-                          status={membership.status}
-                          userName={userProfile?.display_name || 'this user'}
-                          currentUserId={user.id}
-                          memberRole={membership.role}
-                          isOrgAdmin={isOrgAdmin}
-                          memberId={membership.user_id}
-                          poolType={pool.type}
-                          isSquaresLocked={isSquaresLocked}
-                          isMemberSuperAdmin={userProfile?.is_super_admin ?? false}
-                          isCurrentUserSuperAdmin={isSuperAdmin}
-                        />
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                      </span>
+                      {approverProfile?.display_name && (
+                        <span>by {approverProfile.display_name}</span>
+                      )}
+                    </div>
+                    <div className="pt-2 border-t">
+                      <MemberActions
+                        membershipId={membership.id}
+                        poolId={id}
+                        status={membership.status}
+                        userName={userProfile?.display_name || 'this user'}
+                        currentUserId={user.id}
+                        memberRole={membership.role}
+                        isOrgAdmin={isOrgAdmin}
+                        memberId={membership.user_id}
+                        poolType={pool.type}
+                        isSquaresLocked={isSquaresLocked}
+                        isMemberSuperAdmin={userProfile?.is_super_admin ?? false}
+                        isCurrentUserSuperAdmin={isSuperAdmin}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden md:block bg-white rounded-lg shadow overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      User
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Role
+                    </th>
+                    {isSquaresPool && !isNoAccountMode && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Squares
+                      </th>
+                    )}
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Joined
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Approved By
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredMemberships?.filter(m => m.status === 'approved').map((membership) => {
+                    const userProfile = profileMap.get(membership.user_id)
+                    const approverProfile = membership.approved_by
+                      ? profileMap.get(membership.approved_by)
+                      : null
+                    return (
+                      <tr key={membership.id}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">
+                            {userProfile?.display_name || 'Unknown User'}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {membership.role === 'commissioner' ? (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              Commissioner
+                            </span>
+                          ) : (
+                            <span className="text-sm text-gray-500">Member</span>
+                          )}
+                        </td>
+                        {isSquaresPool && !isNoAccountMode && (
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="text-sm font-medium text-gray-900">
+                              {squareCountsByUser.get(membership.user_id) ?? 0}
+                            </span>
+                          </td>
+                        )}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {membership.approved_at
+                            ? new Date(membership.approved_at).toLocaleDateString()
+                            : membership.created_at
+                            ? new Date(membership.created_at).toLocaleDateString()
+                            : '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {approverProfile?.display_name || '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <MemberActions
+                            membershipId={membership.id}
+                            poolId={id}
+                            status={membership.status}
+                            userName={userProfile?.display_name || 'this user'}
+                            currentUserId={user.id}
+                            memberRole={membership.role}
+                            isOrgAdmin={isOrgAdmin}
+                            memberId={membership.user_id}
+                            poolType={pool.type}
+                            isSquaresLocked={isSquaresLocked}
+                            isMemberSuperAdmin={userProfile?.is_super_admin ?? false}
+                            isCurrentUserSuperAdmin={isSuperAdmin}
+                          />
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 
@@ -410,64 +507,101 @@ export default async function PoolMembersPage({ params }: PageProps) {
               <p className="text-gray-600">No invite links yet. Generate one to share with others.</p>
             </div>
           ) : (
-            <div className="bg-white rounded-lg shadow overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Link
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Uses
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Expires
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {joinLinks.map((link) => {
-                    const isExpired = link.expires_at && new Date(link.expires_at) < new Date()
-                    const isMaxedOut = link.max_uses && (link.uses ?? 0) >= link.max_uses
-                    const isActive = !isExpired && !isMaxedOut
+            <>
+              {/* Mobile Card View */}
+              <div className="md:hidden space-y-3">
+                {joinLinks.map((link) => {
+                  const isExpired = link.expires_at && new Date(link.expires_at) < new Date()
+                  const isMaxedOut = link.max_uses && (link.uses ?? 0) >= link.max_uses
+                  const isActive = !isExpired && !isMaxedOut
 
-                    return (
-                      <tr key={link.id} className={!isActive ? 'bg-gray-50' : ''}>
-                        <td className="px-6 py-4">
-                          <code className="text-sm text-gray-600 bg-gray-100 px-2 py-1 rounded break-all">
-                            {link.token}
-                          </code>
-                          {!isActive && (
-                            <span className="ml-2 text-xs text-red-600">
-                              {isExpired ? 'Expired' : 'Max uses reached'}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {link.uses ?? 0}{link.max_uses ? ` / ${link.max_uses}` : ''}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {link.expires_at
-                            ? new Date(link.expires_at).toLocaleDateString()
-                            : 'Never'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex gap-2">
-                            {isActive && (
-                              <CopyLinkButton token={link.token} />
+                  return (
+                    <div key={link.id} className={`bg-white rounded-lg shadow p-4 space-y-3 ${!isActive ? 'opacity-60' : ''}`}>
+                      <div>
+                        <code className="text-sm text-gray-600 bg-gray-100 px-2 py-1 rounded break-all">
+                          {link.token}
+                        </code>
+                        {!isActive && (
+                          <span className="ml-2 text-xs text-destructive">
+                            {isExpired ? 'Expired' : 'Max uses reached'}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                        <span>Uses: {link.uses ?? 0}{link.max_uses ? ` / ${link.max_uses}` : ''}</span>
+                        <span>Expires: {link.expires_at ? new Date(link.expires_at).toLocaleDateString() : 'Never'}</span>
+                      </div>
+                      <div className="flex gap-2 pt-2 border-t">
+                        {isActive && (
+                          <CopyLinkButton token={link.token} />
+                        )}
+                        <DeleteLinkButton linkId={link.id} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden md:block bg-white rounded-lg shadow overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Link
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Uses
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Expires
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {joinLinks.map((link) => {
+                      const isExpired = link.expires_at && new Date(link.expires_at) < new Date()
+                      const isMaxedOut = link.max_uses && (link.uses ?? 0) >= link.max_uses
+                      const isActive = !isExpired && !isMaxedOut
+
+                      return (
+                        <tr key={link.id} className={!isActive ? 'bg-gray-50' : ''}>
+                          <td className="px-6 py-4">
+                            <code className="text-sm text-gray-600 bg-gray-100 px-2 py-1 rounded break-all">
+                              {link.token}
+                            </code>
+                            {!isActive && (
+                              <span className="ml-2 text-xs text-red-600">
+                                {isExpired ? 'Expired' : 'Max uses reached'}
+                              </span>
                             )}
-                            <DeleteLinkButton linkId={link.id} />
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {link.uses ?? 0}{link.max_uses ? ` / ${link.max_uses}` : ''}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {link.expires_at
+                              ? new Date(link.expires_at).toLocaleDateString()
+                              : 'Never'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex gap-2">
+                              {isActive && (
+                                <CopyLinkButton token={link.token} />
+                              )}
+                              <DeleteLinkButton linkId={link.id} />
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       )}

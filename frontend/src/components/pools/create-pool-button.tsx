@@ -17,6 +17,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import { ScrollArea } from '@/components/ui/scroll-area'
 
 interface CreatePoolButtonProps {
   orgId: string
@@ -294,16 +295,17 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
       <DialogTrigger asChild>
         <Button>Create Pool</Button>
       </DialogTrigger>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
+      <DialogContent className="max-w-md max-h-[90vh] flex flex-col p-0">
+        <DialogHeader className="px-6 pt-6 pb-2">
           <DialogTitle>Create Pool</DialogTitle>
           <DialogDescription>
             Set up a new pool for your organization.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit}>
-          <div className="space-y-4 py-4">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <ScrollArea className="flex-1 px-6">
+            <div className="space-y-4 py-2">
             {/* Pool Type Selection */}
             <div className="space-y-2">
               <Label>Pool Type</Label>
@@ -559,9 +561,10 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-          </div>
+            </div>
+          </ScrollArea>
 
-          <DialogFooter>
+          <DialogFooter className="px-6 py-4 border-t">
             <Button
               type="button"
               variant="ghost"

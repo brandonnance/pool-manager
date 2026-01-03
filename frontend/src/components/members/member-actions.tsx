@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
 
 interface MemberActionsProps {
   membershipId: string
@@ -35,12 +37,10 @@ export function MemberActions({
 }: MemberActionsProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [isPromoting, setIsPromoting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
   const handleApprove = async () => {
     setIsLoading(true)
-    setError(null)
 
     const supabase = createClient()
     const { error: updateError } = await supabase
@@ -53,11 +53,12 @@ export function MemberActions({
       .eq('id', membershipId)
 
     if (updateError) {
-      setError(updateError.message)
+      toast.error(updateError.message)
       setIsLoading(false)
       return
     }
 
+    toast.success(`${userName} has been approved`)
     router.refresh()
   }
 
@@ -67,7 +68,6 @@ export function MemberActions({
     }
 
     setIsLoading(true)
-    setError(null)
 
     const supabase = createClient()
     const { error: deleteError } = await supabase
@@ -76,11 +76,12 @@ export function MemberActions({
       .eq('id', membershipId)
 
     if (deleteError) {
-      setError(deleteError.message)
+      toast.error(deleteError.message)
       setIsLoading(false)
       return
     }
 
+    toast.success(`${userName}'s request has been rejected`)
     router.refresh()
   }
 
@@ -105,7 +106,6 @@ export function MemberActions({
     }
 
     setIsLoading(true)
-    setError(null)
 
     const supabase = createClient()
 
@@ -175,14 +175,15 @@ export function MemberActions({
         .eq('id', membershipId)
 
       if (deleteError) {
-        setError(deleteError.message)
+        toast.error(deleteError.message)
         setIsLoading(false)
         return
       }
 
+      toast.success(`${userName} has been removed`)
       router.refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      toast.error(err instanceof Error ? err.message : 'An error occurred')
       setIsLoading(false)
     }
   }
@@ -193,7 +194,6 @@ export function MemberActions({
     }
 
     setIsPromoting(true)
-    setError(null)
 
     const supabase = createClient()
     const { error: updateError } = await supabase
@@ -202,11 +202,12 @@ export function MemberActions({
       .eq('id', membershipId)
 
     if (updateError) {
-      setError(updateError.message)
+      toast.error(updateError.message)
       setIsPromoting(false)
       return
     }
 
+    toast.success(`${userName} is now a commissioner`)
     router.refresh()
   }
 
@@ -220,7 +221,6 @@ export function MemberActions({
     }
 
     setIsPromoting(true)
-    setError(null)
 
     const supabase = createClient()
     const { error: updateError } = await supabase
@@ -229,35 +229,35 @@ export function MemberActions({
       .eq('id', membershipId)
 
     if (updateError) {
-      setError(updateError.message)
+      toast.error(updateError.message)
       setIsPromoting(false)
       return
     }
 
+    toast.success(`${userName} is now a member`)
     router.refresh()
-  }
-
-  if (error) {
-    return <span className="text-red-600 text-xs">{error}</span>
   }
 
   if (status === 'pending') {
     return (
-      <div className="flex gap-2">
-        <button
+      <div className="flex flex-wrap gap-2">
+        <Button
           onClick={handleApprove}
           disabled={isLoading}
-          className="px-3 py-1 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded disabled:opacity-50"
+          size="sm"
+          className="h-8 bg-green-600 hover:bg-green-700"
         >
           {isLoading ? '...' : 'Approve'}
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={handleReject}
           disabled={isLoading}
-          className="px-3 py-1 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded disabled:opacity-50"
+          size="sm"
+          variant="destructive"
+          className="h-8"
         >
           {isLoading ? '...' : 'Reject'}
-        </button>
+        </Button>
       </div>
     )
   }
@@ -273,34 +273,40 @@ export function MemberActions({
     }
 
     return (
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {/* Only org admins can promote/demote commissioners */}
         {isOrgAdmin && (
           isCommissioner ? (
-            <button
+            <Button
               onClick={handleDemote}
               disabled={isPromoting}
-              className="px-3 py-1 text-xs font-medium text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded disabled:opacity-50"
+              size="sm"
+              variant="outline"
+              className="h-8 text-amber-600 border-amber-300 hover:bg-amber-50"
             >
               {isPromoting ? '...' : 'Demote'}
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
               onClick={handlePromote}
               disabled={isPromoting}
-              className="px-3 py-1 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded disabled:opacity-50"
+              size="sm"
+              variant="outline"
+              className="h-8"
             >
               {isPromoting ? '...' : 'Promote'}
-            </button>
+            </Button>
           )
         )}
-        <button
+        <Button
           onClick={handleRemove}
           disabled={isLoading}
-          className="px-3 py-1 text-xs font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded disabled:opacity-50"
+          size="sm"
+          variant="ghost"
+          className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
         >
           {isLoading ? '...' : 'Remove'}
-        </button>
+        </Button>
       </div>
     )
   }

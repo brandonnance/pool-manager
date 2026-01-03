@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { UserDropdown } from '@/components/auth/user-dropdown'
+import { MobileNav } from '@/components/nav/mobile-nav'
 
 export default async function DashboardLayout({
   children,
@@ -34,7 +35,8 @@ export default async function DashboardLayout({
       <header className="bg-primary text-primary-foreground shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-8">
+            <div className="flex items-center space-x-4 md:space-x-8">
+              <MobileNav isSuperAdmin={profile?.is_super_admin || false} />
               <Link href="/dashboard" className="text-xl font-bold flex items-center gap-2">
                 <span className="bg-white text-primary px-2 py-0.5 rounded font-black">BN</span>
                 <span>Pools</span>

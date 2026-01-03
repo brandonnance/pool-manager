@@ -121,58 +121,98 @@ export default async function OrgMembersPage({ params }: PageProps) {
             <p className="text-gray-600">No admins found.</p>
           </div>
         ) : (
-          <div className="bg-white rounded-lg shadow overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    User
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Joined
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {memberships?.filter(m => m.role === 'admin').map((membership) => {
-                  const userProfile = profileMap.get(membership.user_id)
-                  const isCurrentUser = membership.user_id === user.id
-                  return (
-                    <tr key={membership.id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {userProfile?.display_name || 'Unknown User'}
-                          {isCurrentUser && (
-                            <span className="ml-2 text-xs text-gray-500">(you)</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+          <>
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-3">
+              {memberships?.filter(m => m.role === 'admin').map((membership) => {
+                const userProfile = profileMap.get(membership.user_id)
+                const isCurrentUser = membership.user_id === user.id
+                return (
+                  <div key={membership.id} className="bg-white rounded-lg shadow p-4 space-y-3">
+                    <div className="flex justify-between items-start">
+                      <div className="font-medium text-gray-900">
+                        {userProfile?.display_name || 'Unknown User'}
+                        {isCurrentUser && (
+                          <span className="ml-2 text-xs text-muted-foreground">(you)</span>
+                        )}
+                      </div>
+                      <span className="text-xs text-muted-foreground">
                         {membership.created_at
                           ? new Date(membership.created_at).toLocaleDateString()
                           : '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <OrgMemberActions
-                          membershipId={membership.id}
-                          orgId={id}
-                          role={membership.role}
-                          userName={userProfile?.display_name || 'this user'}
-                          isCurrentUser={isCurrentUser}
-                          adminCount={adminCount}
-                          isMemberSuperAdmin={userProfile?.is_super_admin ?? false}
-                          isCurrentUserSuperAdmin={isSuperAdmin}
-                        />
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                      </span>
+                    </div>
+                    <div className="pt-2 border-t">
+                      <OrgMemberActions
+                        membershipId={membership.id}
+                        orgId={id}
+                        role={membership.role}
+                        userName={userProfile?.display_name || 'this user'}
+                        isCurrentUser={isCurrentUser}
+                        adminCount={adminCount}
+                        isMemberSuperAdmin={userProfile?.is_super_admin ?? false}
+                        isCurrentUserSuperAdmin={isSuperAdmin}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden md:block bg-white rounded-lg shadow overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      User
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Joined
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {memberships?.filter(m => m.role === 'admin').map((membership) => {
+                    const userProfile = profileMap.get(membership.user_id)
+                    const isCurrentUser = membership.user_id === user.id
+                    return (
+                      <tr key={membership.id}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">
+                            {userProfile?.display_name || 'Unknown User'}
+                            {isCurrentUser && (
+                              <span className="ml-2 text-xs text-gray-500">(you)</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {membership.created_at
+                            ? new Date(membership.created_at).toLocaleDateString()
+                            : '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <OrgMemberActions
+                            membershipId={membership.id}
+                            orgId={id}
+                            role={membership.role}
+                            userName={userProfile?.display_name || 'this user'}
+                            isCurrentUser={isCurrentUser}
+                            adminCount={adminCount}
+                            isMemberSuperAdmin={userProfile?.is_super_admin ?? false}
+                            isCurrentUserSuperAdmin={isSuperAdmin}
+                          />
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 
@@ -189,54 +229,90 @@ export default async function OrgMembersPage({ params }: PageProps) {
             <p className="text-gray-600">No members yet. Share a pool invite link to add members.</p>
           </div>
         ) : (
-          <div className="bg-white rounded-lg shadow overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    User
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Joined
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {memberships?.filter(m => m.role === 'member').map((membership) => {
-                  const userProfile = profileMap.get(membership.user_id)
-                  return (
-                    <tr key={membership.id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {userProfile?.display_name || 'Unknown User'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+          <>
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-3">
+              {memberships?.filter(m => m.role === 'member').map((membership) => {
+                const userProfile = profileMap.get(membership.user_id)
+                return (
+                  <div key={membership.id} className="bg-white rounded-lg shadow p-4 space-y-3">
+                    <div className="flex justify-between items-start">
+                      <div className="font-medium text-gray-900">
+                        {userProfile?.display_name || 'Unknown User'}
+                      </div>
+                      <span className="text-xs text-muted-foreground">
                         {membership.created_at
                           ? new Date(membership.created_at).toLocaleDateString()
                           : '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <OrgMemberActions
-                          membershipId={membership.id}
-                          orgId={id}
-                          role={membership.role}
-                          userName={userProfile?.display_name || 'this user'}
-                          isCurrentUser={false}
-                          adminCount={adminCount}
-                          isMemberSuperAdmin={userProfile?.is_super_admin ?? false}
-                          isCurrentUserSuperAdmin={isSuperAdmin}
-                        />
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                      </span>
+                    </div>
+                    <div className="pt-2 border-t">
+                      <OrgMemberActions
+                        membershipId={membership.id}
+                        orgId={id}
+                        role={membership.role}
+                        userName={userProfile?.display_name || 'this user'}
+                        isCurrentUser={false}
+                        adminCount={adminCount}
+                        isMemberSuperAdmin={userProfile?.is_super_admin ?? false}
+                        isCurrentUserSuperAdmin={isSuperAdmin}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden md:block bg-white rounded-lg shadow overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      User
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Joined
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {memberships?.filter(m => m.role === 'member').map((membership) => {
+                    const userProfile = profileMap.get(membership.user_id)
+                    return (
+                      <tr key={membership.id}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">
+                            {userProfile?.display_name || 'Unknown User'}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {membership.created_at
+                            ? new Date(membership.created_at).toLocaleDateString()
+                            : '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <OrgMemberActions
+                            membershipId={membership.id}
+                            orgId={id}
+                            role={membership.role}
+                            userName={userProfile?.display_name || 'this user'}
+                            isCurrentUser={false}
+                            adminCount={adminCount}
+                            isMemberSuperAdmin={userProfile?.is_super_admin ?? false}
+                            isCurrentUserSuperAdmin={isSuperAdmin}
+                          />
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 

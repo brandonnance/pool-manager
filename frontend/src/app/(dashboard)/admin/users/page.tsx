@@ -84,7 +84,45 @@ export default async function AdminUsersPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
+          {/* Mobile Card View */}
+          <div className="md:hidden space-y-3">
+            {users?.map((u) => (
+              <div key={u.id} className="border rounded-lg p-4 space-y-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="font-medium">{u.display_name || 'No name'}</div>
+                    <div className="text-sm text-muted-foreground">{u.email || '-'}</div>
+                  </div>
+                  <div className="flex flex-col gap-1 items-end">
+                    {u.deactivated_at ? (
+                      <Badge variant="destructive">Deactivated</Badge>
+                    ) : (
+                      <Badge variant="default" className="bg-green-600">Active</Badge>
+                    )}
+                    {u.is_super_admin && (
+                      <Badge variant="secondary">Super Admin</Badge>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  <span>{orgCountMap[u.id] || 0} orgs</span>
+                  <span>Joined {u.created_at ? new Date(u.created_at).toLocaleDateString() : '-'}</span>
+                </div>
+                <div className="pt-2 border-t">
+                  <UserActions
+                    userId={u.id}
+                    userName={u.display_name || 'User'}
+                    isDeactivated={!!u.deactivated_at}
+                    isSuperAdmin={!!u.is_super_admin}
+                    isCurrentUser={u.id === user.id}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b">

@@ -1,36 +1,34 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
+import { Copy } from 'lucide-react'
 
 interface CopyLinkButtonProps {
   token: string
 }
 
 export function CopyLinkButton({ token }: CopyLinkButtonProps) {
-  const [copied, setCopied] = useState(false)
   const [fullUrl, setFullUrl] = useState('')
 
   useEffect(() => {
-    // Construct full URL on client side
     setFullUrl(`${window.location.origin}/join/${token}`)
   }, [token])
 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(fullUrl)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch (err) {
-      console.error('Failed to copy:', err)
+      toast.success('Link copied to clipboard')
+    } catch {
+      toast.error('Failed to copy link')
     }
   }
 
   return (
-    <button
-      onClick={handleCopy}
-      className="px-3 py-1 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded"
-    >
-      {copied ? 'Copied!' : 'Copy'}
-    </button>
+    <Button variant="ghost" size="sm" onClick={handleCopy} className="h-8 gap-1">
+      <Copy className="h-3 w-3" />
+      Copy
+    </Button>
   )
 }
