@@ -8,6 +8,7 @@ import { PayoutLeaderboard } from './payout-leaderboard'
 import { SingleGameScoreEntry } from './single-game-score-entry'
 import { ScoreChangeLog } from './score-change-log'
 import { EditGameTeamsButton } from './edit-game-teams-button'
+import { buildScoreChangeWinningRoundsMap, buildQuarterModeWinningRoundsMap } from '@/lib/squares'
 import type { WinningRound } from './square-cell'
 
 interface SqPool {
@@ -143,72 +144,10 @@ export function SingleGameSquaresContent({
   const isQuarterMode = sqPool.scoring_mode === 'quarter'
   const isScoreChangeMode = sqPool.scoring_mode === 'score_change'
 
-  // Build winning square rounds map
-  // For single game score_change mode, track forward vs reverse wins
-  const winningSquareRounds = new Map<string, WinningRound>()
-
-  if (isScoreChangeMode) {
-    // Track which squares have forward and/or reverse wins (regular score changes)
-    const forwardWins = new Set<string>()
-    const reverseWins = new Set<string>()
-    // Track final score winners separately
-    const finalForwardWins = new Set<string>()
-    const finalReverseWins = new Set<string>()
-
-    winners.forEach((w) => {
-      if (w.square_id) {
-        if (w.win_type === 'score_change') {
-          forwardWins.add(w.square_id)
-        } else if (w.win_type === 'score_change_reverse') {
-          reverseWins.add(w.square_id)
-        } else if (w.win_type === 'score_change_final') {
-          finalForwardWins.add(w.square_id)
-        } else if (w.win_type === 'score_change_final_reverse') {
-          finalReverseWins.add(w.square_id)
-        }
-      }
-    })
-
-    // First, handle final score winners (purple) - these take precedence
-    const allFinalSquares = new Set([...finalForwardWins, ...finalReverseWins])
-    allFinalSquares.forEach((squareId) => {
-      const hasFinalForward = finalForwardWins.has(squareId)
-      const hasFinalReverse = finalReverseWins.has(squareId)
-
-      if (hasFinalForward && hasFinalReverse) {
-        winningSquareRounds.set(squareId, 'score_change_final_both')
-      } else if (hasFinalForward) {
-        winningSquareRounds.set(squareId, 'score_change_final')
-      } else if (hasFinalReverse) {
-        winningSquareRounds.set(squareId, 'score_change_final_reverse')
-      }
-    })
-
-    // Then handle regular score change winners (only if not already a final winner)
-    const allWinningSquares = new Set([...forwardWins, ...reverseWins])
-    allWinningSquares.forEach((squareId) => {
-      // Skip if already marked as final winner
-      if (winningSquareRounds.has(squareId)) return
-
-      const hasForward = forwardWins.has(squareId)
-      const hasReverse = reverseWins.has(squareId)
-
-      if (hasForward && hasReverse) {
-        winningSquareRounds.set(squareId, 'score_change_both')
-      } else if (hasForward) {
-        winningSquareRounds.set(squareId, 'score_change_forward')
-      } else if (hasReverse) {
-        winningSquareRounds.set(squareId, 'score_change_reverse')
-      }
-    })
-  } else {
-    // Quarter mode - use single_game color for all winners
-    winners.forEach((w) => {
-      if (w.square_id) {
-        winningSquareRounds.set(w.square_id, 'single_game' as WinningRound)
-      }
-    })
-  }
+  // Build winning square rounds map using extracted utility
+  const winningSquareRounds = isScoreChangeMode
+    ? buildScoreChangeWinningRoundsMap(winners)
+    : buildQuarterModeWinningRoundsMap(winners)
 
   // Calculate total claimed squares
   const claimedCount = squares.filter((sq) => sq.user_id).length
