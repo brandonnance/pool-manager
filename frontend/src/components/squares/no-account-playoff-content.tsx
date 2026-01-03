@@ -581,6 +581,49 @@ export function NoAccountPlayoffContent({
     }
   }
 
+  // Calculate live winning squares from in-progress games
+  const liveWinningSquareIds = new Set<string>()
+  if (numbersLocked && rowNumbers && colNumbers) {
+    // Create a map of squares by position for quick lookup
+    const squaresByPosition = new Map<string, NoAccountSquare>()
+    for (const sq of squares) {
+      squaresByPosition.set(`${sq.row_index}-${sq.col_index}`, sq)
+    }
+
+    // Check each in-progress game
+    for (const game of games) {
+      if (game.status !== 'in_progress') continue
+      if (game.home_score === null || game.away_score === null) continue
+
+      const homeDigit = game.home_score % 10
+      const awayDigit = game.away_score % 10
+
+      // Find row/col indices that match these digits
+      const homeRowIdx = rowNumbers.indexOf(homeDigit)
+      const awayColIdx = colNumbers.indexOf(awayDigit)
+
+      if (homeRowIdx !== -1 && awayColIdx !== -1) {
+        // Forward scoring square
+        const forwardSquare = squaresByPosition.get(`${homeRowIdx}-${awayColIdx}`)
+        if (forwardSquare?.id) {
+          liveWinningSquareIds.add(forwardSquare.id)
+        }
+
+        // Reverse scoring square (if enabled)
+        if (reverseScoring) {
+          const reverseHomeRowIdx = rowNumbers.indexOf(awayDigit)
+          const reverseAwayColIdx = colNumbers.indexOf(homeDigit)
+          if (reverseHomeRowIdx !== -1 && reverseAwayColIdx !== -1) {
+            const reverseSquare = squaresByPosition.get(`${reverseHomeRowIdx}-${reverseAwayColIdx}`)
+            if (reverseSquare?.id) {
+              liveWinningSquareIds.add(reverseSquare.id)
+            }
+          }
+        }
+      }
+    }
+  }
+
   // Calculate wins by participant name
   // Track forward vs reverse wins separately
   const winsByName = new Map<string, { total: number; forward: number; reverse: number }>()
@@ -652,6 +695,7 @@ export function NoAccountPlayoffContent({
                 numbersLocked={numbersLocked}
                 isCommissioner={isCommissioner}
                 winningSquareRounds={winningSquareRounds}
+                liveWinningSquareIds={liveWinningSquareIds}
                 homeTeamLabel="Home"
                 awayTeamLabel="Away"
                 legendMode="full_playoff"
