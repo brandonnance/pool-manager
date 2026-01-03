@@ -1,15 +1,15 @@
-'use client'
+"use client";
 
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -17,20 +17,20 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
+} from "@/components/ui/dialog";
 
 interface ExistingSquare {
-  row_index: number
-  col_index: number
-  participant_name: string | null
+  row_index: number;
+  col_index: number;
+  participant_name: string | null;
 }
 
 export interface BulkAssignDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  sqPoolId: string
-  existingSquares: ExistingSquare[]
-  onComplete: () => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  sqPoolId: string;
+  existingSquares: ExistingSquare[];
+  onComplete: () => void;
 }
 
 export function BulkAssignDialog({
@@ -40,221 +40,234 @@ export function BulkAssignDialog({
   existingSquares,
   onComplete,
 }: BulkAssignDialogProps) {
-  const router = useRouter()
-  const [name, setName] = useState('')
-  const [verified, setVerified] = useState(false)
-  const [selectedSquares, setSelectedSquares] = useState<Set<string>>(new Set())
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const router = useRouter();
+  const [name, setName] = useState("");
+  const [verified, setVerified] = useState(false);
+  const [selectedSquares, setSelectedSquares] = useState<Set<string>>(
+    new Set()
+  );
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Autocomplete state
-  const [existingNames, setExistingNames] = useState<string[]>([])
-  const [showSuggestions, setShowSuggestions] = useState(false)
-  const [selectedIndex, setSelectedIndex] = useState(-1)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const [existingNames, setExistingNames] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Build set of claimed squares
   const claimedSquares = useMemo(() => {
-    const set = new Set<string>()
+    const set = new Set<string>();
     existingSquares.forEach((sq) => {
       if (sq.participant_name) {
-        set.add(`${sq.row_index}-${sq.col_index}`)
+        set.add(`${sq.row_index}-${sq.col_index}`);
       }
-    })
-    return set
-  }, [existingSquares])
+    });
+    return set;
+  }, [existingSquares]);
 
   // Fetch existing participant names for autocomplete and case normalization
   useEffect(() => {
     if (open) {
       const fetchNames = async () => {
-        const supabase = createClient()
+        const supabase = createClient();
         const { data } = await supabase
-          .from('sq_squares')
-          .select('participant_name')
-          .eq('sq_pool_id', sqPoolId)
-          .not('participant_name', 'is', null)
+          .from("sq_squares")
+          .select("participant_name")
+          .eq("sq_pool_id", sqPoolId)
+          .not("participant_name", "is", null);
 
         if (data) {
           // Get unique names (case-insensitive), preserving first occurrence casing
-          const nameMap = new Map<string, string>()
-          data.forEach(s => {
+          const nameMap = new Map<string, string>();
+          data.forEach((s) => {
             if (s.participant_name) {
-              const lowerName = s.participant_name.toLowerCase()
+              const lowerName = s.participant_name.toLowerCase();
               if (!nameMap.has(lowerName)) {
-                nameMap.set(lowerName, s.participant_name)
+                nameMap.set(lowerName, s.participant_name);
               }
             }
-          })
-          const uniqueNames = Array.from(nameMap.values())
-          uniqueNames.sort((a, b) => a.localeCompare(b))
-          setExistingNames(uniqueNames)
+          });
+          const uniqueNames = Array.from(nameMap.values());
+          uniqueNames.sort((a, b) => a.localeCompare(b));
+          setExistingNames(uniqueNames);
         }
-      }
-      fetchNames()
+      };
+      fetchNames();
     }
-  }, [open, sqPoolId])
+  }, [open, sqPoolId]);
 
   // Filter suggestions based on input
   const filteredSuggestions = name.trim()
-    ? existingNames.filter(n =>
-        n.toLowerCase().includes(name.toLowerCase()) &&
-        n.toLowerCase() !== name.toLowerCase()
+    ? existingNames.filter(
+        (n) =>
+          n.toLowerCase().includes(name.toLowerCase()) &&
+          n.toLowerCase() !== name.toLowerCase()
       )
-    : []
+    : [];
 
   // Handle keyboard navigation in suggestions
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (!showSuggestions || filteredSuggestions.length === 0) {
-      if (e.key === 'ArrowDown' && filteredSuggestions.length > 0) {
-        setShowSuggestions(true)
-        setSelectedIndex(0)
-        e.preventDefault()
-      }
-      return
-    }
-
-    switch (e.key) {
-      case 'ArrowDown':
-        e.preventDefault()
-        setSelectedIndex(prev =>
-          prev < filteredSuggestions.length - 1 ? prev + 1 : prev
-        )
-        break
-      case 'ArrowUp':
-        e.preventDefault()
-        setSelectedIndex(prev => prev > 0 ? prev - 1 : -1)
-        break
-      case 'Enter':
-        if (selectedIndex >= 0 && selectedIndex < filteredSuggestions.length) {
-          e.preventDefault()
-          setName(filteredSuggestions[selectedIndex])
-          setShowSuggestions(false)
-          setSelectedIndex(-1)
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (!showSuggestions || filteredSuggestions.length === 0) {
+        if (e.key === "ArrowDown" && filteredSuggestions.length > 0) {
+          setShowSuggestions(true);
+          setSelectedIndex(0);
+          e.preventDefault();
         }
-        break
-      case 'Escape':
-        setShowSuggestions(false)
-        setSelectedIndex(-1)
-        break
-    }
-  }, [showSuggestions, filteredSuggestions, selectedIndex])
+        return;
+      }
+
+      switch (e.key) {
+        case "ArrowDown":
+          e.preventDefault();
+          setSelectedIndex((prev) =>
+            prev < filteredSuggestions.length - 1 ? prev + 1 : prev
+          );
+          break;
+        case "ArrowUp":
+          e.preventDefault();
+          setSelectedIndex((prev) => (prev > 0 ? prev - 1 : -1));
+          break;
+        case "Enter":
+          if (
+            selectedIndex >= 0 &&
+            selectedIndex < filteredSuggestions.length
+          ) {
+            e.preventDefault();
+            setName(filteredSuggestions[selectedIndex]);
+            setShowSuggestions(false);
+            setSelectedIndex(-1);
+          }
+          break;
+        case "Escape":
+          setShowSuggestions(false);
+          setSelectedIndex(-1);
+          break;
+      }
+    },
+    [showSuggestions, filteredSuggestions, selectedIndex]
+  );
 
   const handleSelectSuggestion = (suggestion: string) => {
-    setName(suggestion)
-    setShowSuggestions(false)
-    setSelectedIndex(-1)
-    inputRef.current?.focus()
-  }
+    setName(suggestion);
+    setShowSuggestions(false);
+    setSelectedIndex(-1);
+    inputRef.current?.focus();
+  };
 
   // Find the canonical (first-used) casing for a name
   const getCanonicalName = (inputName: string): string => {
-    const lowerInput = inputName.toLowerCase()
-    const existingMatch = existingNames.find(n => n.toLowerCase() === lowerInput)
-    return existingMatch ?? inputName
-  }
+    const lowerInput = inputName.toLowerCase();
+    const existingMatch = existingNames.find(
+      (n) => n.toLowerCase() === lowerInput
+    );
+    return existingMatch ?? inputName;
+  };
 
   // Reset form when dialog opens (via prop change)
   useEffect(() => {
     if (open) {
-      setName('')
-      setVerified(false)
-      setSelectedSquares(new Set())
-      setError(null)
-      setShowSuggestions(false)
-      setSelectedIndex(-1)
+      setName("");
+      setVerified(false);
+      setSelectedSquares(new Set());
+      setError(null);
+      setShowSuggestions(false);
+      setSelectedIndex(-1);
     }
-  }, [open])
+  }, [open]);
 
   // Handle dialog close
   const handleOpenChange = (isOpen: boolean) => {
-    onOpenChange(isOpen)
-  }
+    onOpenChange(isOpen);
+  };
 
   const toggleSquare = (rowIndex: number, colIndex: number) => {
-    const key = `${rowIndex}-${colIndex}`
-    if (claimedSquares.has(key)) return // Can't select claimed squares
+    const key = `${rowIndex}-${colIndex}`;
+    if (claimedSquares.has(key)) return; // Can't select claimed squares
 
     setSelectedSquares((prev) => {
-      const next = new Set(prev)
+      const next = new Set(prev);
       if (next.has(key)) {
-        next.delete(key)
+        next.delete(key);
       } else {
-        next.add(key)
+        next.add(key);
       }
-      return next
-    })
-  }
+      return next;
+    });
+  };
 
   const selectAll = () => {
-    const allAvailable = new Set<string>()
+    const allAvailable = new Set<string>();
     for (let row = 0; row < 10; row++) {
       for (let col = 0; col < 10; col++) {
-        const key = `${row}-${col}`
+        const key = `${row}-${col}`;
         if (!claimedSquares.has(key)) {
-          allAvailable.add(key)
+          allAvailable.add(key);
         }
       }
     }
-    setSelectedSquares(allAvailable)
-  }
+    setSelectedSquares(allAvailable);
+  };
 
   const clearSelection = () => {
-    setSelectedSquares(new Set())
-  }
+    setSelectedSquares(new Set());
+  };
 
   const handleAssign = async () => {
-    const trimmedName = name.trim()
+    const trimmedName = name.trim();
     if (!trimmedName) {
-      setError('Please enter a name')
-      return
+      setError("Please enter a name");
+      return;
     }
     if (selectedSquares.size === 0) {
-      setError('Please select at least one square')
-      return
+      setError("Please select at least one square");
+      return;
     }
 
     // Normalize to existing casing if a case-insensitive match exists
-    const normalizedName = getCanonicalName(trimmedName)
+    const normalizedName = getCanonicalName(trimmedName);
 
-    setIsSubmitting(true)
-    setError(null)
+    setIsSubmitting(true);
+    setError(null);
 
-    const supabase = createClient()
+    const supabase = createClient();
 
     // Build insert array
     const inserts = Array.from(selectedSquares).map((key) => {
-      const [row, col] = key.split('-').map(Number)
+      const [row, col] = key.split("-").map(Number);
       return {
         sq_pool_id: sqPoolId,
         row_index: row,
         col_index: col,
         participant_name: normalizedName,
         verified,
-      }
-    })
+      };
+    });
 
     const { error: insertError } = await supabase
-      .from('sq_squares')
-      .insert(inserts)
+      .from("sq_squares")
+      .insert(inserts);
 
     if (insertError) {
-      if (insertError.code === '23505') {
-        setError('Some squares were just claimed. Please refresh and try again.')
+      if (insertError.code === "23505") {
+        setError(
+          "Some squares were just claimed. Please refresh and try again."
+        );
       } else {
-        setError(insertError.message)
+        setError(insertError.message);
       }
-      setIsSubmitting(false)
-      return
+      setIsSubmitting(false);
+      return;
     }
 
-    setIsSubmitting(false)
-    handleOpenChange(false)
-    onComplete()
-    router.refresh()
-  }
+    setIsSubmitting(false);
+    handleOpenChange(false);
+    onComplete();
+    router.refresh();
+  };
 
-  const availableCount = 100 - claimedSquares.size
+  const availableCount = 100 - claimedSquares.size;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -276,15 +289,15 @@ export function BulkAssignDialog({
                 placeholder="e.g., John Smith or Team Alpha"
                 value={name}
                 onChange={(e) => {
-                  setName(e.target.value)
-                  setShowSuggestions(true)
-                  setSelectedIndex(-1)
+                  setName(e.target.value);
+                  setShowSuggestions(true);
+                  setSelectedIndex(-1);
                 }}
                 onKeyDown={handleKeyDown}
                 onFocus={() => name.trim() && setShowSuggestions(true)}
                 onBlur={() => {
                   // Delay hiding to allow click on suggestion
-                  setTimeout(() => setShowSuggestions(false), 150)
+                  setTimeout(() => setShowSuggestions(false), 150);
                 }}
                 disabled={isSubmitting}
                 autoComplete="off"
@@ -297,12 +310,12 @@ export function BulkAssignDialog({
                       key={suggestion}
                       type="button"
                       className={cn(
-                        'w-full px-3 py-2 text-left text-sm hover:bg-gray-100 focus:bg-gray-100 focus:outline-none',
-                        index === selectedIndex && 'bg-gray-100'
+                        "w-full px-3 py-2 text-left text-sm hover:bg-gray-100 focus:bg-gray-100 focus:outline-none",
+                        index === selectedIndex && "bg-gray-100"
                       )}
                       onMouseDown={(e) => {
-                        e.preventDefault()
-                        handleSelectSuggestion(suggestion)
+                        e.preventDefault();
+                        handleSelectSuggestion(suggestion);
                       }}
                     >
                       {suggestion}
@@ -320,7 +333,7 @@ export function BulkAssignDialog({
 
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label htmlFor="bulk-verified">Verified (Paid)</Label>
+              <Label htmlFor="bulk-verified">Verified</Label>
               <p className="text-xs text-muted-foreground">
                 Mark all selected squares as verified
               </p>
@@ -336,12 +349,8 @@ export function BulkAssignDialog({
           {/* Selection controls */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Badge variant="secondary">
-                {selectedSquares.size} selected
-              </Badge>
-              <Badge variant="outline">
-                {availableCount} available
-              </Badge>
+              <Badge variant="secondary">{selectedSquares.size} selected</Badge>
+              <Badge variant="outline">{availableCount} available</Badge>
             </div>
             <div className="flex gap-2">
               <Button
@@ -370,16 +379,16 @@ export function BulkAssignDialog({
             <div
               className="grid gap-1"
               style={{
-                gridTemplateColumns: 'repeat(10, 1fr)',
+                gridTemplateColumns: "repeat(10, 1fr)",
               }}
             >
               {Array.from({ length: 100 }, (_, i) => {
-                const row = Math.floor(i / 10)
-                const col = i % 10
-                const key = `${row}-${col}`
-                const isClaimed = claimedSquares.has(key)
-                const isSelected = selectedSquares.has(key)
-                const gridNumber = `${row}${col}`
+                const row = Math.floor(i / 10);
+                const col = i % 10;
+                const key = `${row}-${col}`;
+                const isClaimed = claimedSquares.has(key);
+                const isSelected = selectedSquares.has(key);
+                const gridNumber = `${row}${col}`;
 
                 return (
                   <button
@@ -388,24 +397,24 @@ export function BulkAssignDialog({
                     onClick={() => toggleSquare(row, col)}
                     disabled={isClaimed || isSubmitting}
                     className={cn(
-                      'aspect-square text-[10px] font-medium rounded border transition-colors',
+                      "aspect-square text-[10px] font-medium rounded border transition-colors",
                       isClaimed
-                        ? 'bg-gray-200 border-gray-300 text-gray-400 cursor-not-allowed'
+                        ? "bg-gray-200 border-gray-300 text-gray-400 cursor-not-allowed"
                         : isSelected
-                          ? 'bg-primary border-primary text-primary-foreground'
-                          : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-100 cursor-pointer'
+                        ? "bg-primary border-primary text-primary-foreground"
+                        : "bg-white border-gray-300 text-gray-600 hover:bg-gray-100 cursor-pointer"
                     )}
                     title={
                       isClaimed
                         ? `Square ${gridNumber} - Already claimed`
                         : isSelected
-                          ? `Square ${gridNumber} - Selected (click to deselect)`
-                          : `Square ${gridNumber} - Click to select`
+                        ? `Square ${gridNumber} - Selected (click to deselect)`
+                        : `Square ${gridNumber} - Click to select`
                     }
                   >
                     {gridNumber}
                   </button>
-                )
+                );
               })}
             </div>
           </div>
@@ -432,14 +441,18 @@ export function BulkAssignDialog({
           </Button>
           <Button
             onClick={handleAssign}
-            disabled={isSubmitting || !name.trim() || selectedSquares.size === 0}
+            disabled={
+              isSubmitting || !name.trim() || selectedSquares.size === 0
+            }
           >
             {isSubmitting
-              ? 'Assigning...'
-              : `Assign ${selectedSquares.size} Square${selectedSquares.size !== 1 ? 's' : ''}`}
+              ? "Assigning..."
+              : `Assign ${selectedSquares.size} Square${
+                  selectedSquares.size !== 1 ? "s" : ""
+                }`}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

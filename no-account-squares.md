@@ -7,7 +7,7 @@ Add a "No-Account Squares" pool type where participants don't need user accounts
 ## Key Features
 
 - **Commissioner-controlled squares**: Click to assign names (no user accounts for participants)
-- **Verified/paid toggle**: Commissioner tracks who has paid (hidden from public)
+- **Verified toggle**: Commissioner tracks who has been verified (hidden from public)
 - **Public URL**: Custom slug like `/view/superbowl2026` (no auth required)
 - **Both modes**: Single game (quarter or score_change) OR full playoffs
 - **Bulk assign**: Dialog to assign multiple squares to one name
@@ -91,12 +91,14 @@ Add a "No-Account Squares" pool type where participants don't need user accounts
   - [x] Round hierarchy for winning square colors (higher rounds override lower)
 
 - [x] **Members Page Adjustments**
+
   - [x] Hide invite links section for no-account pools
   - [x] Hide pending requests for no-account pools
   - [x] Show only commissioners (not regular members)
   - [x] Hide Squares column for no-account pools
 
 - [x] **Phase 9: Bulk Verification & Participant Management**
+
   - [x] Case-insensitive participant name matching (e.g., "Bobby" and "bobby" are the same person)
   - [x] Name normalization on save (preserves first-used casing)
   - [x] "Verify All" / "Unverify All" buttons in single-square dialog when editing existing assignments
@@ -108,6 +110,7 @@ Add a "No-Account Squares" pool type where participants don't need user accounts
   - [x] Autocomplete suggestions in both single and bulk assign dialogs
 
 - [x] **Phase 10: Final Winner Display**
+
   - [x] Prominent final winner banner when game is marked final (score_change mode)
   - [x] Shows both forward and reverse winners if applicable
   - [x] Special message when same person wins both directions
@@ -139,31 +142,31 @@ Add a "No-Account Squares" pool type where participants don't need user accounts
 
 ## Files Created
 
-| File                                                                 | Purpose                                      |
-| -------------------------------------------------------------------- | -------------------------------------------- |
-| `frontend/src/app/view/[slug]/page.tsx`                              | Public view page (server component)          |
-| `frontend/src/components/squares/no-account-square-cell.tsx`         | Cell with name/verified styling              |
-| `frontend/src/components/squares/no-account-squares-grid.tsx`        | Grid for no-account mode                     |
-| `frontend/src/components/squares/assign-name-dialog.tsx`             | Single square assignment w/ autocomplete     |
-| `frontend/src/components/squares/bulk-assign-dialog.tsx`             | Multi-square assignment                      |
-| `frontend/src/components/squares/no-account-pool-settings.tsx`       | Commissioner settings                        |
-| `frontend/src/components/squares/no-account-single-game-content.tsx` | Single game wrapper                          |
-| `frontend/src/components/squares/no-account-playoff-content.tsx`     | Playoffs wrapper                             |
-| `frontend/src/components/squares/public-realtime-grid.tsx`           | Realtime grid for public view                |
-| `frontend/src/components/squares/public-realtime-games.tsx`          | Realtime games/winners for public view       |
-| `frontend/src/components/squares/edit-game-teams-button.tsx`         | Edit team names for playoff games            |
+| File                                                                 | Purpose                                            |
+| -------------------------------------------------------------------- | -------------------------------------------------- |
+| `frontend/src/app/view/[slug]/page.tsx`                              | Public view page (server component)                |
+| `frontend/src/components/squares/no-account-square-cell.tsx`         | Cell with name/verified styling                    |
+| `frontend/src/components/squares/no-account-squares-grid.tsx`        | Grid for no-account mode                           |
+| `frontend/src/components/squares/assign-name-dialog.tsx`             | Single square assignment w/ autocomplete           |
+| `frontend/src/components/squares/bulk-assign-dialog.tsx`             | Multi-square assignment                            |
+| `frontend/src/components/squares/no-account-pool-settings.tsx`       | Commissioner settings                              |
+| `frontend/src/components/squares/no-account-single-game-content.tsx` | Single game wrapper                                |
+| `frontend/src/components/squares/no-account-playoff-content.tsx`     | Playoffs wrapper                                   |
+| `frontend/src/components/squares/public-realtime-grid.tsx`           | Realtime grid for public view                      |
+| `frontend/src/components/squares/public-realtime-games.tsx`          | Realtime games/winners for public view             |
+| `frontend/src/components/squares/edit-game-teams-button.tsx`         | Edit team names for playoff games                  |
 | `frontend/src/components/squares/participant-summary-panel.tsx`      | Commissioner participant overview with bulk verify |
 
 ## Files Modified
 
-| File                                                       | Changes                                       |
-| ---------------------------------------------------------- | --------------------------------------------- |
-| `frontend/src/app/(dashboard)/pools/[id]/page.tsx`         | Detect no_account_mode, route to components   |
-| `frontend/src/app/(dashboard)/pools/[id]/members/page.tsx` | Hide invite links, show only commissioners    |
-| `frontend/src/components/pools/create-pool-button.tsx`     | Add no-account toggle and slug input          |
-| `frontend/src/components/squares/square-cell.tsx`          | WinningRound type export                      |
-| `frontend/src/app/globals.css`                             | Live winner pulse & game glow animations      |
-| `frontend/src/types/database.ts`                           | Regenerated after migrations                  |
+| File                                                       | Changes                                     |
+| ---------------------------------------------------------- | ------------------------------------------- |
+| `frontend/src/app/(dashboard)/pools/[id]/page.tsx`         | Detect no_account_mode, route to components |
+| `frontend/src/app/(dashboard)/pools/[id]/members/page.tsx` | Hide invite links, show only commissioners  |
+| `frontend/src/components/pools/create-pool-button.tsx`     | Add no-account toggle and slug input        |
+| `frontend/src/components/squares/square-cell.tsx`          | WinningRound type export                    |
+| `frontend/src/app/globals.css`                             | Live winner pulse & game glow animations    |
+| `frontend/src/types/database.ts`                           | Regenerated after migrations                |
 
 ---
 
@@ -189,6 +192,7 @@ ALTER TABLE sq_squares REPLICA IDENTITY FULL;
 ### Realtime Enabled Tables
 
 Via Supabase Dashboard > Database > Replication:
+
 - `sq_squares` - Grid updates
 - `sq_games` - Score/status updates
 - `sq_winners` - Winner records
@@ -202,7 +206,8 @@ Via Supabase Dashboard > Database > Replication:
 ```css
 /* Live winning square pulse animation */
 @keyframes live-winner-pulse {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.6);
     background-color: rgba(16, 185, 129, 0.15);
   }
@@ -220,7 +225,8 @@ Via Supabase Dashboard > Database > Replication:
 
 /* In-progress game card glow */
 @keyframes game-live-glow {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.3);
   }
   50% {
@@ -241,14 +247,14 @@ When a square wins in multiple rounds, the **highest** tier takes precedence for
 
 ```typescript
 const roundHierarchy: Record<string, number> = {
-  wild_card: 1,           // amber/yellow
-  divisional: 2,          // emerald/green
-  conference: 3,          // red
+  wild_card: 1, // amber/yellow
+  divisional: 2, // emerald/green
+  conference: 3, // red
   super_bowl_halftime: 4, // violet
-  super_bowl: 5,          // purple
+  super_bowl: 5, // purple
 
   // Single game mode
-  single_game: 1,         // teal
+  single_game: 1, // teal
 
   // Score change mode
   score_change_forward: 1,
@@ -257,7 +263,7 @@ const roundHierarchy: Record<string, number> = {
   score_change_final: 3,
   score_change_final_reverse: 3,
   score_change_final_both: 4,
-}
+};
 ```
 
 ---
@@ -316,6 +322,7 @@ const roundHierarchy: Record<string, number> = {
 ### Live Winner Calculation
 
 The `PublicRealtimeGrid` component calculates `liveWinningSquareIds` from in-progress games:
+
 1. For each game with `status === 'in_progress'`
 2. Calculate last digits of current scores
 3. Find matching grid position based on `rowNumbers` and `colNumbers`
@@ -325,6 +332,7 @@ The `PublicRealtimeGrid` component calculates `liveWinningSquareIds` from in-pro
 ### Round Hierarchy Implementation
 
 Applied in 3 places for consistency:
+
 - `view/[slug]/page.tsx` (public view)
 - `no-account-playoff-content.tsx` (commissioner no-account)
 - `playoff-squares-content.tsx` (authenticated users)
