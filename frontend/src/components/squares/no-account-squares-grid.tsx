@@ -1,11 +1,17 @@
 'use client'
 
-import { Fragment, useState } from 'react'
+import { Fragment, useState, useRef, useEffect } from 'react'
 import { NoAccountSquareCell } from './no-account-square-cell'
 import { cn } from '@/lib/utils'
 import type { WinningRound } from './square-cell'
 
 export type LegendMode = 'full_playoff' | 'single_game' | 'score_change'
+
+interface SelectedSquare {
+  rowIndex: number
+  colIndex: number
+  participantName: string
+}
 
 export interface NoAccountSquare {
   id: string | null
@@ -47,6 +53,9 @@ export function NoAccountSquaresGrid({
   className,
 }: NoAccountSquaresGridProps) {
   const [loadingCell, setLoadingCell] = useState<string | null>(null)
+  const [selectedSquare, setSelectedSquare] = useState<SelectedSquare | null>(null)
+  const tooltipRef = useRef<HTMLDivElement>(null)
+  const gridRef = useRef<HTMLDivElement>(null)
 
   // Create a map for quick lookup
   const squareMap = new Map<string, NoAccountSquare>()
@@ -54,12 +63,58 @@ export function NoAccountSquaresGrid({
     squareMap.set(`${sq.row_index}-${sq.col_index}`, sq)
   })
 
+  // Close tooltip when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        selectedSquare &&
+        tooltipRef.current &&
+        !tooltipRef.current.contains(e.target as Node) &&
+        gridRef.current &&
+        !gridRef.current.contains(e.target as Node)
+      ) {
+        setSelectedSquare(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [selectedSquare])
+
   const handleSquareClick = (rowIndex: number, colIndex: number) => {
-    if (!onSquareClick) return
+    // Commissioner mode - use the external handler
+    if (isCommissioner && onSquareClick) {
+      const cellKey = `${rowIndex}-${colIndex}`
+      const square = squareMap.get(cellKey) ?? null
+      onSquareClick(rowIndex, colIndex, square)
+      return
+    }
+
+    // Public view - show tooltip for claimed squares
     const cellKey = `${rowIndex}-${colIndex}`
-    const square = squareMap.get(cellKey) ?? null
-    onSquareClick(rowIndex, colIndex, square)
+    const square = squareMap.get(cellKey)
+    if (square?.participant_name) {
+      // Toggle selection - if same square clicked, close; otherwise open new
+      if (
+        selectedSquare?.rowIndex === rowIndex &&
+        selectedSquare?.colIndex === colIndex
+      ) {
+        setSelectedSquare(null)
+      } else {
+        setSelectedSquare({
+          rowIndex,
+          colIndex,
+          participantName: square.participant_name,
+        })
+      }
+    } else {
+      setSelectedSquare(null)
+    }
   }
+
+  // Count squares for selected participant
+  const selectedParticipantSquareCount = selectedSquare
+    ? squares.filter((s) => s.participant_name === selectedSquare.participantName).length
+    : 0
 
   // Calculate statistics
   const totalSquares = 100
@@ -84,7 +139,31 @@ export function NoAccountSquaresGrid({
         )}
       </div>
 
-      <div className="overflow-x-auto overflow-y-visible pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
+      {/* Tooltip for selected participant */}
+      {selectedSquare && (
+        <div
+          ref={tooltipRef}
+          className="mb-3 p-3 bg-primary/10 border border-primary/20 rounded-lg flex items-center justify-between gap-4"
+        >
+          <div>
+            <p className="font-semibold text-foreground">{selectedSquare.participantName}</p>
+            <p className="text-sm text-muted-foreground">
+              {selectedParticipantSquareCount} square{selectedParticipantSquareCount !== 1 ? 's' : ''} (highlighted in blue)
+            </p>
+          </div>
+          <button
+            onClick={() => setSelectedSquare(null)}
+            className="text-muted-foreground hover:text-foreground p-1"
+            aria-label="Close"
+          >
+            <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      <div ref={gridRef} className="overflow-x-auto overflow-y-visible pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
         {/* Away team axis label */}
         <div className="flex items-center justify-center mb-1 sm:mb-2 ml-7 sm:ml-10">
           <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-0.5 sm:py-1 bg-primary/10 rounded-full">
@@ -152,6 +231,10 @@ export function NoAccountSquaresGrid({
                   const cellKey = `${rowIdx}-${colIdx}`
                   const square = squareMap.get(cellKey)
                   const isLoading = loadingCell === cellKey
+                  // Highlight if this square belongs to selected participant
+                  const isHighlighted = selectedSquare
+                    ? square?.participant_name === selectedSquare.participantName
+                    : false
 
                   return (
                     <NoAccountSquareCell
@@ -163,6 +246,7 @@ export function NoAccountSquaresGrid({
                       isCommissioner={isCommissioner}
                       winningRound={square?.id ? winningSquareRounds.get(square.id) ?? null : null}
                       isLiveWinning={square?.id ? liveWinningSquareIds.has(square.id) : false}
+                      isHighlighted={isHighlighted}
                       isLoading={isLoading}
                       onClick={() => handleSquareClick(rowIdx, colIdx)}
                     />

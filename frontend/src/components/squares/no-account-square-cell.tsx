@@ -67,6 +67,7 @@ export interface NoAccountSquareCellProps {
   isCommissioner: boolean
   winningRound: WinningRound
   isLiveWinning?: boolean // Pulsing animation for in-progress game
+  isHighlighted?: boolean // Highlight squares for selected participant (public view)
   isLoading?: boolean
   onClick?: () => void
   className?: string
@@ -80,6 +81,7 @@ export function NoAccountSquareCell({
   isCommissioner,
   winningRound,
   isLiveWinning = false,
+  isHighlighted = false,
   isLoading = false,
   onClick,
   className,
@@ -121,7 +123,10 @@ export function NoAccountSquareCell({
       }
     }
 
-    // Public view - just show as assigned
+    // Public view - show as assigned, with optional highlight
+    if (isHighlighted) {
+      return cn(base, 'bg-sky-100 border-sky-400')
+    }
     return cn(base, 'bg-white border-gray-300')
   }
 
@@ -141,11 +146,16 @@ export function NoAccountSquareCell({
     if (isCommissioner && verified) {
       return 'truncate text-green-700'
     }
+    // Highlighted squares in public view
+    if (isHighlighted) {
+      return 'truncate text-sky-700 font-semibold'
+    }
     return 'truncate text-gray-700'
   }
 
   const displayText = isAssigned ? participantName : gridNumber
-  const isClickable = isCommissioner && !isLoading
+  // Commissioner can always click, public view can click assigned squares for tooltip
+  const isClickable = !isLoading && (isCommissioner || isAssigned)
   const title = isAssigned
     ? isCommissioner
       ? `${participantName} - ${verified ? 'Verified' : 'Not Verified'} - Click to edit`
