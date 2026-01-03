@@ -386,38 +386,51 @@ export default async function PoolDetailPage({ params }: PageProps) {
 
       {/* Pool Header */}
       <Card className="mb-6 border-l-4 border-l-primary">
-        <CardContent className="p-6">
-          <div className="flex justify-between items-start">
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold text-foreground">{pool.name}</h1>
-                <Badge
-                  variant={
-                    pool.status === 'open' ? 'default' :
-                    pool.status === 'completed' ? 'secondary' :
-                    'outline'
-                  }
-                  className={
-                    pool.status === 'open' ? 'bg-primary' :
-                    pool.status === 'draft' ? 'border-amber-500 text-amber-600' :
-                    ''
-                  }
-                >
-                  {pool.status === 'completed' ? 'Completed' : pool.status}
-                </Badge>
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex flex-col gap-4">
+            {/* Top section - pool info and role badge */}
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-xl sm:text-2xl font-bold text-foreground break-words">{pool.name}</h1>
+                <div className="flex flex-wrap items-center gap-2 mt-1">
+                  <Badge
+                    variant={
+                      pool.status === 'open' ? 'default' :
+                      pool.status === 'completed' ? 'secondary' :
+                      'outline'
+                    }
+                    className={
+                      pool.status === 'open' ? 'bg-primary' :
+                      pool.status === 'draft' ? 'border-amber-500 text-amber-600' :
+                      ''
+                    }
+                  >
+                    {pool.status === 'completed' ? 'Completed' : pool.status}
+                  </Badge>
+                  {isCommissioner && (
+                    <Badge variant="secondary" className="bg-primary/10 text-primary shrink-0">
+                      Commissioner
+                    </Badge>
+                  )}
+                  {isPending && (
+                    <Badge variant="outline" className="border-amber-500 text-amber-600 shrink-0">
+                      Pending Approval
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-muted-foreground text-sm mt-2">
+                  {pool.type === 'bowl_buster' ? 'Bowl Buster' : pool.type === 'playoff_squares' || pool.type === 'single_game_squares' ? 'Squares' : pool.type}
+                  {pool.season_label && ` - ${pool.season_label}`}
+                </p>
+                <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+                  {memberCount} member{memberCount !== 1 ? 's' : ''}
+                  {pool.type === 'bowl_buster' && <> &middot; {gamesCount ?? 0} game{(gamesCount ?? 0) !== 1 ? 's' : ''}</>}
+                </p>
               </div>
-              <p className="text-muted-foreground mt-1">
-                {pool.type === 'bowl_buster' ? 'Bowl Buster' : pool.type === 'playoff_squares' || pool.type === 'single_game_squares' ? 'Squares' : pool.type}
-                {pool.season_label && ` - ${pool.season_label}`}
-              </p>
-              <p className="text-sm text-muted-foreground mt-2">
-                {memberCount} member{memberCount !== 1 ? 's' : ''}
-                {pool.type === 'bowl_buster' && <> &middot; {gamesCount ?? 0} game{(gamesCount ?? 0) !== 1 ? 's' : ''}</>}
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              {isCommissioner && (
-                <>
+
+              {/* Action buttons - right side on desktop, below on mobile */}
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                {isCommissioner && (
                   <Link href={`/pools/${id}/members`}>
                     <Button variant="outline" size="sm">
                       Manage Members
@@ -428,26 +441,18 @@ export default async function PoolDetailPage({ params }: PageProps) {
                       )}
                     </Button>
                   </Link>
-                  <Badge variant="secondary" className="bg-primary/10 text-primary">
-                    Commissioner
-                  </Badge>
-                </>
-              )}
-              {/* Super admin not yet a member - show special join button */}
-              {isSuperAdmin && !poolMembership && (
-                <SuperAdminJoinPoolButton
-                  poolId={id}
-                  orgId={pool.org_id}
-                  hasOrgMembership={!!orgMembership}
-                />
-              )}
-              {/* Regular users can request to join */}
-              {!isSuperAdmin && !isMember && !isPending && !isCommissioner && <JoinPoolButton poolId={id} />}
-              {isPending && (
-                <Badge variant="outline" className="border-amber-500 text-amber-600">
-                  Pending Approval
-                </Badge>
-              )}
+                )}
+                {/* Super admin not yet a member - show special join button */}
+                {isSuperAdmin && !poolMembership && (
+                  <SuperAdminJoinPoolButton
+                    poolId={id}
+                    orgId={pool.org_id}
+                    hasOrgMembership={!!orgMembership}
+                  />
+                )}
+                {/* Regular users can request to join */}
+                {!isSuperAdmin && !isMember && !isPending && !isCommissioner && <JoinPoolButton poolId={id} />}
+              </div>
             </div>
           </div>
         </CardContent>

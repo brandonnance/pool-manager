@@ -135,7 +135,7 @@ export function SquareCell({
   // Build class list based on state
   const getStateClasses = () => {
     const base =
-      'flex items-center justify-center text-xs font-medium transition-all border aspect-square min-w-[36px] min-h-[36px]'
+      'flex items-center justify-center text-[10px] sm:text-xs font-medium transition-all border aspect-square'
 
     // Abandoned square - distinct styling (striped pattern via CSS)
     if (isAbandoned) {

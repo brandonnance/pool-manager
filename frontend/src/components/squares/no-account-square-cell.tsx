@@ -91,7 +91,7 @@ export function NoAccountSquareCell({
   // Build class list based on state
   const getStateClasses = () => {
     const base =
-      'flex items-center justify-center text-xs font-medium transition-all border aspect-square min-w-[36px] min-h-[36px] relative overflow-hidden'
+      'flex items-center justify-center text-[10px] sm:text-xs font-medium transition-all border aspect-square relative overflow-hidden'
 
     if (isWinning && winningRound) {
       const colors = winningColors[winningRound]
@@ -131,7 +131,7 @@ export function NoAccountSquareCell({
       return cn('truncate px-0.5 font-semibold', winningColors[winningRound].text)
     }
     if (!isAssigned) {
-      return 'text-gray-400 text-[10px]'
+      return 'text-gray-400 text-[8px] sm:text-[10px]'
     }
     if (isCommissioner && !verified) {
       return 'truncate px-0.5 text-red-600'
