@@ -88,29 +88,66 @@ function SimpleGameScoreCard({
   game: SqGame
   scoringMode: string
 }) {
-  const hasScores = game.home_score !== null && game.away_score !== null
   const isFinal = game.status === 'final'
+  const isLive = game.status === 'in_progress'
+
+  // For quarter mode, show the most recent available score
+  // Priority: final > q3 > halftime > q1
+  let displayHomeScore: number | null = null
+  let displayAwayScore: number | null = null
+  let currentPeriod = ''
+
+  if (scoringMode === 'quarter') {
+    if (game.home_score !== null && game.away_score !== null) {
+      displayHomeScore = game.home_score
+      displayAwayScore = game.away_score
+      currentPeriod = 'Final'
+    } else if (game.q3_home_score !== null && game.q3_away_score !== null) {
+      displayHomeScore = game.q3_home_score
+      displayAwayScore = game.q3_away_score
+      currentPeriod = 'End Q3'
+    } else if (game.halftime_home_score !== null && game.halftime_away_score !== null) {
+      displayHomeScore = game.halftime_home_score
+      displayAwayScore = game.halftime_away_score
+      currentPeriod = 'Halftime'
+    } else if (game.q1_home_score !== null && game.q1_away_score !== null) {
+      displayHomeScore = game.q1_home_score
+      displayAwayScore = game.q1_away_score
+      currentPeriod = 'End Q1'
+    }
+  } else {
+    // Score change mode uses game.home_score/away_score directly
+    displayHomeScore = game.home_score
+    displayAwayScore = game.away_score
+  }
+
+  const hasScores = displayHomeScore !== null && displayAwayScore !== null
 
   return (
     <div className="bg-muted/30 rounded-lg p-4">
       <div className="flex items-center justify-between mb-3">
         <span className="text-sm font-medium">{game.game_name}</span>
-        <Badge variant={isFinal ? 'secondary' : game.status === 'in_progress' ? 'default' : 'outline'}>
-          {isFinal ? 'Final' : game.status === 'in_progress' ? 'Live' : 'Scheduled'}
-        </Badge>
+        <div className="flex items-center gap-2">
+          {scoringMode === 'quarter' && isLive && currentPeriod && (
+            <span className="text-xs text-muted-foreground">{currentPeriod}</span>
+          )}
+          <Badge variant={isFinal ? 'secondary' : isLive ? 'default' : 'outline'}>
+            {isFinal ? 'Final' : isLive ? 'Live' : 'Scheduled'}
+          </Badge>
+        </div>
       </div>
       <div className="flex items-center justify-center gap-4">
         <div className="text-center flex-1">
           <div className="text-sm font-medium truncate">{game.away_team}</div>
           <div className="text-3xl font-bold tabular-nums mt-1">
-            {hasScores ? game.away_score : '-'}
+            {hasScores ? displayAwayScore : '-'}
           </div>
         </div>
         <div className="text-muted-foreground">@</div>
         <div className="text-center flex-1">
           <div className="text-sm font-medium truncate">{game.home_team}</div>
           <div className="text-3xl font-bold tabular-nums mt-1">
-            {hasScores ? game.home_score : '-'}
+            {hasScores ? displayHomeScore : '-'}
           </div>
         </div>
       </div>
@@ -530,7 +567,8 @@ function NoAccountScoreEntry({
       await recordWinner(parseInt(q3Home, 10), parseInt(q3Away, 10), 'q3', 'q3_reverse')
     }
     if (status === 'final' && finalHome !== '' && finalAway !== '') {
-      await recordWinner(parseInt(finalHome, 10), parseInt(finalAway, 10), 'final', 'final_reverse')
+      // Use score_change_final types (DB constraint doesn't allow 'final'/'final_reverse')
+      await recordWinner(parseInt(finalHome, 10), parseInt(finalAway, 10), 'score_change_final', 'score_change_final_reverse')
     }
 
     setIsLoading(false)
@@ -961,11 +999,22 @@ export function NoAccountSingleGameContent({
   // Build winning squares map
   const winningSquareRounds = new Map<string, WinningRound>()
 
+  // Define hierarchy for quarter/score_change mode (higher number = higher priority display)
+  const roundHierarchy: Record<string, number> = {
+    score_change_forward: 1,
+    score_change_reverse: 1,
+    score_change_both: 2,
+    score_change_final: 3,
+    score_change_final_reverse: 3,
+    score_change_final_both: 4,
+  }
+
   if (numbersLocked) {
     for (const winner of winners) {
       if (winner.square_id) {
         let round: WinningRound = null
 
+        // Score change mode win types
         if (winner.win_type === 'score_change_final_both') {
           round = 'score_change_final_both'
         } else if (winner.win_type === 'score_change_final_reverse') {
@@ -982,13 +1031,32 @@ export function NoAccountSingleGameContent({
             (w) => w.square_id === winner.square_id && w.win_type === 'score_change_reverse'
           )
           round = alsoReverse ? 'score_change_both' : 'score_change_forward'
-        } else if (winner.win_type === 'q1' || winner.win_type === 'q3' || winner.win_type === 'halftime' || winner.win_type === 'final') {
-          round = 'single_game'
+        }
+        // Quarter mode - q1, halftime, q3 (forward)
+        // Note: Quarter mode final scores use score_change_final types (handled above) due to DB constraint
+        else if (winner.win_type === 'q1' || winner.win_type === 'halftime' || winner.win_type === 'q3') {
+          const reverseType = `${winner.win_type}_reverse`
+          const alsoReverse = winners.some(
+            (w) => w.square_id === winner.square_id && w.win_type === reverseType
+          )
+          round = alsoReverse ? 'score_change_both' : 'score_change_forward'
+        }
+        // Quarter mode - q1_reverse, halftime_reverse, q3_reverse
+        else if (winner.win_type === 'q1_reverse' || winner.win_type === 'halftime_reverse' || winner.win_type === 'q3_reverse') {
+          const forwardType = winner.win_type.replace('_reverse', '')
+          const alsoForward = winners.some(
+            (w) => w.square_id === winner.square_id && w.win_type === forwardType
+          )
+          round = alsoForward ? 'score_change_both' : 'score_change_reverse'
         }
 
         if (round) {
           const existing = winningSquareRounds.get(winner.square_id)
-          if (!existing) {
+          const existingRank = existing ? roundHierarchy[existing] ?? 0 : 0
+          const newRank = roundHierarchy[round] ?? 0
+
+          // Use hierarchy: final > both > forward/reverse
+          if (newRank >= existingRank) {
             winningSquareRounds.set(winner.square_id, round)
           }
         }
@@ -1063,7 +1131,8 @@ export function NoAccountSingleGameContent({
   const homeTeamLabel = firstGame?.home_team ?? 'Home'
   const awayTeamLabel = firstGame?.away_team ?? 'Away'
 
-  const legendMode = scoringMode === 'score_change' ? 'score_change' : 'single_game'
+  // Both score_change and quarter modes use the same color scheme now
+  const legendMode = 'score_change'
 
   const handleSquareClick = (rowIndex: number, colIndex: number, square: NoAccountSquare | null) => {
     if (!isCommissioner) return
@@ -1133,6 +1202,7 @@ export function NoAccountSingleGameContent({
 
                 {/* Final Winner Display */}
                 {firstGame.status === 'final' && (() => {
+                  // Both score_change and quarter modes use score_change_final types (DB constraint)
                   const finalWinner = winners.find(w => w.win_type === 'score_change_final')
                   const finalReverseWinner = winners.find(w => w.win_type === 'score_change_final_reverse')
 

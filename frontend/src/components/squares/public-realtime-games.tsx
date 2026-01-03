@@ -281,7 +281,8 @@ export function PublicRealtimeGames({
         <h2 className="text-lg font-semibold">Games</h2>
 
         {/* Prominent Final Winner Display */}
-        {scoringMode === 'score_change' && games[0]?.status === 'final' && (() => {
+        {games[0]?.status === 'final' && (() => {
+          // Both score_change and quarter modes use score_change_final types (DB constraint)
           const finalWinner = winners.find(w => w.win_type === 'score_change_final')
           const finalReverseWinner = winners.find(w => w.win_type === 'score_change_final_reverse')
           if (!finalWinner && !finalReverseWinner) return null
@@ -317,10 +318,41 @@ export function PublicRealtimeGames({
 
         <div className="grid gap-4 sm:grid-cols-2">
           {games.map((game) => {
-            const hasScores = game.home_score !== null && game.away_score !== null
             const isFinal = game.status === 'final'
             const isLive = game.status === 'in_progress'
             const isScheduled = !isFinal && !isLive
+
+            // For quarter mode, show the most recent available score
+            // Priority: final > q3 > halftime > q1
+            let displayHomeScore: number | null = null
+            let displayAwayScore: number | null = null
+            let currentPeriod = ''
+
+            if (scoringMode === 'quarter') {
+              if (game.home_score !== null && game.away_score !== null) {
+                displayHomeScore = game.home_score
+                displayAwayScore = game.away_score
+                currentPeriod = 'Final'
+              } else if (game.q3_home_score !== null && game.q3_away_score !== null) {
+                displayHomeScore = game.q3_home_score
+                displayAwayScore = game.q3_away_score
+                currentPeriod = 'End Q3'
+              } else if (game.halftime_home_score !== null && game.halftime_away_score !== null) {
+                displayHomeScore = game.halftime_home_score
+                displayAwayScore = game.halftime_away_score
+                currentPeriod = 'Halftime'
+              } else if (game.q1_home_score !== null && game.q1_away_score !== null) {
+                displayHomeScore = game.q1_home_score
+                displayAwayScore = game.q1_away_score
+                currentPeriod = 'End Q1'
+              }
+            } else {
+              // Score change mode uses game.home_score/away_score directly
+              displayHomeScore = game.home_score
+              displayAwayScore = game.away_score
+            }
+
+            const hasScores = displayHomeScore !== null && displayAwayScore !== null
 
             return (
               <div
@@ -344,15 +376,20 @@ export function PublicRealtimeGames({
                   )}>
                     {game.game_name}
                   </span>
-                  <Badge
-                    variant={isFinal ? 'secondary' : isLive ? 'default' : 'outline'}
-                    className={cn(
-                      isLive && 'bg-amber-500 hover:bg-amber-500 text-white animate-pulse',
-                      isFinal && 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                  <div className="flex items-center gap-2">
+                    {scoringMode === 'quarter' && isLive && currentPeriod && (
+                      <span className="text-xs text-amber-700">{currentPeriod}</span>
                     )}
-                  >
-                    {isFinal ? '✓ Final' : isLive ? '● Live' : 'Scheduled'}
-                  </Badge>
+                    <Badge
+                      variant={isFinal ? 'secondary' : isLive ? 'default' : 'outline'}
+                      className={cn(
+                        isLive && 'bg-amber-500 hover:bg-amber-500 text-white animate-pulse',
+                        isFinal && 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                      )}
+                    >
+                      {isFinal ? '✓ Final' : isLive ? '● Live' : 'Scheduled'}
+                    </Badge>
+                  </div>
                 </div>
                 <div className="flex items-center justify-center gap-4">
                   <div className="text-center flex-1">
@@ -367,7 +404,7 @@ export function PublicRealtimeGames({
                       isScheduled && 'text-muted-foreground/50',
                       isLive && 'text-amber-900'
                     )}>
-                      {hasScores ? game.away_score : '-'}
+                      {hasScores ? displayAwayScore : '-'}
                     </div>
                   </div>
                   <div className={cn(
@@ -387,7 +424,7 @@ export function PublicRealtimeGames({
                       isScheduled && 'text-muted-foreground/50',
                       isLive && 'text-amber-900'
                     )}>
-                      {hasScores ? game.home_score : '-'}
+                      {hasScores ? displayHomeScore : '-'}
                     </div>
                   </div>
                 </div>

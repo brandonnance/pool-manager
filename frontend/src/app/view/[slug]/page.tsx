@@ -183,8 +183,23 @@ export default async function PublicViewPage({ params }: PageProps) {
             )
             round = alsoReverse ? 'score_change_both' : 'score_change_forward'
           }
-        } else if (winner.win_type === 'halftime') {
-          round = 'super_bowl_halftime'
+        }
+        // Quarter mode - q1, halftime, q3 (forward)
+        // Note: Quarter mode final scores use score_change_final types (handled above) due to DB constraint
+        else if (winner.win_type === 'q1' || winner.win_type === 'halftime' || winner.win_type === 'q3') {
+          const reverseType = `${winner.win_type}_reverse`
+          const alsoReverse = winners.some(
+            (w) => w.square_id === winner.square_id && w.win_type === reverseType
+          )
+          round = alsoReverse ? 'score_change_both' : 'score_change_forward'
+        }
+        // Quarter mode - q1_reverse, halftime_reverse, q3_reverse
+        else if (winner.win_type === 'q1_reverse' || winner.win_type === 'halftime_reverse' || winner.win_type === 'q3_reverse') {
+          const forwardType = winner.win_type.replace('_reverse', '')
+          const alsoForward = winners.some(
+            (w) => w.square_id === winner.square_id && w.win_type === forwardType
+          )
+          round = alsoForward ? 'score_change_both' : 'score_change_reverse'
         }
 
         if (round) {
@@ -212,10 +227,9 @@ export default async function PublicViewPage({ params }: PageProps) {
   const awayTeamLabel = isSingleGame && firstGame?.away_team ? firstGame.away_team : 'Away'
 
   // Determine legend mode based on pool settings
+  // Both score_change and quarter modes use the same color scheme
   const legendMode = sqPool.mode === 'single_game'
-    ? sqPool.scoring_mode === 'score_change'
-      ? 'score_change'
-      : 'single_game'
+    ? 'score_change'
     : 'full_playoff'
 
   return (
