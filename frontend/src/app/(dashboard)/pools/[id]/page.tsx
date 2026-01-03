@@ -8,6 +8,8 @@ import { CreateEntryButton } from '@/components/pools/create-entry-button'
 import { PoolStandings } from '@/components/standings/pool-standings'
 import { PlayoffSquaresContent } from '@/components/squares/playoff-squares-content'
 import { SingleGameSquaresContent } from '@/components/squares/single-game-squares-content'
+import { NoAccountSingleGameContent } from '@/components/squares/no-account-single-game-content'
+import { NoAccountPlayoffContent } from '@/components/squares/no-account-playoff-content'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -132,6 +134,8 @@ export default async function PoolDetailPage({ params }: PageProps) {
     row_index: number
     col_index: number
     user_id: string | null
+    participant_name: string | null
+    verified: boolean | null
   }> = []
   let sqGamesData: Array<{
     id: string
@@ -179,10 +183,10 @@ export default async function PoolDetailPage({ params }: PageProps) {
     sqPoolData = sqPool
 
     if (sqPool) {
-      // Get all squares
+      // Get all squares (including no-account fields)
       const { data: squares } = await supabase
         .from('sq_squares')
-        .select('id, row_index, col_index, user_id')
+        .select('id, row_index, col_index, user_id, participant_name, verified')
         .eq('sq_pool_id', sqPool.id)
       sqSquaresData = squares ?? []
 
@@ -247,6 +251,15 @@ export default async function PoolDetailPage({ params }: PageProps) {
       owner_initials: initials,
     }
   })
+
+  // Transform squares data for no-account mode
+  const noAccountSquares = sqSquaresData.map((sq) => ({
+    id: sq.id,
+    row_index: sq.row_index,
+    col_index: sq.col_index,
+    participant_name: sq.participant_name,
+    verified: sq.verified ?? false,
+  }))
 
   // ============================================
   // BOWL BUSTER DATA FETCHING
@@ -441,7 +454,46 @@ export default async function PoolDetailPage({ params }: PageProps) {
       </Card>
 
       {/* Main Content - Conditional based on pool type */}
-      {pool.type === 'playoff_squares' && sqPoolData && sqPoolData.mode === 'single_game' ? (
+      {/* No-Account Mode - Single Game */}
+      {pool.type === 'playoff_squares' && sqPoolData?.no_account_mode && sqPoolData.mode === 'single_game' ? (
+        <NoAccountSingleGameContent
+          sqPoolId={sqPoolData.id}
+          poolId={pool.id}
+          publicSlug={sqPoolData.public_slug}
+          numbersLocked={sqPoolData.numbers_locked ?? false}
+          reverseScoring={sqPoolData.reverse_scoring ?? false}
+          rowNumbers={sqPoolData.row_numbers}
+          colNumbers={sqPoolData.col_numbers}
+          mode={sqPoolData.mode}
+          scoringMode={sqPoolData.scoring_mode}
+          poolStatus={pool.status}
+          squares={noAccountSquares}
+          games={sqGamesData}
+          winners={sqWinnersData}
+          scoreChanges={sqScoreChangesData}
+          isCommissioner={isCommissioner}
+          isSuperAdmin={isSuperAdmin}
+        />
+      ) : pool.type === 'playoff_squares' && sqPoolData?.no_account_mode ? (
+        /* No-Account Mode - Full Playoffs */
+        <NoAccountPlayoffContent
+          sqPoolId={sqPoolData.id}
+          poolId={pool.id}
+          publicSlug={sqPoolData.public_slug}
+          numbersLocked={sqPoolData.numbers_locked ?? false}
+          reverseScoring={sqPoolData.reverse_scoring ?? false}
+          rowNumbers={sqPoolData.row_numbers}
+          colNumbers={sqPoolData.col_numbers}
+          mode={sqPoolData.mode}
+          poolStatus={pool.status}
+          squares={noAccountSquares}
+          games={sqGamesData}
+          winners={sqWinnersData}
+          isCommissioner={isCommissioner}
+          isSuperAdmin={isSuperAdmin}
+        />
+      ) : pool.type === 'playoff_squares' && sqPoolData && sqPoolData.mode === 'single_game' ? (
+        /* Regular Mode - Single Game */
         <SingleGameSquaresContent
           pool={{
             id: pool.id,
