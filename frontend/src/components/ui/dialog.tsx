@@ -50,15 +50,30 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  onOpenAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
+  // Prevent auto-focus on mobile to avoid keyboard popup
+  const handleOpenAutoFocus = React.useCallback(
+    (e: Event) => {
+      // Check if mobile (matches Tailwind's sm breakpoint at 640px)
+      if (typeof window !== 'undefined' && window.innerWidth < 640) {
+        e.preventDefault()
+      }
+      // Still call any custom handler passed in
+      onOpenAutoFocus?.(e)
+    },
+    [onOpenAutoFocus]
+  )
+
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
+        onOpenAutoFocus={handleOpenAutoFocus}
         className={cn(
           // Mobile: positioned near top to avoid keyboard overlap
           // Desktop: centered as usual
