@@ -19,8 +19,7 @@ interface PayoutLeaderboardProps {
 }
 
 interface LeaderboardEntry {
-  userId: string
-  displayName: string
+  participantName: string
   totalWins: number
   normalWins: number
   reverseWins: number
@@ -34,18 +33,17 @@ export function PayoutLeaderboard({ squares, winners, currentUserId }: PayoutLea
     if (sq.id) squareById.set(sq.id, sq)
   })
 
-  // Aggregate wins by user
-  const winsByUser = new Map<string, LeaderboardEntry>()
+  // Aggregate wins by participant name (no-account mode)
+  const winsByParticipant = new Map<string, LeaderboardEntry>()
 
   winners.forEach((winner) => {
     if (!winner.square_id) return
     const square = squareById.get(winner.square_id)
-    if (!square?.user_id) return
+    if (!square?.participant_name) return
 
-    const userId = square.user_id
-    const existing = winsByUser.get(userId) || {
-      userId,
-      displayName: square.owner_name || 'Unknown',
+    const name = square.participant_name
+    const existing = winsByParticipant.get(name) || {
+      participantName: name,
       totalWins: 0,
       normalWins: 0,
       reverseWins: 0,
@@ -58,11 +56,11 @@ export function PayoutLeaderboard({ squares, winners, currentUserId }: PayoutLea
     else if (winner.win_type === 'halftime' || winner.win_type === 'halftime_reverse')
       existing.halftimeWins++
 
-    winsByUser.set(userId, existing)
+    winsByParticipant.set(name, existing)
   })
 
   // Sort by total wins descending
-  const leaderboard = Array.from(winsByUser.values()).sort((a, b) => b.totalWins - a.totalWins)
+  const leaderboard = Array.from(winsByParticipant.values()).sort((a, b) => b.totalWins - a.totalWins)
 
   if (leaderboard.length === 0) {
     return (
@@ -95,25 +93,17 @@ export function PayoutLeaderboard({ squares, winners, currentUserId }: PayoutLea
 
           {/* Entries */}
           {leaderboard.map((entry, index) => {
-            const isCurrentUser = entry.userId === currentUserId
             const rank = index + 1
 
             return (
               <div
-                key={entry.userId}
-                className={`flex items-center px-2 py-2 rounded-md text-sm ${
-                  isCurrentUser ? 'bg-primary/10 font-medium' : 'hover:bg-muted/50'
-                }`}
+                key={entry.participantName}
+                className="flex items-center px-2 py-2 rounded-md text-sm hover:bg-muted/50"
               >
                 <div className="w-8 font-medium">
                   {rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank}
                 </div>
-                <div className="flex-1 truncate">
-                  {entry.displayName}
-                  {isCurrentUser && (
-                    <span className="ml-1 text-xs text-muted-foreground">(You)</span>
-                  )}
-                </div>
+                <div className="flex-1 truncate">{entry.participantName}</div>
                 <div className="w-16 text-right font-bold tabular-nums">{entry.totalWins}</div>
               </div>
             )
@@ -125,8 +115,8 @@ export function PayoutLeaderboard({ squares, winners, currentUserId }: PayoutLea
           <div className="mt-4 pt-4 border-t text-xs text-muted-foreground">
             <div className="font-medium mb-2">Win Breakdown</div>
             {leaderboard.slice(0, 3).map((entry) => (
-              <div key={entry.userId} className="flex justify-between py-0.5">
-                <span className="truncate mr-2">{entry.displayName}</span>
+              <div key={entry.participantName} className="flex justify-between py-0.5">
+                <span className="truncate mr-2">{entry.participantName}</span>
                 <span>
                   {entry.normalWins > 0 && `${entry.normalWins} final`}
                   {entry.normalWins > 0 && entry.reverseWins > 0 && ', '}

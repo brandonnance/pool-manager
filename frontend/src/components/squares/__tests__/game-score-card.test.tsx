@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { GameScoreCard } from '../game-score-card'
 
@@ -218,9 +218,8 @@ describe('GameScoreCard', () => {
           id: 'sq-1',
           row_index: 8,
           col_index: 1,
-          user_id: null,
-          owner_name: null,
-          owner_initials: null,
+          participant_name: 'John Doe',
+          verified: true,
         },
       ]
 
@@ -235,50 +234,6 @@ describe('GameScoreCard', () => {
 
       expect(screen.getByText('Winners')).toBeInTheDocument()
       expect(screen.getByText('John Doe')).toBeInTheDocument()
-    })
-
-    it('shows trophy for current user wins', () => {
-      const finalGame = {
-        ...defaultGame,
-        status: 'final',
-        home_score: 28,
-        away_score: 21,
-      }
-
-      const winners = [
-        {
-          id: 'winner-1',
-          sq_game_id: 'game-1',
-          square_id: 'sq-1',
-          win_type: 'normal',
-          payout: null,
-          winner_name: 'Current User',
-        },
-      ]
-
-      const squares = [
-        {
-          id: 'sq-1',
-          row_index: 8,
-          col_index: 1,
-          user_id: 'user-123',
-          owner_name: 'Current User',
-          owner_initials: 'CU',
-        },
-      ]
-
-      render(
-        <GameScoreCard
-          {...defaultProps}
-          game={finalGame}
-          winners={winners}
-          squares={squares}
-          currentUserId="user-123"
-        />
-      )
-
-      // Trophy emoji should be present
-      expect(screen.getByText('🏆')).toBeInTheDocument()
     })
   })
 
@@ -307,7 +262,7 @@ describe('GameScoreCard', () => {
           {...defaultProps}
           game={finalGame}
           winners={winners}
-          squares={[{ id: 'sq-1', row_index: 0, col_index: 0, user_id: null, owner_name: null, owner_initials: null }]}
+          squares={[{ id: 'sq-1', row_index: 0, col_index: 0, participant_name: 'Winner', verified: true }]}
         />
       )
 
@@ -339,7 +294,7 @@ describe('GameScoreCard', () => {
           {...defaultProps}
           game={finalGame}
           winners={winners}
-          squares={[{ id: 'sq-1', row_index: 0, col_index: 0, user_id: null, owner_name: null, owner_initials: null }]}
+          squares={[{ id: 'sq-1', row_index: 0, col_index: 0, participant_name: 'Winner', verified: true }]}
         />
       )
 
@@ -373,7 +328,7 @@ describe('GameScoreCard', () => {
           {...defaultProps}
           game={finalGame}
           winners={winners}
-          squares={[{ id: 'sq-1', row_index: 0, col_index: 0, user_id: null, owner_name: null, owner_initials: null }]}
+          squares={[{ id: 'sq-1', row_index: 0, col_index: 0, participant_name: 'Winner', verified: true }]}
         />
       )
 
@@ -401,50 +356,4 @@ describe('GameScoreCard', () => {
     })
   })
 
-  describe('user won styling', () => {
-    it('applies special styling when current user won', () => {
-      const finalGame = {
-        ...defaultGame,
-        status: 'final',
-        home_score: 28,
-        away_score: 21,
-      }
-
-      const winners = [
-        {
-          id: 'winner-1',
-          sq_game_id: 'game-1',
-          square_id: 'sq-1',
-          win_type: 'normal',
-          payout: null,
-          winner_name: 'Current User',
-        },
-      ]
-
-      const squares = [
-        {
-          id: 'sq-1',
-          row_index: 8,
-          col_index: 1,
-          user_id: 'user-123',
-          owner_name: 'Current User',
-          owner_initials: 'CU',
-        },
-      ]
-
-      const { container } = render(
-        <GameScoreCard
-          {...defaultProps}
-          game={finalGame}
-          winners={winners}
-          squares={squares}
-          currentUserId="user-123"
-        />
-      )
-
-      // Card should have amber ring styling
-      const card = container.querySelector('[class*="ring-amber"]')
-      expect(card).toBeInTheDocument()
-    })
-  })
 })

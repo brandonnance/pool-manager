@@ -1,81 +1,38 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { SquareCell, type WinningRound } from '../square-cell'
+import { SquareCell } from '../square-cell'
+import type { WinningRound } from '../square-cell'
 
 describe('SquareCell', () => {
   const defaultProps = {
     rowIndex: 0,
     colIndex: 0,
-    ownerId: null,
-    ownerInitials: null,
-    ownerName: null,
-    isCurrentUser: false,
+    participantName: null,
+    verified: false,
+    isCommissioner: false,
     winningRound: null as WinningRound,
-    canClaim: false,
-    canUnclaim: false,
   }
 
   describe('rendering states', () => {
-    it('renders an empty available square', () => {
-      render(<SquareCell {...defaultProps} canClaim={true} />)
+    it('renders empty available square with grid number', () => {
+      render(<SquareCell {...defaultProps} />)
 
       const button = screen.getByRole('button')
       expect(button).toBeInTheDocument()
-      expect(button).toHaveAttribute('data-row', '0')
-      expect(button).toHaveAttribute('data-col', '0')
+      expect(button).toHaveTextContent('00')
     })
 
-    it('renders owner initials when provided', () => {
-      render(
-        <SquareCell
-          {...defaultProps}
-          ownerId="user-1"
-          ownerInitials="JD"
-          ownerName="John Doe"
-        />
-      )
+    it('renders grid number based on row and column indices', () => {
+      render(<SquareCell {...defaultProps} rowIndex={5} colIndex={7} />)
 
-      expect(screen.getByText('JD')).toBeInTheDocument()
+      expect(screen.getByRole('button')).toHaveTextContent('57')
     })
 
-    it('calculates initials from owner name when initials not provided', () => {
-      render(
-        <SquareCell
-          {...defaultProps}
-          ownerId="user-1"
-          ownerInitials={null}
-          ownerName="John Doe"
-        />
-      )
+    it('renders participant name when assigned', () => {
+      render(<SquareCell {...defaultProps} participantName="John Doe" />)
 
-      expect(screen.getByText('JD')).toBeInTheDocument()
-    })
-
-    it('calculates single initial for single-name owner', () => {
-      render(
-        <SquareCell
-          {...defaultProps}
-          ownerId="user-1"
-          ownerInitials={null}
-          ownerName="John"
-        />
-      )
-
-      expect(screen.getByText('J')).toBeInTheDocument()
-    })
-
-    it('displays dash for abandoned squares', () => {
-      render(
-        <SquareCell
-          {...defaultProps}
-          ownerId="user-1"
-          ownerName="John Doe"
-          isAbandoned={true}
-        />
-      )
-
-      expect(screen.getByText('—')).toBeInTheDocument()
+      expect(screen.getByRole('button')).toHaveTextContent('John Doe')
     })
 
     it('shows loading indicator when loading', () => {
@@ -83,242 +40,167 @@ describe('SquareCell', () => {
 
       const button = screen.getByRole('button')
       expect(button).toHaveClass('animate-pulse')
-      // Should not show initials when loading
-      expect(screen.queryByText('JD')).not.toBeInTheDocument()
+      // Should not show grid number or name when loading
+      expect(button).not.toHaveTextContent('00')
     })
   })
 
-  describe('title attributes', () => {
-    it('shows "Loading..." title when loading', () => {
-      render(<SquareCell {...defaultProps} isLoading={true} />)
-
-      expect(screen.getByRole('button')).toHaveAttribute('title', 'Loading...')
-    })
-
-    it('shows "Click to claim" for available squares', () => {
-      render(<SquareCell {...defaultProps} canClaim={true} />)
-
-      expect(screen.getByRole('button')).toHaveAttribute('title', 'Click to claim')
-    })
-
-    it('shows owner name for owned squares', () => {
+  describe('commissioner view', () => {
+    it('shows verified status in title for commissioner', () => {
       render(
         <SquareCell
           {...defaultProps}
-          ownerId="user-1"
-          ownerName="John Doe"
+          participantName="John Doe"
+          verified={true}
+          isCommissioner={true}
         />
       )
+
+      expect(screen.getByRole('button')).toHaveAttribute(
+        'title',
+        'John Doe - Verified - Click to edit'
+      )
+    })
+
+    it('shows not verified status in title for commissioner', () => {
+      render(
+        <SquareCell
+          {...defaultProps}
+          participantName="John Doe"
+          verified={false}
+          isCommissioner={true}
+        />
+      )
+
+      expect(screen.getByRole('button')).toHaveAttribute(
+        'title',
+        'John Doe - Not Verified - Click to edit'
+      )
+    })
+
+    it('shows assign prompt for empty square in commissioner view', () => {
+      render(<SquareCell {...defaultProps} isCommissioner={true} />)
+
+      expect(screen.getByRole('button')).toHaveAttribute(
+        'title',
+        'Square 00 - Click to assign'
+      )
+    })
+
+    it('applies green styling for verified squares in commissioner view', () => {
+      render(
+        <SquareCell
+          {...defaultProps}
+          participantName="John Doe"
+          verified={true}
+          isCommissioner={true}
+        />
+      )
+
+      const button = screen.getByRole('button')
+      expect(button.className).toContain('green')
+    })
+
+    it('applies red styling for unverified squares in commissioner view', () => {
+      render(
+        <SquareCell
+          {...defaultProps}
+          participantName="John Doe"
+          verified={false}
+          isCommissioner={true}
+        />
+      )
+
+      const button = screen.getByRole('button')
+      expect(button.className).toContain('red')
+    })
+  })
+
+  describe('public view', () => {
+    it('shows participant name in title for public view', () => {
+      render(<SquareCell {...defaultProps} participantName="John Doe" />)
 
       expect(screen.getByRole('button')).toHaveAttribute('title', 'John Doe')
     })
 
-    it('shows unclaim message for current user squares', () => {
+    it('shows available status for empty square in public view', () => {
+      render(<SquareCell {...defaultProps} />)
+
+      expect(screen.getByRole('button')).toHaveAttribute('title', 'Square 00 - Available')
+    })
+
+    it('applies sky blue styling for highlighted squares', () => {
       render(
         <SquareCell
           {...defaultProps}
-          ownerId="user-1"
-          ownerName="John Doe"
-          isCurrentUser={true}
-          canUnclaim={true}
+          participantName="John Doe"
+          isHighlighted={true}
         />
       )
 
-      expect(screen.getByRole('button')).toHaveAttribute(
-        'title',
-        'John Doe - Click to unclaim'
-      )
-    })
-
-    it('shows admin assign message for empty squares', () => {
-      render(<SquareCell {...defaultProps} isAdmin={true} />)
-
-      expect(screen.getByRole('button')).toHaveAttribute('title', 'Click to assign')
-    })
-
-    it('shows admin reassign message for owned squares', () => {
-      render(
-        <SquareCell
-          {...defaultProps}
-          ownerId="user-1"
-          ownerName="John Doe"
-          isAdmin={true}
-        />
-      )
-
-      expect(screen.getByRole('button')).toHaveAttribute(
-        'title',
-        'John Doe - Click to reassign'
-      )
-    })
-
-    it('shows abandoned message', () => {
-      render(
-        <SquareCell
-          {...defaultProps}
-          ownerId="user-1"
-          isAbandoned={true}
-        />
-      )
-
-      expect(screen.getByRole('button')).toHaveAttribute('title', 'Abandoned')
-    })
-
-    it('shows abandoned reassign message for admin', () => {
-      render(
-        <SquareCell
-          {...defaultProps}
-          ownerId="user-1"
-          isAbandoned={true}
-          isAdmin={true}
-        />
-      )
-
-      expect(screen.getByRole('button')).toHaveAttribute(
-        'title',
-        'Abandoned - Click to reassign'
-      )
+      const button = screen.getByRole('button')
+      expect(button.className).toContain('sky')
     })
   })
 
   describe('click handlers', () => {
-    it('calls onClick when claiming available square', async () => {
+    it('calls onClick when commissioner clicks square', async () => {
       const user = userEvent.setup()
       const onClick = vi.fn()
 
-      render(<SquareCell {...defaultProps} canClaim={true} onClick={onClick} />)
+      render(
+        <SquareCell
+          {...defaultProps}
+          isCommissioner={true}
+          onClick={onClick}
+        />
+      )
 
       await user.click(screen.getByRole('button'))
       expect(onClick).toHaveBeenCalledTimes(1)
     })
 
-    it('calls onUnclaim when unclaiming own square', async () => {
-      const user = userEvent.setup()
-      const onUnclaim = vi.fn()
-
-      render(
-        <SquareCell
-          {...defaultProps}
-          ownerId="user-1"
-          isCurrentUser={true}
-          canUnclaim={true}
-          onUnclaim={onUnclaim}
-        />
-      )
-
-      await user.click(screen.getByRole('button'))
-      expect(onUnclaim).toHaveBeenCalledTimes(1)
-    })
-
-    it('calls onAdminClick when admin clicks square', async () => {
-      const user = userEvent.setup()
-      const onAdminClick = vi.fn()
-
-      render(
-        <SquareCell
-          {...defaultProps}
-          isAdmin={true}
-          onAdminClick={onAdminClick}
-        />
-      )
-
-      await user.click(screen.getByRole('button'))
-      expect(onAdminClick).toHaveBeenCalledTimes(1)
-    })
-
-    it('does not call onClick when square is not claimable', async () => {
+    it('calls onClick when clicking assigned square in public view', async () => {
       const user = userEvent.setup()
       const onClick = vi.fn()
 
-      render(<SquareCell {...defaultProps} canClaim={false} onClick={onClick} />)
+      render(
+        <SquareCell
+          {...defaultProps}
+          participantName="John Doe"
+          onClick={onClick}
+        />
+      )
+
+      await user.click(screen.getByRole('button'))
+      expect(onClick).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not call onClick for unassigned square in public view', async () => {
+      const user = userEvent.setup()
+      const onClick = vi.fn()
+
+      render(<SquareCell {...defaultProps} onClick={onClick} />)
 
       await user.click(screen.getByRole('button'))
       expect(onClick).not.toHaveBeenCalled()
     })
 
-    it('does not call handlers when loading', async () => {
+    it('does not call onClick when loading', async () => {
       const user = userEvent.setup()
       const onClick = vi.fn()
 
       render(
-        <SquareCell {...defaultProps} canClaim={true} onClick={onClick} isLoading={true} />
+        <SquareCell
+          {...defaultProps}
+          isCommissioner={true}
+          isLoading={true}
+          onClick={onClick}
+        />
       )
 
       await user.click(screen.getByRole('button'))
       expect(onClick).not.toHaveBeenCalled()
-    })
-
-    it('prevents unclaim when square is winning', async () => {
-      const user = userEvent.setup()
-      const onUnclaim = vi.fn()
-
-      render(
-        <SquareCell
-          {...defaultProps}
-          ownerId="user-1"
-          isCurrentUser={true}
-          canUnclaim={true}
-          winningRound="wild_card"
-          onUnclaim={onUnclaim}
-        />
-      )
-
-      await user.click(screen.getByRole('button'))
-      expect(onUnclaim).not.toHaveBeenCalled()
-    })
-
-    it('admin can click abandoned squares even if winning', async () => {
-      const user = userEvent.setup()
-      const onAdminClick = vi.fn()
-
-      render(
-        <SquareCell
-          {...defaultProps}
-          ownerId="user-1"
-          isAbandoned={true}
-          isAdmin={true}
-          winningRound="wild_card"
-          onAdminClick={onAdminClick}
-        />
-      )
-
-      await user.click(screen.getByRole('button'))
-      expect(onAdminClick).toHaveBeenCalledTimes(1)
-    })
-  })
-
-  describe('disabled state', () => {
-    it('is disabled when not claimable and not owned', () => {
-      render(<SquareCell {...defaultProps} canClaim={false} />)
-
-      expect(screen.getByRole('button')).toBeDisabled()
-    })
-
-    it('is disabled when owned by other user and not admin', () => {
-      render(
-        <SquareCell
-          {...defaultProps}
-          ownerId="other-user"
-          ownerName="Other User"
-          isCurrentUser={false}
-          canUnclaim={false}
-        />
-      )
-
-      expect(screen.getByRole('button')).toBeDisabled()
-    })
-
-    it('is enabled when admin', () => {
-      render(
-        <SquareCell
-          {...defaultProps}
-          ownerId="other-user"
-          ownerName="Other User"
-          isAdmin={true}
-        />
-      )
-
-      expect(screen.getByRole('button')).not.toBeDisabled()
     })
   })
 
@@ -342,53 +224,19 @@ describe('SquareCell', () => {
       render(
         <SquareCell
           {...defaultProps}
-          ownerId="user-1"
-          ownerInitials="JD"
+          participantName="Winner"
           winningRound={round}
         />
       )
 
-      // Should render without errors
-      expect(screen.getByText('JD')).toBeInTheDocument()
-    })
-
-    it('applies different styling for current user winning square', () => {
-      const { rerender } = render(
-        <SquareCell
-          {...defaultProps}
-          ownerId="user-1"
-          ownerInitials="JD"
-          winningRound="wild_card"
-          isCurrentUser={false}
-        />
-      )
-
-      const buttonNotCurrentUser = screen.getByRole('button')
-      const classesNotCurrentUser = buttonNotCurrentUser.className
-
-      rerender(
-        <SquareCell
-          {...defaultProps}
-          ownerId="user-1"
-          ownerInitials="JD"
-          winningRound="wild_card"
-          isCurrentUser={true}
-        />
-      )
-
-      const buttonCurrentUser = screen.getByRole('button')
-      const classesCurrentUser = buttonCurrentUser.className
-
-      // Classes should be different
-      expect(classesNotCurrentUser).not.toBe(classesCurrentUser)
+      expect(screen.getByRole('button')).toHaveTextContent('Winner')
     })
 
     it('applies gradient for score_change_both', () => {
       render(
         <SquareCell
           {...defaultProps}
-          ownerId="user-1"
-          ownerInitials="JD"
+          participantName="Winner"
           winningRound="score_change_both"
         />
       )
@@ -397,44 +245,26 @@ describe('SquareCell', () => {
       expect(button.className).toContain('gradient')
     })
 
-    it('applies gradient for score_change_final_both', () => {
+    it('applies live winning animation when isLiveWinning', () => {
       render(
         <SquareCell
           {...defaultProps}
-          ownerId="user-1"
-          ownerInitials="JD"
-          winningRound="score_change_final_both"
+          participantName="Winner"
+          isLiveWinning={true}
         />
       )
 
       const button = screen.getByRole('button')
-      expect(button.className).toContain('gradient')
-    })
-  })
-
-  describe('current user styling', () => {
-    it('applies sky blue styling for current user non-winning square', () => {
-      render(
-        <SquareCell
-          {...defaultProps}
-          ownerId="user-1"
-          ownerInitials="JD"
-          isCurrentUser={true}
-          winningRound={null}
-        />
-      )
-
-      const button = screen.getByRole('button')
-      expect(button.className).toContain('sky')
+      expect(button.className).toContain('animate-live-winner')
     })
   })
 
   describe('data attributes', () => {
     it('sets correct row and col data attributes', () => {
-      render(<SquareCell {...defaultProps} rowIndex={5} colIndex={7} />)
+      render(<SquareCell {...defaultProps} rowIndex={3} colIndex={7} />)
 
       const button = screen.getByRole('button')
-      expect(button).toHaveAttribute('data-row', '5')
+      expect(button).toHaveAttribute('data-row', '3')
       expect(button).toHaveAttribute('data-col', '7')
     })
   })

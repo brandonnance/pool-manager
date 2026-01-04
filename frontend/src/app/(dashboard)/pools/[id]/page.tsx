@@ -6,10 +6,8 @@ import { JoinPoolButton } from '@/components/pools/join-pool-button'
 import { SuperAdminJoinPoolButton } from '@/components/pools/super-admin-join-pool-button'
 import { CreateEntryButton } from '@/components/pools/create-entry-button'
 import { PoolStandings } from '@/components/standings/pool-standings'
-import { PlayoffSquaresContent } from '@/components/squares/playoff-squares-content'
-import { SingleGameSquaresContent } from '@/components/squares/single-game-squares-content'
-import { NoAccountSingleGameContent } from '@/components/squares/no-account-single-game-content'
-import { NoAccountPlayoffContent } from '@/components/squares/no-account-playoff-content'
+import { SingleGameContent } from '@/components/squares/single-game-content'
+import { PlayoffContent } from '@/components/squares/playoff-content'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -459,9 +457,9 @@ export default async function PoolDetailPage({ params }: PageProps) {
       </Card>
 
       {/* Main Content - Conditional based on pool type */}
-      {/* No-Account Mode - Single Game */}
-      {pool.type === 'playoff_squares' && sqPoolData?.no_account_mode && sqPoolData.mode === 'single_game' ? (
-        <NoAccountSingleGameContent
+      {/* Squares - Single Game Mode */}
+      {pool.type === 'playoff_squares' && sqPoolData && sqPoolData.mode === 'single_game' ? (
+        <SingleGameContent
           sqPoolId={sqPoolData.id}
           poolId={pool.id}
           publicSlug={sqPoolData.public_slug}
@@ -479,9 +477,9 @@ export default async function PoolDetailPage({ params }: PageProps) {
           isCommissioner={isCommissioner}
           isSuperAdmin={isSuperAdmin}
         />
-      ) : pool.type === 'playoff_squares' && sqPoolData?.no_account_mode ? (
-        /* No-Account Mode - Full Playoffs */
-        <NoAccountPlayoffContent
+      ) : pool.type === 'playoff_squares' && sqPoolData ? (
+        /* Squares - Full Playoffs Mode */
+        <PlayoffContent
           sqPoolId={sqPoolData.id}
           poolId={pool.id}
           publicSlug={sqPoolData.public_slug}
@@ -496,64 +494,6 @@ export default async function PoolDetailPage({ params }: PageProps) {
           winners={sqWinnersData}
           isCommissioner={isCommissioner}
           isSuperAdmin={isSuperAdmin}
-        />
-      ) : pool.type === 'playoff_squares' && sqPoolData && sqPoolData.mode === 'single_game' ? (
-        /* Regular Mode - Single Game */
-        <SingleGameSquaresContent
-          pool={{
-            id: pool.id,
-            name: pool.name,
-            status: pool.status,
-            visibility: pool.visibility,
-          }}
-          sqPool={{
-            id: sqPoolData.id,
-            pool_id: sqPoolData.pool_id,
-            reverse_scoring: sqPoolData.reverse_scoring,
-            max_squares_per_player: sqPoolData.max_squares_per_player,
-            numbers_locked: sqPoolData.numbers_locked,
-            row_numbers: sqPoolData.row_numbers,
-            col_numbers: sqPoolData.col_numbers,
-            mode: sqPoolData.mode,
-            scoring_mode: sqPoolData.scoring_mode,
-            q1_payout: sqPoolData.q1_payout,
-            halftime_payout: sqPoolData.halftime_payout,
-            q3_payout: sqPoolData.q3_payout,
-            final_payout: sqPoolData.final_payout,
-            per_change_payout: sqPoolData.per_change_payout,
-            final_bonus_payout: sqPoolData.final_bonus_payout,
-          }}
-          squares={squaresForGrid}
-          game={sqGamesData[0]}
-          winners={sqWinnersData}
-          scoreChanges={sqScoreChangesData}
-          currentUserId={user.id}
-          isCommissioner={isCommissioner}
-          isMember={isMember}
-        />
-      ) : pool.type === 'playoff_squares' && sqPoolData ? (
-        <PlayoffSquaresContent
-          pool={{
-            id: pool.id,
-            name: pool.name,
-            status: pool.status,
-            visibility: pool.visibility,
-          }}
-          sqPool={{
-            id: sqPoolData.id,
-            pool_id: sqPoolData.pool_id,
-            reverse_scoring: sqPoolData.reverse_scoring,
-            max_squares_per_player: sqPoolData.max_squares_per_player,
-            numbers_locked: sqPoolData.numbers_locked,
-            row_numbers: sqPoolData.row_numbers,
-            col_numbers: sqPoolData.col_numbers,
-          }}
-          squares={squaresForGrid}
-          games={sqGamesData}
-          winners={sqWinnersData}
-          currentUserId={user.id}
-          isCommissioner={isCommissioner}
-          isMember={isMember}
         />
       ) : pool.type === 'playoff_squares' && !sqPoolData ? (
         <Card>

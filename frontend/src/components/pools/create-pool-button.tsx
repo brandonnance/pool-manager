@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { getEnabledPoolTypes, getNflPlayoffGamesTemplate, type PoolTypes, type NflPlayoffGame } from '@/lib/site-settings'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -26,36 +27,18 @@ type PoolType = 'bowl_buster' | 'playoff_squares'
 type SquaresMode = 'full_playoff' | 'single_game'
 type ScoringMode = 'quarter' | 'score_change'
 
-// NFL Playoff games template
-const NFL_PLAYOFF_GAMES = [
-  // Wild Card Round (6 games)
-  { game_name: 'AFC Wild Card 1', home_team: 'TBD', away_team: 'TBD', round: 'wild_card', display_order: 1 },
-  { game_name: 'AFC Wild Card 2', home_team: 'TBD', away_team: 'TBD', round: 'wild_card', display_order: 2 },
-  { game_name: 'AFC Wild Card 3', home_team: 'TBD', away_team: 'TBD', round: 'wild_card', display_order: 3 },
-  { game_name: 'NFC Wild Card 1', home_team: 'TBD', away_team: 'TBD', round: 'wild_card', display_order: 4 },
-  { game_name: 'NFC Wild Card 2', home_team: 'TBD', away_team: 'TBD', round: 'wild_card', display_order: 5 },
-  { game_name: 'NFC Wild Card 3', home_team: 'TBD', away_team: 'TBD', round: 'wild_card', display_order: 6 },
-  // Divisional Round (4 games)
-  { game_name: 'AFC Divisional 1', home_team: 'TBD', away_team: 'TBD', round: 'divisional', display_order: 7 },
-  { game_name: 'AFC Divisional 2', home_team: 'TBD', away_team: 'TBD', round: 'divisional', display_order: 8 },
-  { game_name: 'NFC Divisional 1', home_team: 'TBD', away_team: 'TBD', round: 'divisional', display_order: 9 },
-  { game_name: 'NFC Divisional 2', home_team: 'TBD', away_team: 'TBD', round: 'divisional', display_order: 10 },
-  // Conference Championships (2 games)
-  { game_name: 'AFC Championship', home_team: 'TBD', away_team: 'TBD', round: 'conference', display_order: 11 },
-  { game_name: 'NFC Championship', home_team: 'TBD', away_team: 'TBD', round: 'conference', display_order: 12 },
-  // Super Bowl (1 game)
-  { game_name: 'Super Bowl', home_team: 'TBD', away_team: 'TBD', round: 'super_bowl', display_order: 13, pays_halftime: true },
-]
-
 export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [name, setName] = useState('')
   const [seasonLabel, setSeasonLabel] = useState('')
   const [poolType, setPoolType] = useState<PoolType>('bowl_buster')
 
+  // Enabled pool types from site settings
+  const [enabledPoolTypes, setEnabledPoolTypes] = useState<PoolTypes | null>(null)
+  const [nflGamesTemplate, setNflGamesTemplate] = useState<NflPlayoffGame[] | null>(null)
+
   // Playoff Squares specific options
   const [reverseScoring, setReverseScoring] = useState(true)
-  const [maxSquaresPerPlayer, setMaxSquaresPerPlayer] = useState('')
 
   // Single Game Squares mode options
   const [squaresMode, setSquaresMode] = useState<SquaresMode>('full_playoff')
@@ -64,8 +47,7 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
   const [homeTeam, setHomeTeam] = useState('')
   const [awayTeam, setAwayTeam] = useState('')
 
-  // No-Account mode options
-  const [noAccountMode, setNoAccountMode] = useState(false)
+  // Public slug (always enabled for squares - no-account mode only)
   const [publicSlug, setPublicSlug] = useState('')
   const [slugError, setSlugError] = useState<string | null>(null)
   const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null)
@@ -74,6 +56,37 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+
+  // Fetch enabled pool types and NFL games template when dialog opens
+  useEffect(() => {
+    if (isOpen && !enabledPoolTypes) {
+      getEnabledPoolTypes().then(setEnabledPoolTypes)
+      getNflPlayoffGamesTemplate().then(setNflGamesTemplate)
+    }
+  }, [isOpen, enabledPoolTypes])
+
+  // Auto-set pool type based on what's enabled
+  useEffect(() => {
+    if (enabledPoolTypes) {
+      if (!enabledPoolTypes.bowl_buster && enabledPoolTypes.playoff_squares) {
+        setPoolType('playoff_squares')
+      } else if (enabledPoolTypes.bowl_buster && !enabledPoolTypes.playoff_squares) {
+        setPoolType('bowl_buster')
+      }
+    }
+  }, [enabledPoolTypes])
+
+  // Auto-generate slug from pool name for squares pools
+  useEffect(() => {
+    if (poolType === 'playoff_squares' && name) {
+      const slug = generateSlug(name)
+      setPublicSlug(slug)
+      // Clear slug error when auto-generating
+      if (slug.length >= 3) {
+        setSlugError(null)
+      }
+    }
+  }, [name, poolType])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -111,12 +124,10 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
 
     // Note: pool_commissioner_trigger automatically creates commissioner membership
 
-    // For Playoff Squares, create sq_pool and games
+    // For Playoff Squares, create sq_pool and games (always no-account mode)
     if (poolType === 'playoff_squares') {
-      const maxSquares = noAccountMode ? null : (maxSquaresPerPlayer ? parseInt(maxSquaresPerPlayer) : null)
-
-      // Validate slug format for no-account mode
-      if (noAccountMode && publicSlug) {
+      // Validate slug format
+      if (publicSlug) {
         if (!/^[a-z0-9-]+$/.test(publicSlug)) {
           setError('Slug can only contain lowercase letters, numbers, and hyphens')
           setIsLoading(false)
@@ -129,17 +140,17 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
         }
       }
 
-      // Create sq_pools record
+      // Create sq_pools record - always no_account_mode: true
       const { data: sqPool, error: sqPoolError } = await supabase
         .from('sq_pools')
         .insert({
           pool_id: pool.id,
           reverse_scoring: reverseScoring,
-          max_squares_per_player: maxSquares,
+          max_squares_per_player: null, // No limit in no-account mode
           mode: squaresMode,
           scoring_mode: squaresMode === 'single_game' ? scoringMode : null,
-          no_account_mode: noAccountMode,
-          public_slug: noAccountMode && publicSlug ? publicSlug : null,
+          no_account_mode: true, // Always no-account mode
+          public_slug: publicSlug || null,
         })
         .select()
         .single()
@@ -151,15 +162,16 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
       }
 
       if (squaresMode === 'full_playoff') {
-        // Create the 13 NFL playoff games
-        const gamesToInsert = NFL_PLAYOFF_GAMES.map((game) => ({
+        // Use NFL games template from site_settings
+        const template = nflGamesTemplate || []
+        const gamesToInsert = template.map((game) => ({
           sq_pool_id: sqPool.id,
-          game_name: game.game_name,
-          home_team: game.home_team,
-          away_team: game.away_team,
+          game_name: game.name,
+          home_team: 'TBD',
+          away_team: 'TBD',
           round: game.round,
           display_order: game.display_order,
-          pays_halftime: game.pays_halftime ?? false,
+          pays_halftime: game.round === 'super_bowl', // Super Bowl pays halftime
           status: 'scheduled',
         }))
 
@@ -206,13 +218,11 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
     setSeasonLabel('')
     setPoolType('bowl_buster')
     setReverseScoring(true)
-    setMaxSquaresPerPlayer('')
     setSquaresMode('full_playoff')
     setScoringMode('quarter')
     setGameName('')
     setHomeTeam('')
     setAwayTeam('')
-    setNoAccountMode(false)
     setPublicSlug('')
     setSlugError(null)
     setSlugAvailable(null)
@@ -248,7 +258,7 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
 
   // Debounced slug availability check
   useEffect(() => {
-    if (!noAccountMode || !publicSlug || slugError) {
+    if (poolType !== 'playoff_squares' || !publicSlug || slugError) {
       setSlugAvailable(null)
       return
     }
@@ -258,7 +268,7 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
     }, 500)
 
     return () => clearTimeout(timeoutId)
-  }, [publicSlug, noAccountMode, slugError, checkSlugAvailability])
+  }, [publicSlug, poolType, slugError, checkSlugAvailability])
 
   // Generate slug from name
   const generateSlug = (name: string) => {
@@ -289,6 +299,11 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
     }
   }
 
+  // Count enabled pool types
+  const enabledCount = enabledPoolTypes
+    ? (enabledPoolTypes.bowl_buster ? 1 : 0) + (enabledPoolTypes.playoff_squares ? 1 : 0)
+    : 2
+
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
@@ -304,36 +319,49 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
 
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
-            {/* Pool Type Selection */}
-            <div className="space-y-2">
-              <Label>Pool Type</Label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPoolType('bowl_buster')}
-                  className={`p-3 rounded-lg border text-left transition-all ${
-                    poolType === 'bowl_buster'
-                      ? 'border-primary bg-primary/10'
-                      : 'border-border hover:border-muted-foreground'
-                  }`}
-                >
-                  <div className="font-medium">Bowl Buster</div>
-                  <div className="text-xs text-muted-foreground">Pick bowl game winners</div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPoolType('playoff_squares')}
-                  className={`p-3 rounded-lg border text-left transition-all ${
-                    poolType === 'playoff_squares'
-                      ? 'border-primary bg-primary/10'
-                      : 'border-border hover:border-muted-foreground'
-                  }`}
-                >
-                  <div className="font-medium">Squares</div>
-                  <div className="text-xs text-muted-foreground">10x10 squares grid</div>
-                </button>
+            {/* Pool Type Selection - only show if more than one type enabled */}
+            {enabledCount > 1 && (
+              <div className="space-y-2">
+                <Label>Pool Type</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {enabledPoolTypes?.bowl_buster && (
+                    <button
+                      type="button"
+                      onClick={() => setPoolType('bowl_buster')}
+                      className={`p-3 rounded-lg border text-left transition-all ${
+                        poolType === 'bowl_buster'
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border hover:border-muted-foreground'
+                      }`}
+                    >
+                      <div className="font-medium">Bowl Buster</div>
+                      <div className="text-xs text-muted-foreground">Pick bowl game winners</div>
+                    </button>
+                  )}
+                  {enabledPoolTypes?.playoff_squares && (
+                    <button
+                      type="button"
+                      onClick={() => setPoolType('playoff_squares')}
+                      className={`p-3 rounded-lg border text-left transition-all ${
+                        poolType === 'playoff_squares'
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border hover:border-muted-foreground'
+                      }`}
+                    >
+                      <div className="font-medium">Squares</div>
+                      <div className="text-xs text-muted-foreground">10x10 squares grid</div>
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Show single pool type header if only one is enabled */}
+            {enabledCount === 1 && enabledPoolTypes && (
+              <div className="text-sm text-muted-foreground">
+                Creating a {enabledPoolTypes.bowl_buster ? 'Bowl Buster' : 'Squares'} pool
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="name">Pool Name</Label>
@@ -373,7 +401,9 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
                       }`}
                     >
                       <div className="font-medium text-sm">Full Playoff</div>
-                      <div className="text-xs text-muted-foreground">13 NFL playoff games</div>
+                      <div className="text-xs text-muted-foreground">
+                        {nflGamesTemplate?.length || 13} NFL playoff games
+                      </div>
                     </button>
                     <button
                       type="button"
@@ -459,64 +489,42 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
                   </>
                 )}
 
-                <div className="text-sm font-medium pt-2">Management Mode</div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="noAccountMode" className="text-sm font-normal">No-Account Mode</Label>
-                    <div className="text-xs text-muted-foreground">
-                      Commissioner assigns squares to names (no user accounts)
-                    </div>
-                  </div>
-                  <Switch
-                    id="noAccountMode"
-                    checked={noAccountMode}
-                    onCheckedChange={(checked) => {
-                      setNoAccountMode(checked)
-                      if (checked && name && !publicSlug) {
-                        setPublicSlug(generateSlug(name))
-                      }
-                    }}
-                  />
-                </div>
-
-                {noAccountMode && (
-                  <div className="space-y-2 ml-4 border-l-2 pl-4">
-                    <Label htmlFor="publicSlug">Public URL Slug</Label>
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">/view/</span>
-                      <Input
-                        id="publicSlug"
-                        value={publicSlug}
-                        onChange={(e) => handleSlugChange(e.target.value)}
-                        placeholder="my-pool-name"
-                        className={`font-mono text-sm ${
-                          slugError ? 'border-destructive' :
-                          slugAvailable === false ? 'border-destructive' :
-                          slugAvailable === true ? 'border-green-500' : ''
-                        }`}
-                      />
-                      {checkingSlug && (
-                        <div className="text-xs text-muted-foreground animate-pulse">...</div>
-                      )}
-                    </div>
-                    {slugError ? (
-                      <div className="text-xs text-destructive">{slugError}</div>
-                    ) : slugAvailable === false ? (
-                      <div className="text-xs text-destructive">
-                        This slug is already taken. Try a different one.
-                      </div>
-                    ) : slugAvailable === true ? (
-                      <div className="text-xs text-green-600">
-                        This slug is available!
-                      </div>
-                    ) : (
-                      <div className="text-xs text-muted-foreground">
-                        Share this link for anyone to view the grid
-                      </div>
+                {/* Public URL slug - always shown for squares */}
+                <div className="space-y-2">
+                  <Label htmlFor="publicSlug">Public URL Slug</Label>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">/view/</span>
+                    <Input
+                      id="publicSlug"
+                      value={publicSlug}
+                      onChange={(e) => handleSlugChange(e.target.value)}
+                      placeholder="my-pool-name"
+                      className={`font-mono text-sm ${
+                        slugError ? 'border-destructive' :
+                        slugAvailable === false ? 'border-destructive' :
+                        slugAvailable === true ? 'border-green-500' : ''
+                      }`}
+                    />
+                    {checkingSlug && (
+                      <div className="text-xs text-muted-foreground animate-pulse">...</div>
                     )}
                   </div>
-                )}
+                  {slugError ? (
+                    <div className="text-xs text-destructive">{slugError}</div>
+                  ) : slugAvailable === false ? (
+                    <div className="text-xs text-destructive">
+                      This slug is already taken. Try a different one.
+                    </div>
+                  ) : slugAvailable === true ? (
+                    <div className="text-xs text-green-600">
+                      This slug is available!
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted-foreground">
+                      Share this link for anyone to view the grid
+                    </div>
+                  )}
+                </div>
 
                 <div className="text-sm font-medium pt-2">Grid Options</div>
 
@@ -533,24 +541,6 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
                     onCheckedChange={setReverseScoring}
                   />
                 </div>
-
-                {!noAccountMode && (
-                  <div className="space-y-2">
-                    <Label htmlFor="maxSquares">Max Squares per Player (optional)</Label>
-                    <Input
-                      id="maxSquares"
-                      type="number"
-                      min="1"
-                      max="100"
-                      value={maxSquaresPerPlayer}
-                      onChange={(e) => setMaxSquaresPerPlayer(e.target.value)}
-                      placeholder="Unlimited"
-                    />
-                    <div className="text-xs text-muted-foreground">
-                      Leave blank for no limit
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
@@ -574,7 +564,7 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
               disabled={
                 isLoading ||
                 !name.trim() ||
-                (noAccountMode && (!!slugError || slugAvailable === false || checkingSlug))
+                (poolType === 'playoff_squares' && (!!slugError || slugAvailable === false || checkingSlug))
               }
             >
               {isLoading ? 'Creating...' : 'Create Pool'}

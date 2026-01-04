@@ -58,13 +58,25 @@ export function MobileNav({ isSuperAdmin }: MobileNavProps) {
             Organizations
           </Link>
           {isSuperAdmin && (
-            <Link
-              href="/admin/users"
-              onClick={handleLinkClick}
-              className="text-primary-foreground/90 hover:text-primary-foreground hover:bg-white/10 px-4 py-3 rounded-md text-base font-medium transition-colors"
-            >
-              Users
-            </Link>
+            <>
+              <div className="mt-4 mb-2 px-4 text-xs font-semibold uppercase tracking-wider text-primary-foreground/60">
+                Admin
+              </div>
+              <Link
+                href="/admin/users"
+                onClick={handleLinkClick}
+                className="text-primary-foreground/90 hover:text-primary-foreground hover:bg-white/10 px-4 py-3 rounded-md text-base font-medium transition-colors"
+              >
+                Users
+              </Link>
+              <Link
+                href="/admin/settings"
+                onClick={handleLinkClick}
+                className="text-primary-foreground/90 hover:text-primary-foreground hover:bg-white/10 px-4 py-3 rounded-md text-base font-medium transition-colors"
+              >
+                Site Settings
+              </Link>
+            </>
           )}
         </nav>
       </SheetContent>

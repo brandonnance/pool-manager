@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/types/database'
-import { NoAccountSquaresGrid, type NoAccountSquare } from './no-account-squares-grid'
-import { NoAccountPoolSettings } from './no-account-pool-settings'
+import { SquaresGrid, type NoAccountSquare } from './squares-grid'
+import { PoolSettings } from './pool-settings'
 import { AssignNameDialog } from './assign-name-dialog'
 import { BulkAssignDialog } from './bulk-assign-dialog'
 import { EditGameTeamsButton } from './edit-game-teams-button'
@@ -455,7 +455,7 @@ function SimplePlayoffGameCard({
   )
 }
 
-export function NoAccountPlayoffContent({
+export function PlayoffContent({
   sqPoolId,
   poolId,
   publicSlug,
@@ -687,7 +687,7 @@ export function NoAccountPlayoffContent({
               </div>
             </CardHeader>
             <CardContent>
-              <NoAccountSquaresGrid
+              <SquaresGrid
                 sqPoolId={sqPoolId}
                 squares={squares}
                 rowNumbers={rowNumbers}
@@ -758,7 +758,7 @@ export function NoAccountPlayoffContent({
         <div className="space-y-6">
           {/* Commissioner Settings */}
           {isCommissioner && (
-            <NoAccountPoolSettings
+            <PoolSettings
               sqPoolId={sqPoolId}
               poolId={poolId}
               publicSlug={publicSlug}

@@ -767,6 +767,35 @@ export type Database = {
         }
         Relationships: []
       }
+      site_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sq_games: {
         Row: {
           away_score: number | null
@@ -1058,6 +1087,7 @@ export type Database = {
         }
         Returns: number
       }
+      get_enabled_pool_types: { Args: never; Returns: Json }
       get_game_winner: { Args: { p_game_id: string }; Returns: string }
       is_bowl_pick_locked: {
         Args: { p_pool_game_id: string }

@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { NoAccountSquaresGrid, type NoAccountSquare } from './no-account-squares-grid'
+import { SquaresGrid, type NoAccountSquare } from './squares-grid'
 import type { WinningRound } from './square-cell'
 
 interface Game {
@@ -259,7 +259,7 @@ export function PublicRealtimeGrid({
   }, [sqPoolId, numbersLocked, router])
 
   return (
-    <NoAccountSquaresGrid
+    <SquaresGrid
       sqPoolId={sqPoolId}
       squares={squares}
       rowNumbers={rowNumbers}
