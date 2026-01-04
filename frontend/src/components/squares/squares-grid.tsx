@@ -39,6 +39,9 @@ export interface NoAccountSquaresGridProps {
   awayTeamLabel?: string
   legendMode?: LegendMode
   onSquareClick?: (rowIndex: number, colIndex: number, square: NoAccountSquare | null) => void
+  // Controlled selection for external participant list integration
+  controlledParticipantName?: string | null
+  onParticipantSelect?: (name: string | null) => void
   className?: string
 }
 
@@ -55,10 +58,18 @@ export function SquaresGrid({
   awayTeamLabel = 'Away',
   legendMode = 'full_playoff',
   onSquareClick,
+  controlledParticipantName,
+  onParticipantSelect,
   className,
 }: NoAccountSquaresGridProps) {
   const [loadingCell, setLoadingCell] = useState<string | null>(null)
-  const [selectedSquare, setSelectedSquare] = useState<SelectedSquare | null>(null)
+  const [internalSelectedSquare, setInternalSelectedSquare] = useState<SelectedSquare | null>(null)
+
+  // Use controlled participant name if provided, otherwise use internal state
+  const isControlled = controlledParticipantName !== undefined
+  const selectedParticipantName = isControlled
+    ? controlledParticipantName
+    : internalSelectedSquare?.participantName ?? null
   const tooltipRef = useRef<HTMLDivElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
 
@@ -68,22 +79,43 @@ export function SquaresGrid({
     squareMap.set(`${sq.row_index}-${sq.col_index}`, sq)
   })
 
+  // Helper to update selection (respects controlled/uncontrolled mode)
+  const setSelectedParticipant = (name: string | null) => {
+    if (isControlled) {
+      onParticipantSelect?.(name)
+    } else {
+      if (name) {
+        // Find a square with this participant to set as selected
+        const sq = squares.find((s) => s.participant_name === name)
+        if (sq) {
+          setInternalSelectedSquare({
+            rowIndex: sq.row_index,
+            colIndex: sq.col_index,
+            participantName: name,
+          })
+        }
+      } else {
+        setInternalSelectedSquare(null)
+      }
+    }
+  }
+
   // Close tooltip when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (
-        selectedSquare &&
+        selectedParticipantName &&
         tooltipRef.current &&
         !tooltipRef.current.contains(e.target as Node) &&
         gridRef.current &&
         !gridRef.current.contains(e.target as Node)
       ) {
-        setSelectedSquare(null)
+        setSelectedParticipant(null)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [selectedSquare])
+  }, [selectedParticipantName, isControlled])
 
   const handleSquareClick = (rowIndex: number, colIndex: number) => {
     // Commissioner mode - use the external handler
@@ -98,27 +130,20 @@ export function SquaresGrid({
     const cellKey = `${rowIndex}-${colIndex}`
     const square = squareMap.get(cellKey)
     if (square?.participant_name) {
-      // Toggle selection - if same square clicked, close; otherwise open new
-      if (
-        selectedSquare?.rowIndex === rowIndex &&
-        selectedSquare?.colIndex === colIndex
-      ) {
-        setSelectedSquare(null)
+      // Toggle selection - if same participant clicked, close; otherwise open new
+      if (selectedParticipantName === square.participant_name) {
+        setSelectedParticipant(null)
       } else {
-        setSelectedSquare({
-          rowIndex,
-          colIndex,
-          participantName: square.participant_name,
-        })
+        setSelectedParticipant(square.participant_name)
       }
     } else {
-      setSelectedSquare(null)
+      setSelectedParticipant(null)
     }
   }
 
   // Count squares for selected participant
-  const selectedParticipantSquareCount = selectedSquare
-    ? squares.filter((s) => s.participant_name === selectedSquare.participantName).length
+  const selectedParticipantSquareCount = selectedParticipantName
+    ? squares.filter((s) => s.participant_name === selectedParticipantName).length
     : 0
 
   // Calculate statistics
@@ -145,19 +170,19 @@ export function SquaresGrid({
       </div>
 
       {/* Tooltip for selected participant */}
-      {selectedSquare && (
+      {selectedParticipantName && (
         <div
           ref={tooltipRef}
           className="mb-3 p-3 bg-primary/10 border border-primary/20 rounded-lg flex items-center justify-between gap-4"
         >
           <div>
-            <p className="font-semibold text-foreground">{selectedSquare.participantName}</p>
+            <p className="font-semibold text-foreground">{selectedParticipantName}</p>
             <p className="text-sm text-muted-foreground">
               {selectedParticipantSquareCount} square{selectedParticipantSquareCount !== 1 ? 's' : ''} (highlighted in blue)
             </p>
           </div>
           <button
-            onClick={() => setSelectedSquare(null)}
+            onClick={() => setSelectedParticipant(null)}
             className="text-muted-foreground hover:text-foreground p-1"
             aria-label="Close"
           >
@@ -237,8 +262,8 @@ export function SquaresGrid({
                   const square = squareMap.get(cellKey)
                   const isLoading = loadingCell === cellKey
                   // Highlight if this square belongs to selected participant
-                  const isHighlighted = selectedSquare
-                    ? square?.participant_name === selectedSquare.participantName
+                  const isHighlighted = selectedParticipantName
+                    ? square?.participant_name === selectedParticipantName
                     : false
 
                   return (

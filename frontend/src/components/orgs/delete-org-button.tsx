@@ -242,7 +242,7 @@ export function DeleteOrgButton({ orgId, orgName }: DeleteOrgButtonProps) {
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="destructive" size="sm">
+        <Button variant="destructive" size="sm" className="w-full sm:w-auto">
           Delete Organization
         </Button>
       </DialogTrigger>

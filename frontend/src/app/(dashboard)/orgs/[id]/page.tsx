@@ -119,13 +119,13 @@ export default async function OrgDetailPage({ params }: PageProps) {
                 </Badge>
               )}
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 w-full sm:w-auto">
               {/* Super admin not yet a member - show join button */}
               {isSuperAdmin && !membership && (
                 <SuperAdminJoinOrgButton orgId={id} orgName={org.name} />
               )}
               {isOrgAdmin && (
-                <Button variant="outline" size="sm" asChild>
+                <Button variant="outline" size="sm" asChild className="w-full sm:w-auto">
                   <Link href={`/orgs/${id}/members`}>
                     Manage Members
                   </Link>

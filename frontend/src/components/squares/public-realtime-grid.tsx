@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { SquaresGrid, type NoAccountSquare } from './squares-grid'
+import { PublicParticipantList } from './public-participant-list'
 import type { WinningRound } from './square-cell'
 
 interface Game {
@@ -53,6 +54,7 @@ export function PublicRealtimeGrid({
   const router = useRouter()
   const [squares, setSquares] = useState<NoAccountSquare[]>(initialSquares)
   const [games, setGames] = useState<Game[]>(initialGames ?? [])
+  const [selectedParticipantName, setSelectedParticipantName] = useState<string | null>(null)
 
   // Convert array back to Map
   const winningSquareRounds = useMemo(
@@ -259,18 +261,27 @@ export function PublicRealtimeGrid({
   }, [sqPoolId, numbersLocked, router])
 
   return (
-    <SquaresGrid
-      sqPoolId={sqPoolId}
-      squares={squares}
-      rowNumbers={rowNumbers}
-      colNumbers={colNumbers}
-      numbersLocked={numbersLocked}
-      isCommissioner={false}
-      winningSquareRounds={winningSquareRounds}
-      liveWinningSquareIds={liveWinningSquareIds}
-      homeTeamLabel={homeTeamLabel}
-      awayTeamLabel={awayTeamLabel}
-      legendMode={legendMode}
-    />
+    <div className="space-y-4">
+      <PublicParticipantList
+        squares={squares}
+        selectedParticipantName={selectedParticipantName}
+        onSelectParticipant={setSelectedParticipantName}
+      />
+      <SquaresGrid
+        sqPoolId={sqPoolId}
+        squares={squares}
+        rowNumbers={rowNumbers}
+        colNumbers={colNumbers}
+        numbersLocked={numbersLocked}
+        isCommissioner={false}
+        winningSquareRounds={winningSquareRounds}
+        liveWinningSquareIds={liveWinningSquareIds}
+        homeTeamLabel={homeTeamLabel}
+        awayTeamLabel={awayTeamLabel}
+        legendMode={legendMode}
+        controlledParticipantName={selectedParticipantName}
+        onParticipantSelect={setSelectedParticipantName}
+      />
+    </div>
   )
 }

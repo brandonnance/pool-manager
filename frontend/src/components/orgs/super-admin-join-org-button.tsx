@@ -49,12 +49,13 @@ export function SuperAdminJoinOrgButton({ orgId, orgName }: SuperAdminJoinOrgBut
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2 w-full sm:w-auto">
       <Button
         onClick={handleJoin}
         disabled={isLoading}
         variant="default"
         size="sm"
+        className="w-full sm:w-auto"
       >
         {isLoading ? 'Joining...' : 'Join as Super Admin'}
       </Button>
