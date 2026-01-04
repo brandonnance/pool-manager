@@ -197,14 +197,14 @@ export function NoAccountSquaresGrid({
             }}
           >
             {/* Top-left corner cell - empty */}
-            <div className="bg-muted/50 rounded-tl-lg" />
+            <div className="bg-slate-100 rounded-tl-lg" />
 
             {/* Column headers (Away team score - 0-9) */}
             {Array.from({ length: 10 }, (_, colIdx) => (
               <div
                 key={`col-header-${colIdx}`}
                 className={cn(
-                  'bg-muted flex items-center justify-center font-bold text-xs sm:text-sm',
+                  'bg-slate-100 flex items-center justify-center font-bold text-base sm:text-lg text-slate-700',
                   colIdx === 9 && 'rounded-tr-lg'
                 )}
               >
@@ -219,7 +219,7 @@ export function NoAccountSquaresGrid({
                 <div
                   key={`row-header-${rowIdx}`}
                   className={cn(
-                    'bg-muted flex items-center justify-center font-bold text-xs sm:text-sm',
+                    'bg-slate-100 flex items-center justify-center font-bold text-base sm:text-lg text-slate-700',
                     rowIdx === 9 && 'rounded-bl-lg'
                   )}
                 >

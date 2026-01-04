@@ -358,7 +358,7 @@ export function SquaresGrid({
               <div
                 key={`col-header-${colIdx}`}
                 className={cn(
-                  'bg-muted flex items-center justify-center font-bold text-xs sm:text-sm',
+                  'bg-primary/15 flex items-center justify-center font-bold text-sm sm:text-base text-primary',
                   colIdx === 9 && 'rounded-tr-lg'
                 )}
               >
@@ -373,7 +373,7 @@ export function SquaresGrid({
                 <div
                   key={`row-header-${rowIdx}`}
                   className={cn(
-                    'bg-muted flex items-center justify-center font-bold text-xs sm:text-sm',
+                    'bg-primary/15 flex items-center justify-center font-bold text-sm sm:text-base text-primary',
                     rowIdx === 9 && 'rounded-bl-lg'
                   )}
                 >

@@ -108,8 +108,8 @@ export function NoAccountSquareCell({
     }
 
     if (!isAssigned) {
-      // Available square - gray with grid number
-      return cn(base, 'bg-gray-100 border-gray-300 text-gray-500')
+      // Available square - light background with visible grid number
+      return cn(base, 'bg-gray-50 border-gray-300')
     }
 
     // Assigned square
@@ -136,8 +136,8 @@ export function NoAccountSquareCell({
       return cn('truncate font-semibold', winningColors[winningRound].text)
     }
     if (!isAssigned) {
-      // Grid numbers like "00" - no truncation needed
-      return 'text-gray-400 text-[6px] sm:text-[8px]'
+      // Grid numbers like "00" - larger and darker for visibility
+      return 'text-gray-500 text-[10px] sm:text-xs font-semibold'
     }
     // Names need truncation but no padding to maximize space
     if (isCommissioner && !verified) {
