@@ -1,0 +1,101 @@
+'use client'
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
+import { Loader2 } from 'lucide-react'
+
+interface PoolTypesSettingsProps {
+  initialPoolTypes: {
+    bowl_buster: boolean
+    playoff_squares: boolean
+  }
+}
+
+export function PoolTypesSettings({ initialPoolTypes }: PoolTypesSettingsProps) {
+  const router = useRouter()
+  const [poolTypes, setPoolTypes] = useState(initialPoolTypes)
+  const [isSaving, setIsSaving] = useState(false)
+  const [hasChanges, setHasChanges] = useState(false)
+
+  const handleToggle = (key: 'bowl_buster' | 'playoff_squares') => {
+    setPoolTypes(prev => {
+      const updated = { ...prev, [key]: !prev[key] }
+      setHasChanges(
+        updated.bowl_buster !== initialPoolTypes.bowl_buster ||
+        updated.playoff_squares !== initialPoolTypes.playoff_squares
+      )
+      return updated
+    })
+  }
+
+  const handleSave = async () => {
+    setIsSaving(true)
+    const supabase = createClient()
+
+    const { error } = await supabase
+      .from('site_settings')
+      .update({ value: poolTypes })
+      .eq('key', 'pool_types')
+
+    if (error) {
+      console.error('Error saving pool types:', error)
+      alert('Failed to save settings')
+    } else {
+      setHasChanges(false)
+      router.refresh()
+    }
+
+    setIsSaving(false)
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="bowl_buster" className="text-base font-medium">
+              Bowl Buster
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              College football bowl pick pools with margin-of-victory scoring
+            </p>
+          </div>
+          <Switch
+            id="bowl_buster"
+            checked={poolTypes.bowl_buster}
+            onCheckedChange={() => handleToggle('bowl_buster')}
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="playoff_squares" className="text-base font-medium">
+              Playoff Squares
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              NFL playoff squares pools with public grid links
+            </p>
+          </div>
+          <Switch
+            id="playoff_squares"
+            checked={poolTypes.playoff_squares}
+            onCheckedChange={() => handleToggle('playoff_squares')}
+          />
+        </div>
+      </div>
+
+      {hasChanges && (
+        <div className="flex justify-end pt-4 border-t">
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Save Changes
+          </Button>
+        </div>
+      )}
+    </div>
+  )
+}

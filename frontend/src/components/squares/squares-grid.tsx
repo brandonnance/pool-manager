@@ -1,323 +1,174 @@
 'use client'
 
-import { Fragment, useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import { SquareCell, type WinningRound } from './square-cell'
+import { Fragment, useState, useRef, useEffect } from 'react'
+import { SquareCell } from './square-cell'
 import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import type { WinningRound } from './square-cell'
 
+export type LegendMode = 'full_playoff' | 'single_game' | 'score_change'
+
+interface SelectedSquare {
+  rowIndex: number
+  colIndex: number
+  participantName: string
+}
+
+// Square type for squares pool (no-account mode uses participant_name instead of user_id)
 export interface Square {
   id: string | null
   row_index: number
   col_index: number
-  user_id: string | null
-  owner_name: string | null
-  owner_initials: string | null
+  participant_name: string | null
+  verified: boolean
+  user_id?: string | null // Optional for backwards compatibility, not used in no-account mode
 }
 
-interface Member {
-  user_id: string
-  display_name: string
-}
+// Alias for backwards compatibility
+export type NoAccountSquare = Square
 
-export type LegendMode = 'full_playoff' | 'single_game' | 'score_change'
-
-export interface SquaresGridProps {
+export interface NoAccountSquaresGridProps {
   sqPoolId: string
-  poolId: string
-  squares: Square[]
+  squares: NoAccountSquare[]
   rowNumbers: number[] | null
   colNumbers: number[] | null
   numbersLocked: boolean
-  currentUserId: string | null
-  userSquareCount: number
-  maxSquaresPerPlayer: number | null
-  canClaim: boolean
-  isCommissioner?: boolean
+  isCommissioner: boolean
   winningSquareRounds?: Map<string, WinningRound>
+  liveWinningSquareIds?: Set<string> // Square IDs currently winning from in-progress games
   homeTeamLabel?: string
   awayTeamLabel?: string
   legendMode?: LegendMode
+  onSquareClick?: (rowIndex: number, colIndex: number, square: NoAccountSquare | null) => void
   className?: string
 }
 
 export function SquaresGrid({
   sqPoolId,
-  poolId,
   squares,
   rowNumbers,
   colNumbers,
   numbersLocked,
-  currentUserId,
-  userSquareCount,
-  maxSquaresPerPlayer,
-  canClaim,
-  isCommissioner = false,
+  isCommissioner,
   winningSquareRounds = new Map(),
+  liveWinningSquareIds = new Set(),
   homeTeamLabel = 'Home',
   awayTeamLabel = 'Away',
   legendMode = 'full_playoff',
+  onSquareClick,
   className,
-}: SquaresGridProps) {
-  const router = useRouter()
+}: NoAccountSquaresGridProps) {
   const [loadingCell, setLoadingCell] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  // Realtime subscription for live grid updates
-  useEffect(() => {
-    const supabase = createClient()
-
-    const channel = supabase
-      .channel(`squares-${sqPoolId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // Listen to INSERT, UPDATE, DELETE
-          schema: 'public',
-          table: 'sq_squares',
-          filter: `sq_pool_id=eq.${sqPoolId}`,
-        },
-        () => {
-          // When any square changes, refresh the page to get updated data
-          router.refresh()
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [sqPoolId, router])
-
-  // Admin assignment dialog state
-  const [assignDialogOpen, setAssignDialogOpen] = useState(false)
-  const [selectedSquare, setSelectedSquare] = useState<{
-    rowIndex: number
-    colIndex: number
-    square: Square | null
-  } | null>(null)
-  const [members, setMembers] = useState<Member[]>([])
-  const [isFetchingMembers, setIsFetchingMembers] = useState(false)
-  const [selectedUserId, setSelectedUserId] = useState<string>('')
-  const [isAssigning, setIsAssigning] = useState(false)
+  const [selectedSquare, setSelectedSquare] = useState<SelectedSquare | null>(null)
+  const tooltipRef = useRef<HTMLDivElement>(null)
+  const gridRef = useRef<HTMLDivElement>(null)
 
   // Create a map for quick lookup
-  const squareMap = new Map<string, Square>()
+  const squareMap = new Map<string, NoAccountSquare>()
   squares.forEach((sq) => {
     squareMap.set(`${sq.row_index}-${sq.col_index}`, sq)
   })
 
-  // Check if user can claim more squares
-  const canClaimMore = !maxSquaresPerPlayer || userSquareCount < maxSquaresPerPlayer
-
-  // Fetch members when dialog opens
+  // Close tooltip when clicking outside
   useEffect(() => {
-    if (assignDialogOpen && members.length === 0 && !isFetchingMembers) {
-      fetchMembers()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assignDialogOpen])
-
-  const fetchMembers = async () => {
-    setIsFetchingMembers(true)
-    const supabase = createClient()
-
-    const { data: memberships } = await supabase
-      .from('pool_memberships')
-      .select('user_id')
-      .eq('pool_id', poolId)
-      .eq('status', 'approved')
-
-    if (memberships && memberships.length > 0) {
-      const userIds = memberships.map((m) => m.user_id)
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, display_name')
-        .in('id', userIds)
-
-      setMembers(
-        profiles?.map((p) => ({
-          user_id: p.id,
-          display_name: p.display_name || 'Unknown',
-        })) ?? []
-      )
-    }
-
-    setIsFetchingMembers(false)
-  }
-
-  const handleAdminClick = (rowIndex: number, colIndex: number) => {
-    const cellKey = `${rowIndex}-${colIndex}`
-    const square = squareMap.get(cellKey) || null
-    setSelectedSquare({ rowIndex, colIndex, square })
-    setSelectedUserId(square?.user_id || '')
-    setAssignDialogOpen(true)
-  }
-
-  const handleAssign = async () => {
-    if (!selectedSquare || !selectedUserId) return
-
-    setIsAssigning(true)
-    setError(null)
-
-    const supabase = createClient()
-    const { rowIndex, colIndex, square } = selectedSquare
-
-    if (square?.id) {
-      // Update existing square
-      const { error: updateError } = await supabase
-        .from('sq_squares')
-        .update({ user_id: selectedUserId })
-        .eq('id', square.id)
-
-      if (updateError) {
-        setError(updateError.message)
-        setIsAssigning(false)
-        return
-      }
-    } else {
-      // Insert new square
-      const { error: insertError } = await supabase.from('sq_squares').insert({
-        sq_pool_id: sqPoolId,
-        row_index: rowIndex,
-        col_index: colIndex,
-        user_id: selectedUserId,
-      })
-
-      if (insertError) {
-        setError(insertError.message)
-        setIsAssigning(false)
-        return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        selectedSquare &&
+        tooltipRef.current &&
+        !tooltipRef.current.contains(e.target as Node) &&
+        gridRef.current &&
+        !gridRef.current.contains(e.target as Node)
+      ) {
+        setSelectedSquare(null)
       }
     }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [selectedSquare])
 
-    setIsAssigning(false)
-    setAssignDialogOpen(false)
-    setSelectedSquare(null)
-    router.refresh()
-  }
-
-  const handleUnassign = async () => {
-    if (!selectedSquare?.square?.id) return
-
-    setIsAssigning(true)
-    setError(null)
-
-    const supabase = createClient()
-
-    const { error: deleteError } = await supabase
-      .from('sq_squares')
-      .delete()
-      .eq('id', selectedSquare.square.id)
-
-    if (deleteError) {
-      setError(deleteError.message)
-      setIsAssigning(false)
+  const handleSquareClick = (rowIndex: number, colIndex: number) => {
+    // Commissioner mode - use the external handler
+    if (isCommissioner && onSquareClick) {
+      const cellKey = `${rowIndex}-${colIndex}`
+      const square = squareMap.get(cellKey) ?? null
+      onSquareClick(rowIndex, colIndex, square)
       return
     }
 
-    setIsAssigning(false)
-    setAssignDialogOpen(false)
-    setSelectedSquare(null)
-    router.refresh()
-  }
-
-  // Commissioners can always assign/reassign squares (even after lock for abandoned squares)
-  const canAdminAssign = isCommissioner
-
-  const handleSquareClaim = async (rowIndex: number, colIndex: number) => {
-    if (!currentUserId || !canClaim || !canClaimMore) return
-
-    const cellKey = `${rowIndex}-${colIndex}`
-    setLoadingCell(cellKey)
-    setError(null)
-
-    const supabase = createClient()
-
-    const { error: insertError } = await supabase.from('sq_squares').insert({
-      sq_pool_id: sqPoolId,
-      row_index: rowIndex,
-      col_index: colIndex,
-      user_id: currentUserId,
-    })
-
-    if (insertError) {
-      console.error('Error claiming square:', insertError)
-      // Handle unique constraint violation (race condition - someone else claimed it)
-      if (insertError.code === '23505') {
-        setError('This square was just claimed by someone else. Refreshing grid...')
-        // Auto-refresh after a brief delay so user sees the message
-        setTimeout(() => {
-          setError(null)
-          router.refresh()
-        }, 1500)
-      } else {
-        setError(insertError.message)
-      }
-      setLoadingCell(null)
-      return
-    }
-
-    setLoadingCell(null)
-    router.refresh()
-  }
-
-  const handleSquareUnclaim = async (rowIndex: number, colIndex: number) => {
-    if (!currentUserId || numbersLocked) return
-
+    // Public view - show tooltip for claimed squares
     const cellKey = `${rowIndex}-${colIndex}`
     const square = squareMap.get(cellKey)
-    if (!square?.id || square.user_id !== currentUserId) return
-
-    setLoadingCell(cellKey)
-    setError(null)
-
-    const supabase = createClient()
-
-    const { error: deleteError } = await supabase
-      .from('sq_squares')
-      .delete()
-      .eq('id', square.id)
-
-    if (deleteError) {
-      console.error('Error unclaiming square:', deleteError)
-      setError(deleteError.message)
+    if (square?.participant_name) {
+      // Toggle selection - if same square clicked, close; otherwise open new
+      if (
+        selectedSquare?.rowIndex === rowIndex &&
+        selectedSquare?.colIndex === colIndex
+      ) {
+        setSelectedSquare(null)
+      } else {
+        setSelectedSquare({
+          rowIndex,
+          colIndex,
+          participantName: square.participant_name,
+        })
+      }
+    } else {
+      setSelectedSquare(null)
     }
-
-    setLoadingCell(null)
-    router.refresh()
   }
 
-  // Can unclaim if: pool is open and numbers not locked
-  const canUnclaim = canClaim && !numbersLocked
+  // Count squares for selected participant
+  const selectedParticipantSquareCount = selectedSquare
+    ? squares.filter((s) => s.participant_name === selectedSquare.participantName).length
+    : 0
+
+  // Calculate statistics
+  const totalSquares = 100
+  const claimedSquares = squares.filter((s) => s.participant_name).length
+  const verifiedSquares = squares.filter((s) => s.verified).length
+  const availableSquares = totalSquares - claimedSquares
 
   return (
-    <div className={cn('space-y-2', className)}>
-      {error && (
-        <div className="text-sm text-destructive bg-destructive/10 px-3 py-2 rounded-md">
-          {error}
+    <div className={cn('space-y-4', className)}>
+      {/* Statistics row */}
+      <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+        <span>
+          <strong className="text-foreground">{claimedSquares}</strong> claimed
+        </span>
+        <span>
+          <strong className="text-foreground">{availableSquares}</strong> available
+        </span>
+        {isCommissioner && (
+          <span>
+            <strong className="text-green-600">{verifiedSquares}</strong> verified
+          </span>
+        )}
+      </div>
+
+      {/* Tooltip for selected participant */}
+      {selectedSquare && (
+        <div
+          ref={tooltipRef}
+          className="mb-3 p-3 bg-primary/10 border border-primary/20 rounded-lg flex items-center justify-between gap-4"
+        >
+          <div>
+            <p className="font-semibold text-foreground">{selectedSquare.participantName}</p>
+            <p className="text-sm text-muted-foreground">
+              {selectedParticipantSquareCount} square{selectedParticipantSquareCount !== 1 ? 's' : ''} (highlighted in blue)
+            </p>
+          </div>
+          <button
+            onClick={() => setSelectedSquare(null)}
+            className="text-muted-foreground hover:text-foreground p-1"
+            aria-label="Close"
+          >
+            <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
       )}
 
-      <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+      <div ref={gridRef} className="overflow-x-auto overflow-y-visible pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
         {/* Away team axis label */}
         <div className="flex items-center justify-center mb-1 sm:mb-2 ml-7 sm:ml-10">
           <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-0.5 sm:py-1 bg-primary/10 rounded-full">
@@ -351,18 +202,18 @@ export function SquaresGrid({
             }}
           >
             {/* Top-left corner cell - empty */}
-            <div className="bg-muted/50 rounded-tl-lg" />
+            <div className="bg-slate-100 rounded-tl-lg" />
 
             {/* Column headers (Away team score - 0-9) */}
             {Array.from({ length: 10 }, (_, colIdx) => (
               <div
                 key={`col-header-${colIdx}`}
                 className={cn(
-                  'bg-primary/15 flex items-center justify-center font-bold text-sm sm:text-base text-primary',
+                  'bg-slate-100 flex items-center justify-center font-bold text-base sm:text-lg text-slate-700',
                   colIdx === 9 && 'rounded-tr-lg'
                 )}
               >
-                {colNumbers ? colNumbers[colIdx] : '?'}
+                {numbersLocked && colNumbers ? colNumbers[colIdx] : '?'}
               </div>
             ))}
 
@@ -373,11 +224,11 @@ export function SquaresGrid({
                 <div
                   key={`row-header-${rowIdx}`}
                   className={cn(
-                    'bg-primary/15 flex items-center justify-center font-bold text-sm sm:text-base text-primary',
+                    'bg-slate-100 flex items-center justify-center font-bold text-base sm:text-lg text-slate-700',
                     rowIdx === 9 && 'rounded-bl-lg'
                   )}
                 >
-                  {rowNumbers ? rowNumbers[rowIdx] : '?'}
+                  {numbersLocked && rowNumbers ? rowNumbers[rowIdx] : '?'}
                 </div>
 
                 {/* Square cells for this row */}
@@ -385,25 +236,24 @@ export function SquaresGrid({
                   const cellKey = `${rowIdx}-${colIdx}`
                   const square = squareMap.get(cellKey)
                   const isLoading = loadingCell === cellKey
+                  // Highlight if this square belongs to selected participant
+                  const isHighlighted = selectedSquare
+                    ? square?.participant_name === selectedSquare.participantName
+                    : false
 
                   return (
                     <SquareCell
                       key={cellKey}
                       rowIndex={rowIdx}
                       colIndex={colIdx}
-                      ownerId={square?.user_id || null}
-                      ownerInitials={square?.owner_initials || null}
-                      ownerName={square?.owner_name || null}
-                      isCurrentUser={square?.user_id === currentUserId}
+                      participantName={square?.participant_name ?? null}
+                      verified={square?.verified ?? false}
+                      isCommissioner={isCommissioner}
                       winningRound={square?.id ? winningSquareRounds.get(square.id) ?? null : null}
-                      canClaim={canClaim && canClaimMore && !numbersLocked}
-                      canUnclaim={canUnclaim}
-                      isAdmin={canAdminAssign}
+                      isLiveWinning={square?.id ? liveWinningSquareIds.has(square.id) : false}
+                      isHighlighted={isHighlighted}
                       isLoading={isLoading}
-                      isAbandoned={!!square?.id && !square?.user_id}
-                      onClick={() => handleSquareClaim(rowIdx, colIdx)}
-                      onUnclaim={() => handleSquareUnclaim(rowIdx, colIdx)}
-                      onAdminClick={() => handleAdminClick(rowIdx, colIdx)}
+                      onClick={() => handleSquareClick(rowIdx, colIdx)}
                     />
                   )
                 })}
@@ -416,21 +266,34 @@ export function SquaresGrid({
       {/* Legend */}
       <div className="flex flex-wrap gap-2 sm:gap-4 text-[10px] sm:text-xs text-muted-foreground mt-2">
         <div className="flex items-center gap-1">
-          <div className="size-3 sm:size-4 rounded border border-border bg-muted/50" />
+          <div className="size-3 sm:size-4 rounded border border-gray-300 bg-gray-100 flex items-center justify-center text-[6px] sm:text-[8px] text-gray-400">
+            00
+          </div>
           <span>Available</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="size-3 sm:size-4 rounded border border-sky-400 bg-sky-100" />
-          <span>Yours</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="size-3 sm:size-4 rounded border border-border bg-card" />
+          <div className="size-3 sm:size-4 rounded border border-gray-300 bg-white" />
           <span>Claimed</span>
         </div>
-        <div className="flex items-center gap-1">
-          <div className="size-3 sm:size-4 rounded border border-dashed border-amber-300 bg-amber-50" />
-          <span>Abandoned</span>
-        </div>
+        {isCommissioner && (
+          <>
+            <div className="flex items-center gap-1">
+              <div className="size-3 sm:size-4 rounded border border-green-300 bg-green-50" />
+              <span>Verified</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div
+                className="size-3 sm:size-4 rounded border border-red-300 bg-white"
+                style={{
+                  background:
+                    'linear-gradient(135deg, white 45%, rgb(239 68 68 / 0.3) 45%, rgb(239 68 68 / 0.3) 55%, white 55%)',
+                }}
+              />
+              <span>Not Verified</span>
+            </div>
+          </>
+        )}
+        {/* Winner colors based on legend mode */}
         {legendMode === 'full_playoff' ? (
           <>
             <div className="flex items-center gap-1">
@@ -488,84 +351,6 @@ export function SquaresGrid({
           </div>
         )}
       </div>
-
-      {/* Admin Assignment Dialog */}
-      <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {selectedSquare?.square?.user_id ? 'Reassign Square' : 'Assign Square'}
-            </DialogTitle>
-            <DialogDescription>
-              Square [{selectedSquare?.rowIndex ?? 0}, {selectedSquare?.colIndex ?? 0}]
-              {selectedSquare?.square?.owner_name && (
-                <span className="block mt-1">
-                  Currently assigned to: <strong>{selectedSquare.square.owner_name}</strong>
-                </span>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Assign to Member</Label>
-              {isFetchingMembers ? (
-                <div className="text-sm text-muted-foreground">Loading members...</div>
-              ) : members.length === 0 ? (
-                <div className="text-sm text-muted-foreground">No approved members found</div>
-              ) : (
-                <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a member" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {members.map((member) => (
-                      <SelectItem key={member.user_id} value={member.user_id}>
-                        {member.display_name}
-                        {member.user_id === selectedSquare?.square?.user_id && ' (current)'}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-          </div>
-
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            {selectedSquare?.square?.user_id && (
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={handleUnassign}
-                disabled={isAssigning}
-                className="sm:mr-auto"
-              >
-                {isAssigning ? 'Removing...' : 'Remove Assignment'}
-              </Button>
-            )}
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setAssignDialogOpen(false)}
-              disabled={isAssigning}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleAssign}
-              disabled={isAssigning || !selectedUserId || isFetchingMembers}
-            >
-              {isAssigning ? 'Assigning...' : 'Assign Square'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

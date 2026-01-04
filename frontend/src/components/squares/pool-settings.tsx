@@ -34,7 +34,7 @@ const RANDOM_NAMES = [
   'Gina', 'Hugo', 'Iris', 'Jake', 'Kim', 'Liam', 'Mia', 'Nick'
 ]
 
-export function NoAccountPoolSettings({
+export function PoolSettings({
   sqPoolId,
   poolId,
   publicSlug,

@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { UserDropdown } from '@/components/auth/user-dropdown'
 import { MobileNav } from '@/components/nav/mobile-nav'
+import { AdminDropdown } from '@/components/admin/admin-dropdown'
 
 export default async function DashboardLayout({
   children,
@@ -54,14 +55,7 @@ export default async function DashboardLayout({
                 >
                   Organizations
                 </Link>
-                {profile?.is_super_admin && (
-                  <Link
-                    href="/admin/users"
-                    className="text-primary-foreground/80 hover:text-primary-foreground hover:bg-white/10 px-4 py-2 rounded-md text-sm font-medium transition-colors"
-                  >
-                    Users
-                  </Link>
-                )}
+                {profile?.is_super_admin && <AdminDropdown />}
               </nav>
             </div>
             <UserDropdown
