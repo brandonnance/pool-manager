@@ -23,7 +23,7 @@ interface CreatePoolButtonProps {
   orgId: string
 }
 
-type PoolType = 'bowl_buster' | 'playoff_squares'
+type PoolType = 'bowl_buster' | 'playoff_squares' | 'golf'
 type SquaresMode = 'full_playoff' | 'single_game'
 type ScoringMode = 'quarter' | 'score_change'
 
@@ -65,13 +65,15 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
     }
   }, [isOpen, enabledPoolTypes])
 
-  // Auto-set pool type based on what's enabled
+  // Auto-set pool type based on what's enabled (pick first enabled type)
   useEffect(() => {
     if (enabledPoolTypes) {
-      if (!enabledPoolTypes.bowl_buster && enabledPoolTypes.playoff_squares) {
-        setPoolType('playoff_squares')
-      } else if (enabledPoolTypes.bowl_buster && !enabledPoolTypes.playoff_squares) {
+      if (enabledPoolTypes.bowl_buster) {
         setPoolType('bowl_buster')
+      } else if (enabledPoolTypes.playoff_squares) {
+        setPoolType('playoff_squares')
+      } else if (enabledPoolTypes.golf) {
+        setPoolType('golf')
       }
     }
   }, [enabledPoolTypes])
@@ -207,6 +209,23 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
       }
     }
 
+    // For Golf pools, create gp_pools record
+    if (poolType === 'golf') {
+      const { error: gpPoolError } = await supabase
+        .from('gp_pools')
+        .insert({
+          pool_id: pool.id,
+          min_tier_points: 21, // Default, can be changed in setup
+          demo_mode: false,
+        })
+
+      if (gpPoolError) {
+        setError(gpPoolError.message)
+        setIsLoading(false)
+        return
+      }
+    }
+
     setIsOpen(false)
     resetForm()
     router.refresh()
@@ -301,8 +320,8 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
 
   // Count enabled pool types
   const enabledCount = enabledPoolTypes
-    ? (enabledPoolTypes.bowl_buster ? 1 : 0) + (enabledPoolTypes.playoff_squares ? 1 : 0)
-    : 2
+    ? (enabledPoolTypes.bowl_buster ? 1 : 0) + (enabledPoolTypes.playoff_squares ? 1 : 0) + (enabledPoolTypes.golf ? 1 : 0)
+    : 3
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
@@ -352,6 +371,20 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
                       <div className="text-xs text-muted-foreground">10x10 squares grid</div>
                     </button>
                   )}
+                  {enabledPoolTypes?.golf && (
+                    <button
+                      type="button"
+                      onClick={() => setPoolType('golf')}
+                      className={`p-3 rounded-lg border text-left transition-all ${
+                        poolType === 'golf'
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border hover:border-muted-foreground'
+                      }`}
+                    >
+                      <div className="font-medium">Golf Majors</div>
+                      <div className="text-xs text-muted-foreground">Tiered picks, best 4 of 6</div>
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -359,7 +392,7 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
             {/* Show single pool type header if only one is enabled */}
             {enabledCount === 1 && enabledPoolTypes && (
               <div className="text-sm text-muted-foreground">
-                Creating a {enabledPoolTypes.bowl_buster ? 'Bowl Buster' : 'Squares'} pool
+                Creating a {enabledPoolTypes.bowl_buster ? 'Bowl Buster' : enabledPoolTypes.playoff_squares ? 'Squares' : 'Golf Majors'} pool
               </div>
             )}
 
@@ -369,7 +402,11 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder={poolType === 'bowl_buster' ? 'My Bowl Pool' : 'Super Bowl Squares 2025'}
+                placeholder={
+                  poolType === 'bowl_buster' ? 'My Bowl Pool' :
+                  poolType === 'playoff_squares' ? 'Super Bowl Squares 2025' :
+                  'Masters 2025 Pool'
+                }
                 required
               />
             </div>

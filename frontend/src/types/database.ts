@@ -555,6 +555,347 @@ export type Database = {
         }
         Relationships: []
       }
+      gp_entries: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          entry_name: string | null
+          entry_number: number | null
+          id: string
+          pool_id: string
+          submitted_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          entry_name?: string | null
+          entry_number?: number | null
+          id?: string
+          pool_id: string
+          submitted_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          entry_name?: string | null
+          entry_number?: number | null
+          id?: string
+          pool_id?: string
+          submitted_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gp_entries_pool_id_fkey"
+            columns: ["pool_id"]
+            isOneToOne: false
+            referencedRelation: "pools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gp_entry_picks: {
+        Row: {
+          created_at: string | null
+          entry_id: string
+          golfer_id: string
+          id: string
+        }
+        Insert: {
+          created_at?: string | null
+          entry_id: string
+          golfer_id: string
+          id?: string
+        }
+        Update: {
+          created_at?: string | null
+          entry_id?: string
+          golfer_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gp_entry_picks_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "gp_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gp_entry_picks_golfer_id_fkey"
+            columns: ["golfer_id"]
+            isOneToOne: false
+            referencedRelation: "gp_golfers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gp_golfer_results: {
+        Row: {
+          golfer_id: string
+          id: string
+          made_cut: boolean | null
+          position: string | null
+          round_1: number | null
+          round_2: number | null
+          round_3: number | null
+          round_4: number | null
+          thru: number | null
+          total_score: number | null
+          tournament_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          golfer_id: string
+          id?: string
+          made_cut?: boolean | null
+          position?: string | null
+          round_1?: number | null
+          round_2?: number | null
+          round_3?: number | null
+          round_4?: number | null
+          thru?: number | null
+          total_score?: number | null
+          tournament_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          golfer_id?: string
+          id?: string
+          made_cut?: boolean | null
+          position?: string | null
+          round_1?: number | null
+          round_2?: number | null
+          round_3?: number | null
+          round_4?: number | null
+          thru?: number | null
+          total_score?: number | null
+          tournament_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gp_golfer_results_golfer_id_fkey"
+            columns: ["golfer_id"]
+            isOneToOne: false
+            referencedRelation: "gp_golfers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gp_golfer_results_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "gp_tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gp_golfers: {
+        Row: {
+          country: string | null
+          created_at: string | null
+          headshot_url: string | null
+          id: string
+          name: string
+          owgr_rank: number | null
+          sportradar_player_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          country?: string | null
+          created_at?: string | null
+          headshot_url?: string | null
+          id?: string
+          name: string
+          owgr_rank?: number | null
+          sportradar_player_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          country?: string | null
+          created_at?: string | null
+          headshot_url?: string | null
+          id?: string
+          name?: string
+          owgr_rank?: number | null
+          sportradar_player_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      gp_pools: {
+        Row: {
+          created_at: string | null
+          demo_mode: boolean | null
+          id: string
+          min_tier_points: number | null
+          picks_lock_at: string | null
+          pool_id: string
+          tournament_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          demo_mode?: boolean | null
+          id?: string
+          min_tier_points?: number | null
+          picks_lock_at?: string | null
+          pool_id: string
+          tournament_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          demo_mode?: boolean | null
+          id?: string
+          min_tier_points?: number | null
+          picks_lock_at?: string | null
+          pool_id?: string
+          tournament_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gp_pools_pool_id_fkey"
+            columns: ["pool_id"]
+            isOneToOne: true
+            referencedRelation: "pools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gp_pools_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "gp_tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gp_tier_assignments: {
+        Row: {
+          created_at: string | null
+          golfer_id: string
+          id: string
+          pool_id: string
+          tier_value: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          golfer_id: string
+          id?: string
+          pool_id: string
+          tier_value: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          golfer_id?: string
+          id?: string
+          pool_id?: string
+          tier_value?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gp_tier_assignments_golfer_id_fkey"
+            columns: ["golfer_id"]
+            isOneToOne: false
+            referencedRelation: "gp_golfers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gp_tier_assignments_pool_id_fkey"
+            columns: ["pool_id"]
+            isOneToOne: false
+            referencedRelation: "gp_pools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gp_tournament_field: {
+        Row: {
+          created_at: string | null
+          golfer_id: string
+          id: string
+          status: string | null
+          tournament_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          golfer_id: string
+          id?: string
+          status?: string | null
+          tournament_id: string
+        }
+        Update: {
+          created_at?: string | null
+          golfer_id?: string
+          id?: string
+          status?: string | null
+          tournament_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gp_tournament_field_golfer_id_fkey"
+            columns: ["golfer_id"]
+            isOneToOne: false
+            referencedRelation: "gp_golfers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gp_tournament_field_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "gp_tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gp_tournaments: {
+        Row: {
+          course_name: string | null
+          created_at: string | null
+          cut_round: number | null
+          end_date: string
+          id: string
+          name: string
+          par: number | null
+          sportradar_tournament_id: string | null
+          start_date: string
+          status: string | null
+          updated_at: string | null
+          venue: string | null
+        }
+        Insert: {
+          course_name?: string | null
+          created_at?: string | null
+          cut_round?: number | null
+          end_date: string
+          id?: string
+          name: string
+          par?: number | null
+          sportradar_tournament_id?: string | null
+          start_date: string
+          status?: string | null
+          updated_at?: string | null
+          venue?: string | null
+        }
+        Update: {
+          course_name?: string | null
+          created_at?: string | null
+          cut_round?: number | null
+          end_date?: string
+          id?: string
+          name?: string
+          par?: number | null
+          sportradar_tournament_id?: string | null
+          start_date?: string
+          status?: string | null
+          updated_at?: string | null
+          venue?: string | null
+        }
+        Relationships: []
+      }
       join_links: {
         Row: {
           created_at: string | null
@@ -1076,6 +1417,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_golf_entry_score: {
+        Args: { p_entry_id: string }
+        Returns: number
+      }
+      calculate_golfer_score: {
+        Args: {
+          p_made_cut: boolean
+          p_round_1: number
+          p_round_2: number
+          p_round_3: number
+          p_round_4: number
+        }
+        Returns: number
+      }
       calculate_pick_score: {
         Args: {
           p_away_score: number
@@ -1094,6 +1449,7 @@ export type Database = {
         Returns: boolean
       }
       is_cfp_locked: { Args: { p_pool_id: string }; Returns: boolean }
+      is_golf_picks_locked: { Args: { p_pool_id: string }; Returns: boolean }
       is_org_admin: { Args: { p_org_id: string }; Returns: boolean }
       is_org_commissioner: { Args: { p_org_id: string }; Returns: boolean }
       is_pool_commissioner: { Args: { p_pool_id: string }; Returns: boolean }

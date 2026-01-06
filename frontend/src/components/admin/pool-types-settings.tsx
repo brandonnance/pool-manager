@@ -12,6 +12,7 @@ interface PoolTypesSettingsProps {
   initialPoolTypes: {
     bowl_buster: boolean
     playoff_squares: boolean
+    golf: boolean
   }
 }
 
@@ -21,12 +22,13 @@ export function PoolTypesSettings({ initialPoolTypes }: PoolTypesSettingsProps) 
   const [isSaving, setIsSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
 
-  const handleToggle = (key: 'bowl_buster' | 'playoff_squares') => {
+  const handleToggle = (key: 'bowl_buster' | 'playoff_squares' | 'golf') => {
     setPoolTypes(prev => {
       const updated = { ...prev, [key]: !prev[key] }
       setHasChanges(
         updated.bowl_buster !== initialPoolTypes.bowl_buster ||
-        updated.playoff_squares !== initialPoolTypes.playoff_squares
+        updated.playoff_squares !== initialPoolTypes.playoff_squares ||
+        updated.golf !== initialPoolTypes.golf
       )
       return updated
     })
@@ -84,6 +86,22 @@ export function PoolTypesSettings({ initialPoolTypes }: PoolTypesSettingsProps) 
             id="playoff_squares"
             checked={poolTypes.playoff_squares}
             onCheckedChange={() => handleToggle('playoff_squares')}
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="golf" className="text-base font-medium">
+              Golf Majors
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              Tiered golf picks with best 4 of 6 scoring
+            </p>
+          </div>
+          <Switch
+            id="golf"
+            checked={poolTypes.golf}
+            onCheckedChange={() => handleToggle('golf')}
           />
         </div>
       </div>

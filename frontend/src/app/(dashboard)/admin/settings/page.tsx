@@ -31,6 +31,7 @@ export default async function AdminSettingsPage() {
   const poolTypes = settings?.find(s => s.key === 'pool_types')?.value as {
     bowl_buster: boolean
     playoff_squares: boolean
+    golf: boolean
   } | null
 
   const nflPlayoffGames = settings?.find(s => s.key === 'nfl_playoff_games')?.value as Array<{
@@ -59,7 +60,7 @@ export default async function AdminSettingsPage() {
         </CardHeader>
         <CardContent>
           <PoolTypesSettings
-            initialPoolTypes={poolTypes ?? { bowl_buster: true, playoff_squares: true }}
+            initialPoolTypes={poolTypes ?? { bowl_buster: true, playoff_squares: true, golf: true }}
           />
         </CardContent>
       </Card>
