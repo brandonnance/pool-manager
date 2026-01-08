@@ -105,7 +105,7 @@ Same 10x10 grid mechanics as NFL Playoff Squares, but for a single game with mor
 
 ## Pool Type #3: March Madness Blind Draw
 
-### Status: DESIGNED, NOT IMPLEMENTED
+### Status: PLANNED - See [blind-draw.md](blind-draw.md) for full implementation plan
 
 ### Overview
 64-player pool where each player is randomly assigned one NCAA tournament team. Advancement is based on **covering the spread**, not just winning. The twist: you always inherit the WINNING team, so even underdogs have a fair shot.
