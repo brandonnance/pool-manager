@@ -23,7 +23,7 @@ interface CreatePoolButtonProps {
   orgId: string
 }
 
-type PoolType = 'bowl_buster' | 'playoff_squares'
+type PoolType = 'bowl_buster' | 'playoff_squares' | 'golf' | 'march_madness'
 type SquaresMode = 'full_playoff' | 'single_game'
 type ScoringMode = 'quarter' | 'score_change'
 
@@ -65,13 +65,18 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
     }
   }, [isOpen, enabledPoolTypes])
 
-  // Auto-set pool type based on what's enabled
+  // Auto-set pool type to first enabled type
   useEffect(() => {
     if (enabledPoolTypes) {
-      if (!enabledPoolTypes.bowl_buster && enabledPoolTypes.playoff_squares) {
-        setPoolType('playoff_squares')
-      } else if (enabledPoolTypes.bowl_buster && !enabledPoolTypes.playoff_squares) {
+      // Set to first enabled pool type
+      if (enabledPoolTypes.bowl_buster) {
         setPoolType('bowl_buster')
+      } else if (enabledPoolTypes.playoff_squares) {
+        setPoolType('playoff_squares')
+      } else if (enabledPoolTypes.golf) {
+        setPoolType('golf')
+      } else if (enabledPoolTypes.march_madness) {
+        setPoolType('march_madness')
       }
     }
   }, [enabledPoolTypes])
@@ -207,6 +212,37 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
       }
     }
 
+    // For Golf pools, create gp_pools record
+    if (poolType === 'golf') {
+      const { error: gpPoolError } = await supabase
+        .from('gp_pools')
+        .insert({
+          pool_id: pool.id,
+        })
+
+      if (gpPoolError) {
+        setError(gpPoolError.message)
+        setIsLoading(false)
+        return
+      }
+    }
+
+    // For March Madness pools, create mm_pools record
+    if (poolType === 'march_madness') {
+      const { error: mmPoolError } = await supabase
+        .from('mm_pools')
+        .insert({
+          pool_id: pool.id,
+          tournament_year: new Date().getFullYear(),
+        })
+
+      if (mmPoolError) {
+        setError(mmPoolError.message)
+        setIsLoading(false)
+        return
+      }
+    }
+
     setIsOpen(false)
     resetForm()
     router.refresh()
@@ -301,8 +337,11 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
 
   // Count enabled pool types
   const enabledCount = enabledPoolTypes
-    ? (enabledPoolTypes.bowl_buster ? 1 : 0) + (enabledPoolTypes.playoff_squares ? 1 : 0)
-    : 2
+    ? (enabledPoolTypes.bowl_buster ? 1 : 0) +
+      (enabledPoolTypes.playoff_squares ? 1 : 0) +
+      (enabledPoolTypes.golf ? 1 : 0) +
+      (enabledPoolTypes.march_madness ? 1 : 0)
+    : 4
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
@@ -350,6 +389,34 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
                     >
                       <div className="font-medium">Squares</div>
                       <div className="text-xs text-muted-foreground">10x10 squares grid</div>
+                    </button>
+                  )}
+                  {enabledPoolTypes?.golf && (
+                    <button
+                      type="button"
+                      onClick={() => setPoolType('golf')}
+                      className={`p-3 rounded-lg border text-left transition-all ${
+                        poolType === 'golf'
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border hover:border-muted-foreground'
+                      }`}
+                    >
+                      <div className="font-medium">Golf Pool</div>
+                      <div className="text-xs text-muted-foreground">Pick golfers by tier</div>
+                    </button>
+                  )}
+                  {enabledPoolTypes?.march_madness && (
+                    <button
+                      type="button"
+                      onClick={() => setPoolType('march_madness')}
+                      className={`p-3 rounded-lg border text-left transition-all ${
+                        poolType === 'march_madness'
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border hover:border-muted-foreground'
+                      }`}
+                    >
+                      <div className="font-medium">March Madness</div>
+                      <div className="text-xs text-muted-foreground">64-player blind draw</div>
                     </button>
                   )}
                 </div>
