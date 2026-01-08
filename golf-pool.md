@@ -25,7 +25,7 @@ A tiered golf major pool system for PGA majors (Masters, PGA Championship, US Op
 |---------|--------|----------|
 | Manual score entry page | NOT STARTED | Medium |
 | Public standings URL | NOT STARTED | Low |
-| Sportradar live sync | NOT STARTED | Low (demo works) |
+| Slash Golf live sync | NOT STARTED | Low (demo works) |
 
 ### Recently Completed (This Session)
 
@@ -35,6 +35,8 @@ A tiered golf major pool system for PGA majors (Masters, PGA Championship, US Op
 | Golfer Info Popover | COMPLETE | Hover card (desktop) + tap icon (mobile) with photo, country, OWGR, tier, status |
 | Empty Tier Hiding | COMPLETE | Tier 0 section hidden when no golfers assigned |
 | Duplicate Entry Fix | COMPLETE | Fixed race condition + added DB unique constraint |
+| Slash Golf Tournament Import | COMPLETE | Browse/import PGA Tour tournaments from Slash Golf API |
+| Pick Sheet Redesign | COMPLETE | Horizontal tier rows matching Open Championship style |
 
 ---
 
@@ -45,7 +47,8 @@ A tiered golf major pool system for PGA majors (Masters, PGA Championship, US Op
 ```
 frontend/src/app/api/golf/
 ├── demo/route.ts              # POST: seed, simulate, reset demo data
-└── standings/route.ts         # GET: calculate standings with best 4 of 6
+├── standings/route.ts         # GET: calculate standings with best 4 of 6
+└── tournaments/route.ts       # GET: fetch tournaments, POST: import tournament
 ```
 
 ### Pages
@@ -74,9 +77,9 @@ frontend/src/lib/golf/
 ├── types.ts                   # GolferWithTier, EntryStanding, etc.
 └── validation.ts              # validateRoster (6 golfers, min tier points)
 
-frontend/src/lib/sportradar/
-├── client.ts                  # API client (singleton)
-└── types.ts                   # Sportradar response types
+frontend/src/lib/slashgolf/
+├── client.ts                  # Slash Golf API client (singleton)
+└── types.ts                   # Slash Golf response types & helpers
 ```
 
 ### Pool Detail Page
@@ -167,7 +170,7 @@ const scoreToPar = totalScore - effectivePar    // e.g., 140 - 144 = -4
 gp_golfers
 ├── id (uuid, PK)
 ├── name (text)
-├── sportradar_player_id (text, unique, nullable)
+├── sportradar_player_id (text, unique, nullable)  # Used for Slash Golf player ID
 ├── country (text)
 ├── headshot_url (text)
 ├── owgr_rank (integer)
@@ -175,7 +178,7 @@ gp_golfers
 gp_tournaments
 ├── id (uuid, PK)
 ├── name (text)
-├── sportradar_tournament_id (text, unique, nullable)
+├── sportradar_tournament_id (text, unique, nullable)  # Used for Slash Golf tournament ID
 ├── start_date, end_date (date)
 ├── par (integer, default 72)           # Added for score-to-par
 ├── cut_round (integer, default 2)
@@ -294,6 +297,55 @@ Returns:
 }
 ```
 
+### GET /api/golf/tournaments
+
+Query params:
+- `year` - PGA Tour season year (defaults to current year)
+- `tournId` - If provided, returns player field for that tournament
+- `action=leaderboard` - If provided with tournId, returns scores
+
+Returns:
+```typescript
+// List tournaments
+{ tournaments: GolfTournament[] }
+
+// Get field
+{ players: GolfPlayer[] }
+
+// Get leaderboard
+{ scores: GolfPlayerScore[] }
+```
+
+### POST /api/golf/tournaments
+
+Body:
+```typescript
+{
+  poolId: string
+  tournamentData: {
+    tournId: string      // Slash Golf tournament ID
+    name: string
+    startDate: string    // ISO date string
+    endDate: string
+    venue?: string
+    courseName?: string
+    par?: number
+    status: 'upcoming' | 'in_progress' | 'completed'
+  }
+}
+```
+
+Returns:
+```typescript
+{
+  success: boolean
+  tournamentId: string
+  importedCount: number
+  totalPlayers: number
+  fieldError?: string   // If field couldn't be fetched
+}
+```
+
 ### POST /api/golf/demo
 
 Body:
@@ -302,6 +354,64 @@ Body:
   poolId: string
   action: 'seed' | 'simulate' | 'reset'
 }
+```
+
+---
+
+## Slash Golf API Integration
+
+### Overview
+
+We use the **Slash Golf API** (via RapidAPI) for PGA Tour data. This is a cost-effective alternative to Sportradar.
+
+### Pricing Tiers
+
+| Plan | Calls/month | Price |
+|------|-------------|-------|
+| Free | 250 | $0 |
+| Pro | 2,000 | $20 |
+| Ultra | 20,000 | $50 |
+| Mega | Unlimited | $100 |
+
+### Endpoints Used
+
+| Endpoint | Purpose |
+|----------|---------|
+| GET /schedule | Tournament list for a year |
+| GET /tournament | Player field (entry list) |
+| GET /leaderboard | Live scores |
+| GET /stats | World rankings (OWGR) |
+| GET /players | Player search |
+
+### API Response Format
+
+The Slash Golf API returns data in **MongoDB Extended JSON format**. Key differences:
+- Dates: `{ "$date": { "$numberLong": "1736467200000" } }`
+- Numbers: `{ "$numberInt": "100000" }` or `{ "$numberLong": "..." }`
+
+Our client includes helper functions to parse these:
+- `parseMongoDate()` - Converts to ISO date string
+- `parseMongoNumber()` - Converts to JavaScript number
+
+### Field Availability Note
+
+Tournament fields are typically **not available until ~1 week before** the tournament starts. If you try to import a tournament too early, the field will be empty. You can:
+1. Wait until the field is announced
+2. Add golfers manually via the tier editor
+
+### Environment Variables
+
+```
+# Slash Golf API (via RapidAPI)
+RAPIDAPI_KEY=your_api_key_here
+```
+
+### API Client Location
+
+```
+frontend/src/lib/slashgolf/
+├── client.ts    # SlashGolfClient class with all methods
+└── types.ts     # Response types and parsing helpers
 ```
 
 ---
@@ -348,16 +458,6 @@ Body:
 
 ---
 
-## Environment Variables
-
-```
-# Sportradar (not yet used - demo mode works without it)
-SPORTRADAR_API_KEY=xxx
-SPORTRADAR_BASE_URL=https://api.sportradar.com/golf/production/pga/v3
-```
-
----
-
 ## Testing Checklist
 
 - [x] Create golf pool from org page
@@ -372,6 +472,8 @@ SPORTRADAR_BASE_URL=https://api.sportradar.com/golf/production/pga/v3
 - [ ] Multiple entries per user
 - [x] Proxy entry management (commissioner can edit any entry via /golf/entries)
 - [ ] Public standings URL
+- [x] Import tournament from Slash Golf API
+- [ ] Live score sync from Slash Golf API
 
 ---
 
@@ -379,8 +481,8 @@ SPORTRADAR_BASE_URL=https://api.sportradar.com/golf/production/pga/v3
 
 1. **Manual score entry**: `/golf/scores` page returns 404
 2. **Public URL**: No `/view/[slug]` route for sharing standings
-3. **Sportradar live sync**: API client exists but not integrated
-4. **Pick locking**: Lock time not enforced server-side (demo mode bypasses)
+3. **Pick locking**: Lock time not enforced server-side (demo mode bypasses)
+4. **Live sync**: Automatic score updates from Slash Golf API not implemented yet
 
 ---
 
@@ -397,9 +499,11 @@ SPORTRADAR_BASE_URL=https://api.sportradar.com/golf/production/pga/v3
 | Standings wrapper | `frontend/src/components/golf/golf-standings-wrapper.tsx` |
 | Standings API | `frontend/src/app/api/golf/standings/route.ts` |
 | Demo API | `frontend/src/app/api/golf/demo/route.ts` |
+| Tournaments API | `frontend/src/app/api/golf/tournaments/route.ts` |
+| Slash Golf client | `frontend/src/lib/slashgolf/client.ts` |
+| Slash Golf types | `frontend/src/lib/slashgolf/types.ts` |
 | Scoring utilities | `frontend/src/lib/golf/scoring.ts` |
 | Validation | `frontend/src/lib/golf/validation.ts` |
 | Types | `frontend/src/lib/golf/types.ts` |
 | Demo data | `frontend/src/lib/golf/demo-data.ts` |
-| Sportradar client | `frontend/src/lib/sportradar/client.ts` |
 | Database types | `frontend/src/types/database.ts` |
