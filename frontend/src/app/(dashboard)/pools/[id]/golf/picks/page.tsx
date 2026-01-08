@@ -3,13 +3,12 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { ArrowLeft, Loader2, Search, Check, X, Clock, AlertCircle, User, Globe, Trophy, Info } from 'lucide-react'
+import { ArrowLeft, Loader2, Search, Check, X, Clock, AlertCircle, User, Globe, Trophy } from 'lucide-react'
 import Link from 'next/link'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { getTierColor, getTierLabel, getTierPoints } from '@/lib/golf/types'
 import { validateRoster, getTierPointsSummary } from '@/lib/golf/validation'
 import { arePicksLocked, getTimeUntilLock } from '@/lib/golf/scoring'
@@ -481,88 +480,68 @@ export default function GolfPicksPage() {
         />
       </div>
 
-      {/* Golfer Grid by Tier */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {/* Golfer Table by Tier */}
+      <div className="border rounded-lg overflow-hidden">
         {Array.from({ length: 7 }, (_, tier) => {
           const tierGolfers = golfersByTier.get(tier) || []
           if (tierGolfers.length === 0) return null
-          
+
+          // Tier colors matching the screenshot style
+          const tierBgColor = tier <= 1 ? 'bg-blue-900' : tier <= 3 ? 'bg-blue-800' : 'bg-amber-500'
+          const tierTextColor = 'text-white'
+
           return (
-            <Card key={tier}>
-              <CardHeader className="py-3">
-                <CardTitle className={cn('text-sm font-medium flex items-center justify-between')}>
-                  <span className={cn('px-2 py-1 rounded text-white', getTierColor(tier))}>
-                    {getTierLabel(tier)}
-                  </span>
-                  <span className="text-muted-foreground text-xs">
-                    {getTierPoints(tier)} pts
-                  </span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="space-y-1">
-                  {tierGolfers.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No golfers</p>
-                  ) : (
-                    tierGolfers.map(golfer => {
-                      const isSelected = picks.some(p => p.golferId === golfer.id)
-                      const canSelect = !isLocked && (isSelected || picks.length < 6)
+            <div key={tier}>
+              {/* Tier Header */}
+              <div className={cn('px-4 py-2 font-bold text-center text-sm', tierBgColor, tierTextColor)}>
+                TIER {tier === 0 ? '0 (Elite)' : tier}
+              </div>
 
-                      return (
-                        <div key={golfer.id} className="flex items-center gap-1">
-                          {/* Main golfer button with HoverCard for desktop */}
-                          <HoverCard openDelay={300} closeDelay={100}>
-                            <HoverCardTrigger asChild>
-                              <button
-                                onClick={() => !isLocked && toggleGolfer(golfer)}
-                                disabled={isLocked || (!isSelected && picks.length >= 6)}
-                                className={cn(
-                                  'flex-1 text-left px-3 py-2 rounded-md transition-colors text-sm',
-                                  isSelected
-                                    ? 'bg-primary text-primary-foreground'
-                                    : canSelect
-                                    ? 'hover:bg-muted'
-                                    : 'opacity-50 cursor-not-allowed'
-                                )}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <span>{golfer.name}</span>
-                                  {isSelected && <Check className="h-4 w-4" />}
-                                </div>
-                                <div className="text-xs opacity-70">{golfer.country}</div>
-                              </button>
-                            </HoverCardTrigger>
-                            <HoverCardContent side="right" align="start" className="w-72 hidden md:block">
-                              <GolferInfoContent golfer={golfer} />
-                            </HoverCardContent>
-                          </HoverCard>
+              {/* Golfers Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 border-b last:border-b-0">
+                {tierGolfers.map((golfer) => {
+                  const isSelected = picks.some(p => p.golferId === golfer.id)
+                  const canSelect = !isLocked && (isSelected || picks.length < 6)
 
-                          {/* Info icon with Popover for mobile (tap-friendly) */}
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <button
-                                className={cn(
-                                  'p-1.5 rounded-md transition-colors',
-                                  isSelected
-                                    ? 'text-primary-foreground/70 hover:text-primary-foreground'
-                                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                                )}
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <Info className="h-4 w-4" />
-                              </button>
-                            </PopoverTrigger>
-                            <PopoverContent side="left" align="start" className="w-72">
-                              <GolferInfoContent golfer={golfer} />
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                      )
-                    })
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                  return (
+                    <HoverCard key={golfer.id} openDelay={300} closeDelay={100}>
+                      <HoverCardTrigger asChild>
+                        <button
+                          onClick={() => !isLocked && toggleGolfer(golfer)}
+                          disabled={isLocked || (!isSelected && picks.length >= 6)}
+                          className={cn(
+                            'relative px-3 py-3 text-sm font-medium text-center border-r border-b last:border-r-0 transition-all',
+                            'md:[&:nth-child(4n)]:border-r-0',
+                            '[&:nth-child(2n)]:border-r-0 md:[&:nth-child(2n)]:border-r',
+                            isSelected
+                              ? 'bg-green-600 text-white'
+                              : canSelect
+                              ? 'bg-slate-100 hover:bg-slate-200'
+                              : 'bg-slate-100 opacity-50 cursor-not-allowed'
+                          )}
+                        >
+                          <span className="block truncate">
+                            {golfer.name.split(' ').map((part, i, arr) =>
+                              i === arr.length - 1 ? part.toUpperCase() : `${part.charAt(0)}. `
+                            ).join('')}
+                          </span>
+                          {isSelected && (
+                            <Check className="absolute top-1 right-1 h-4 w-4" />
+                          )}
+                        </button>
+                      </HoverCardTrigger>
+                      <HoverCardContent side="top" align="center" className="w-72">
+                        <GolferInfoContent golfer={golfer} />
+                        {/* Mobile-friendly tap hint */}
+                        <p className="text-xs text-muted-foreground mt-2 md:hidden">
+                          Tap name to {isSelected ? 'deselect' : 'select'}
+                        </p>
+                      </HoverCardContent>
+                    </HoverCard>
+                  )
+                })}
+              </div>
+            </div>
           )
         })}
       </div>
