@@ -7,7 +7,7 @@ import {
   shuffleArray,
 } from '@/lib/madness'
 
-type DemoAction = 'seed' | 'simulate_round' | 'reset'
+type DemoAction = 'seed' | 'seed_teams' | 'seed_entries' | 'simulate_round' | 'reset'
 
 export async function POST(request: NextRequest) {
   try {
@@ -92,6 +92,12 @@ export async function POST(request: NextRequest) {
     switch (action) {
       case 'seed':
         return await seedDemoData(supabase, mmPoolId, mmPool.pool_id)
+
+      case 'seed_teams':
+        return await seedDemoTeams(supabase, mmPoolId)
+
+      case 'seed_entries':
+        return await seedDemoEntries(supabase, mmPoolId)
 
       case 'simulate_round':
         return await simulateNextRound(supabase, mmPoolId)
@@ -306,5 +312,150 @@ async function resetPool(
   return NextResponse.json({
     success: true,
     message: 'Pool reset to post-setup state',
+  })
+}
+
+async function seedDemoTeams(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  mmPoolId: string
+) {
+  // Check if teams already exist
+  const { count: existingTeams } = await supabase
+    .from('mm_pool_teams')
+    .select('*', { count: 'exact', head: true })
+    .eq('mm_pool_id', mmPoolId)
+
+  if (existingTeams && existingTeams > 0) {
+    return NextResponse.json(
+      { error: 'Teams already exist. Reset the pool first or delete existing teams.' },
+      { status: 400 }
+    )
+  }
+
+  // Get or create bb_teams for demo teams
+  const teamIds: Map<string, string> = new Map()
+
+  for (const demoTeam of DEMO_TEAMS) {
+    // Check if team exists
+    let { data: existingTeam } = await supabase
+      .from('bb_teams')
+      .select('id')
+      .eq('name', demoTeam.name)
+      .single()
+
+    if (!existingTeam) {
+      // Create team
+      const { data: newTeam, error } = await supabase
+        .from('bb_teams')
+        .insert({ name: demoTeam.name, abbrev: demoTeam.abbrev })
+        .select('id')
+        .single()
+
+      if (error) {
+        console.error('Error creating team:', error)
+        continue
+      }
+      existingTeam = newTeam
+    }
+
+    if (existingTeam) {
+      teamIds.set(`${demoTeam.region}-${demoTeam.seed}`, existingTeam.id)
+    }
+  }
+
+  // Create mm_pool_teams
+  const poolTeamsToInsert = DEMO_TEAMS.map(demoTeam => ({
+    mm_pool_id: mmPoolId,
+    team_id: teamIds.get(`${demoTeam.region}-${demoTeam.seed}`)!,
+    seed: demoTeam.seed,
+    region: demoTeam.region,
+  })).filter(t => t.team_id)
+
+  const { error: poolTeamsError } = await supabase
+    .from('mm_pool_teams')
+    .insert(poolTeamsToInsert)
+
+  if (poolTeamsError) {
+    console.error('Error creating pool teams:', poolTeamsError)
+    return NextResponse.json(
+      { error: 'Failed to create pool teams' },
+      { status: 500 }
+    )
+  }
+
+  return NextResponse.json({
+    success: true,
+    message: 'Demo bracket seeded with 64 teams',
+    teams_created: poolTeamsToInsert.length,
+  })
+}
+
+async function seedDemoEntries(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  mmPoolId: string
+) {
+  // Check current entry count
+  const { count: existingEntries } = await supabase
+    .from('mm_entries')
+    .select('*', { count: 'exact', head: true })
+    .eq('mm_pool_id', mmPoolId)
+    .eq('status', 'approved')
+
+  const currentCount = existingEntries ?? 0
+  const spotsRemaining = 64 - currentCount
+
+  if (spotsRemaining <= 0) {
+    return NextResponse.json(
+      { error: 'Pool already has 64 entries' },
+      { status: 400 }
+    )
+  }
+
+  // Get existing names to avoid duplicates
+  const { data: existingNames } = await supabase
+    .from('mm_entries')
+    .select('display_name')
+    .eq('mm_pool_id', mmPoolId)
+
+  const usedNames = new Set(existingNames?.map(e => e.display_name?.toLowerCase()) ?? [])
+
+  // Filter out already-used names and shuffle
+  const availableNames = DEMO_PLAYER_NAMES.filter(
+    name => !usedNames.has(name.toLowerCase())
+  )
+  const shuffledNames = shuffleArray(availableNames)
+  const namesToAdd = shuffledNames.slice(0, spotsRemaining)
+
+  if (namesToAdd.length === 0) {
+    return NextResponse.json(
+      { error: 'No more demo names available' },
+      { status: 400 }
+    )
+  }
+
+  // Create entries (without user_id - these are placeholder entries)
+  const entriesToInsert = namesToAdd.map(name => ({
+    mm_pool_id: mmPoolId,
+    display_name: name,
+    status: 'approved',
+  }))
+
+  const { error: entriesError } = await supabase
+    .from('mm_entries')
+    .insert(entriesToInsert)
+
+  if (entriesError) {
+    console.error('Error creating entries:', entriesError)
+    return NextResponse.json(
+      { error: 'Failed to create entries: ' + entriesError.message },
+      { status: 500 }
+    )
+  }
+
+  return NextResponse.json({
+    success: true,
+    message: `Added ${namesToAdd.length} demo entries`,
+    entries_added: namesToAdd.length,
+    total_entries: currentCount + namesToAdd.length,
   })
 }

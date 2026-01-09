@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { RandomDrawButton, AddEntryDialog, EntryRequestActions, PublicLinkManager } from '@/components/march-madness'
+import { RandomDrawButton, AddEntryDialog, EntryRequestActions, PublicLinkManager, DemoSeedButton } from '@/components/march-madness'
 import { DeleteEntryButton } from '@/components/march-madness/delete-entry-button'
 
 interface PageProps {
@@ -139,6 +139,9 @@ export default async function MarchMadnessEntriesPage({ params }: PageProps) {
           <Badge variant={approvedEntries.length === 64 ? 'default' : 'secondary'} className="text-lg px-3 py-1">
             {approvedEntries.length} / 64
           </Badge>
+          {!mmPool.draw_completed && (
+            <DemoSeedButton mmPoolId={mmPool.id} variant="entries" />
+          )}
           <AddEntryDialog
             mmPoolId={mmPool.id}
             currentEntryCount={approvedEntries.length}

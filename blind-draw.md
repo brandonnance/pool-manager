@@ -1,8 +1,58 @@
 # March Madness Blind Draw - Implementation Plan
 
 > **Pool Type #3** from [FUTURE_POOLS.md](FUTURE_POOLS.md)
-> **Status:** PLANNED - Ready to implement
+> **Status:** IN PROGRESS - Core functionality complete
 > **Target:** March 2025 (or later)
+
+---
+
+## Implementation Status
+
+### Completed
+- [x] **Phase 1: Database Schema** - All mm_* tables created with RLS policies
+- [x] **Phase 2: Site Settings & Types** - march_madness enabled, types regenerated
+- [x] **Phase 3: Pool Creation** - march_madness pool type in create-pool-button
+- [x] **Phase 4: Pool Detail Page** - Conditional rendering for march_madness
+- [x] **Phase 5: Components** - All core components created:
+  - `march-madness-content.tsx` - Main wrapper with commissioner tools
+  - `bracket-view.tsx` - Desktop bracket layout (4 regions, gap-tuned alignment)
+  - `standings-table.tsx` - Entry standings with elimination status
+  - `team-draw-display.tsx` - Shows team assignments
+  - `game-card.tsx` - Individual game display
+  - `enter-score-dialog.tsx` - Commissioner score entry
+  - `enter-spread-dialog.tsx` - Commissioner spread entry
+  - `random-draw-button.tsx` - Random team assignment
+  - `team-selector.tsx` - Select teams from bb_teams
+  - `add-entry-dialog.tsx` - Add entries to pool
+  - `delete-entry-button.tsx` - Remove entries
+  - `entry-request-actions.tsx` - Approve/reject entry requests
+  - `public-link-manager.tsx` - Manage join links
+  - `join-pool-button.tsx` - Public join functionality
+  - `demo-seed-button.tsx` - Seed demo data
+- [x] **Phase 6: Pages** - All pages created:
+  - `/pools/[id]/march-madness/setup` - Team setup, seed assignment
+  - `/pools/[id]/march-madness/entries` - Entry management, random draw
+  - `/pools/[id]/march-madness/games` - Enter scores page
+- [x] **Phase 7: Library** - Core library files:
+  - `lib/madness/scoring.ts` - Spread cover calculations
+  - `lib/madness/types.ts` - API response types
+  - `api/madness/demo/route.ts` - Demo data seeding
+  - `api/madness/scores/route.ts` - Score entry API
+- [x] **Database Trigger** - `mm_process_game_result()` handles:
+  - Spread cover calculation
+  - Push rule handling (higher_seed_advances, lower_seed_advances, coin_flip)
+  - Entry elimination
+  - Team elimination
+  - Team transfer to advancing entry
+
+### In Progress
+- [ ] Next round game population - When a game is marked final, populate the next round game with advancing team/entry
+- [ ] Bracket view mobile improvements
+
+### Not Started
+- [ ] External API integration (SportsDataIO, Odds API)
+- [ ] Edge function for auto-sync
+- [ ] Payout tracking and display
 
 ---
 

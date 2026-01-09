@@ -2,6 +2,7 @@
 export { AddEntryDialog } from './add-entry-dialog'
 export { BracketView } from './bracket-view'
 export { DeleteEntryButton } from './delete-entry-button'
+export { DemoSeedButton } from './demo-seed-button'
 export { EnterScoreDialog } from './enter-score-dialog'
 export { EnterSpreadDialog } from './enter-spread-dialog'
 export { EntryRequestActions } from './entry-request-actions'

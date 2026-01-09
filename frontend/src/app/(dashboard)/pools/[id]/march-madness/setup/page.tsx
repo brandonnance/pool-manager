@@ -3,7 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { TeamSelector } from '@/components/march-madness'
+import { TeamSelector, DemoSeedButton } from '@/components/march-madness'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -104,16 +104,21 @@ export default async function MarchMadnessSetupPage({ params }: PageProps) {
         </ol>
       </nav>
 
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Tournament Setup</h1>
           <p className="text-muted-foreground">
             Add the 64 tournament teams with their seeds and regions
           </p>
         </div>
-        <Badge variant={poolTeams && poolTeams.length === 64 ? 'default' : 'secondary'} className="text-lg px-3 py-1">
-          {poolTeams?.length ?? 0} / 64 Teams
-        </Badge>
+        <div className="flex items-center gap-3">
+          <Badge variant={poolTeams && poolTeams.length === 64 ? 'default' : 'secondary'} className="text-lg px-3 py-1">
+            {poolTeams?.length ?? 0} / 64 Teams
+          </Badge>
+          {(!poolTeams || poolTeams.length === 0) && !mmPool.draw_completed && (
+            <DemoSeedButton mmPoolId={mmPool.id} variant="teams" />
+          )}
+        </div>
       </div>
 
       {mmPool.draw_completed && (

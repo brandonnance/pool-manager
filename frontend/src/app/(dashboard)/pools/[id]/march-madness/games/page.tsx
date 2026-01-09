@@ -3,21 +3,20 @@ import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { GameCard } from '@/components/march-madness'
+import { EnterScoreDialog, EnterSpreadDialog } from '@/components/march-madness'
 
 interface PageProps {
   params: Promise<{ id: string }>
 }
 
-const ROUND_ORDER = ['R64', 'R32', 'S16', 'E8', 'F4', 'FINAL'] as const
+const ROUND_ORDER = ['R64', 'R32', 'S16', 'E8', 'F4', 'Final']
 const ROUND_LABELS: Record<string, string> = {
-  R64: 'Round of 64',
-  R32: 'Round of 32',
-  S16: 'Sweet 16',
-  E8: 'Elite 8',
-  F4: 'Final Four',
-  FINAL: 'Championship',
+  'R64': 'Round of 64',
+  'R32': 'Round of 32',
+  'S16': 'Sweet 16',
+  'E8': 'Elite 8',
+  'F4': 'Final Four',
+  'Final': 'Championship',
 }
 
 export default async function MarchMadnessGamesPage({ params }: PageProps) {
@@ -80,42 +79,34 @@ export default async function MarchMadnessGamesPage({ params }: PageProps) {
     notFound()
   }
 
-  // Get entries
-  const { data: entries } = await supabase
-    .from('mm_entries')
-    .select('*')
-    .eq('mm_pool_id', mmPool.id)
-
-  // Get pool teams
-  const { data: poolTeams } = await supabase
-    .from('mm_pool_teams')
-    .select('*, bb_teams (id, name, abbrev)')
-    .eq('mm_pool_id', mmPool.id)
-
-  // Get games
+  // Get all games
   const { data: games } = await supabase
     .from('mm_games')
     .select('*')
     .eq('mm_pool_id', mmPool.id)
     .order('round')
+    .order('region')
     .order('game_number')
 
+  // Get pool teams for team names
+  const { data: poolTeams } = await supabase
+    .from('mm_pool_teams')
+    .select('*, bb_teams (id, name, abbrev)')
+    .eq('mm_pool_id', mmPool.id)
+
+  const teamById = new Map(poolTeams?.map(t => [t.id, t]) ?? [])
+
   // Group games by round
-  const gamesByRound = new Map<string, typeof games>()
-  ROUND_ORDER.forEach(round => {
-    gamesByRound.set(
-      round,
-      games?.filter(g => g.round === round).sort((a, b) => (a.game_number || 0) - (b.game_number || 0)) ?? []
-    )
-  })
+  const gamesByRound = ROUND_ORDER.map(round => ({
+    round,
+    label: ROUND_LABELS[round],
+    games: (games ?? []).filter(g => g.round === round),
+  })).filter(r => r.games.length > 0)
 
-  // Find first round with games
-  const firstRoundWithGames = ROUND_ORDER.find(r => (gamesByRound.get(r)?.length ?? 0) > 0) || 'R64'
-
-  // Calculate stats
+  // Count stats
   const totalGames = games?.length ?? 0
   const completedGames = games?.filter(g => g.status === 'final').length ?? 0
-  const gamesWithSpread = games?.filter(g => g.spread !== null).length ?? 0
+  const inProgressGames = games?.filter(g => g.status === 'in_progress').length ?? 0
 
   return (
     <div>
@@ -144,95 +135,167 @@ export default async function MarchMadnessGamesPage({ params }: PageProps) {
         </ol>
       </nav>
 
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">Manage Games</h1>
-        <p className="text-muted-foreground">Enter spreads and scores for each game</p>
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Enter Scores</h1>
+          <p className="text-muted-foreground">
+            Enter game scores and mark games as final
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Badge variant="secondary" className="text-sm px-3 py-1">
+            {completedGames}/{totalGames} Complete
+          </Badge>
+          {inProgressGames > 0 && (
+            <Badge className="bg-amber-500 text-sm px-3 py-1">
+              {inProgressGames} Live
+            </Badge>
+          )}
+        </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        <Card>
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold">{totalGames}</p>
-            <p className="text-sm text-muted-foreground">Total Games</p>
+      {!mmPool.draw_completed && (
+        <Card className="mb-6 border-amber-300 bg-amber-50">
+          <CardContent className="py-4">
+            <p className="text-amber-800">
+              <strong>Note:</strong> The team draw has not been completed yet.
+              Run the draw first before entering scores.
+            </p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold">{gamesWithSpread}</p>
-            <p className="text-sm text-muted-foreground">Spreads Set</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold">{completedGames}</p>
-            <p className="text-sm text-muted-foreground">Completed</p>
-          </CardContent>
-        </Card>
-      </div>
+      )}
 
       {totalGames === 0 ? (
         <Card>
           <CardContent className="py-8 text-center">
-            <h3 className="text-lg font-semibold mb-2">No Games Yet</h3>
             <p className="text-muted-foreground">
-              Games will be created after the team draw is completed.
+              No games have been created yet. Complete the team draw to generate games.
             </p>
           </CardContent>
         </Card>
       ) : (
-        <Tabs defaultValue={firstRoundWithGames}>
-          <TabsList className="grid grid-cols-6 mb-4">
-            {ROUND_ORDER.map(round => {
-              const roundGames = gamesByRound.get(round) || []
-              const completed = roundGames.filter(g => g.status === 'final').length
-              return (
-                <TabsTrigger
-                  key={round}
-                  value={round}
-                  disabled={roundGames.length === 0}
-                  className="text-xs sm:text-sm"
-                >
-                  {ROUND_LABELS[round].replace('Round of ', 'R')}
-                  {roundGames.length > 0 && (
-                    <Badge variant="secondary" className="ml-1 text-xs hidden sm:inline-flex">
-                      {completed}/{roundGames.length}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-              )
-            })}
-          </TabsList>
+        <div className="space-y-6">
+          {gamesByRound.map(({ round, label, games: roundGames }) => (
+            <Card key={round}>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center justify-between">
+                  <span>{label}</span>
+                  <Badge variant="outline">
+                    {roundGames.filter(g => g.status === 'final').length}/{roundGames.length}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {roundGames.map((game) => {
+                    const higherTeam = teamById.get(game.higher_seed_team_id)
+                    const lowerTeam = teamById.get(game.lower_seed_team_id)
 
-          {ROUND_ORDER.map(round => {
-            const roundGames = gamesByRound.get(round) || []
-            return (
-              <TabsContent key={round} value={round}>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                  {roundGames.map(game => (
-                    <GameCard
-                      key={game.id}
-                      game={game}
-                      poolTeams={poolTeams ?? []}
-                      entries={entries ?? []}
-                      currentUserId={user.id}
-                      isCommissioner={true}
-                    />
-                  ))}
+                    const isFinal = game.status === 'final'
+                    const isLive = game.status === 'in_progress'
+                    const hasScores = game.higher_seed_score !== null && game.lower_seed_score !== null
+
+                    const higherWins = hasScores && game.higher_seed_score > game.lower_seed_score
+                    const lowerWins = hasScores && game.lower_seed_score > game.higher_seed_score
+
+                    return (
+                      <div
+                        key={game.id}
+                        className={`rounded-lg border p-3 ${
+                          isFinal
+                            ? 'bg-muted/30'
+                            : isLive
+                            ? 'border-amber-300 bg-amber-50'
+                            : 'bg-card'
+                        }`}
+                      >
+                        {/* Game header */}
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-muted-foreground">
+                            {game.region ? `${game.region} Region` : 'Final Four'}
+                          </span>
+                          <Badge
+                            variant={isFinal ? 'secondary' : isLive ? 'default' : 'outline'}
+                            className={isLive ? 'bg-amber-500' : ''}
+                          >
+                            {isFinal ? 'Final' : isLive ? 'Live' : 'Scheduled'}
+                          </Badge>
+                        </div>
+
+                        {/* Teams */}
+                        <div className="space-y-2 mb-3">
+                          {/* Higher seed */}
+                          <div className={`flex items-center justify-between ${
+                            higherWins && isFinal ? 'font-semibold text-emerald-700' : ''
+                          }`}>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground w-4">
+                                {higherTeam?.seed}
+                              </span>
+                              <span className="truncate text-sm">
+                                {higherTeam?.bb_teams?.abbrev || higherTeam?.bb_teams?.name || 'TBD'}
+                              </span>
+                            </div>
+                            <span className="font-mono font-bold">
+                              {game.higher_seed_score ?? '-'}
+                            </span>
+                          </div>
+
+                          {/* Lower seed */}
+                          <div className={`flex items-center justify-between ${
+                            lowerWins && isFinal ? 'font-semibold text-emerald-700' : ''
+                          }`}>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground w-4">
+                                {lowerTeam?.seed}
+                              </span>
+                              <span className="truncate text-sm">
+                                {lowerTeam?.bb_teams?.abbrev || lowerTeam?.bb_teams?.name || 'TBD'}
+                              </span>
+                            </div>
+                            <span className="font-mono font-bold">
+                              {game.lower_seed_score ?? '-'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Spread info */}
+                        {game.spread !== null && (
+                          <div className="text-xs text-muted-foreground mb-2">
+                            Spread: {game.spread > 0 ? '+' : ''}{game.spread}
+                          </div>
+                        )}
+
+                        {/* Actions */}
+                        <div className="flex gap-2">
+                          {game.spread === null && game.status === 'scheduled' && (
+                            <EnterSpreadDialog
+                              gameId={game.id}
+                              higherSeedTeamName={higherTeam?.bb_teams?.name || 'Higher Seed'}
+                              lowerSeedTeamName={lowerTeam?.bb_teams?.name || 'Lower Seed'}
+                              currentSpread={game.spread}
+                            />
+                          )}
+                          <EnterScoreDialog
+                            gameId={game.id}
+                            higherSeedTeamName={higherTeam?.bb_teams?.name || 'Higher Seed'}
+                            lowerSeedTeamName={lowerTeam?.bb_teams?.name || 'Lower Seed'}
+                            higherSeedSeed={higherTeam?.seed || 0}
+                            lowerSeedSeed={lowerTeam?.seed || 0}
+                            currentHigherScore={game.higher_seed_score}
+                            currentLowerScore={game.lower_seed_score}
+                            currentStatus={game.status}
+                            spread={game.spread}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
-                {roundGames.length === 0 && (
-                  <Card>
-                    <CardContent className="py-8 text-center">
-                      <p className="text-muted-foreground">
-                        No games in this round yet
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
-            )
-          })}
-        </Tabs>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       )}
     </div>
   )
