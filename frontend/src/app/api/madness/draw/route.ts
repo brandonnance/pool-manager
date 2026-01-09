@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { shuffleArray, generateRound64Games } from '@/lib/madness'
+import { shuffleArray, generateAllTournamentGames } from '@/lib/madness'
 
 export async function POST(request: NextRequest) {
   try {
@@ -150,18 +150,26 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Generate Round of 64 games
-    const round64Games = generateRound64Games(teams.map(t => ({
+    // Generate ALL 63 tournament games (R64 through FINAL)
+    const allGames = generateAllTournamentGames(teams.map(t => ({
       id: t.id,
       seed: t.seed,
       region: t.region,
     })))
 
     // Create game records
-    for (const game of round64Games) {
-      // Find entries for each team
-      const higherSeedEntry = assignments.find(a => a.team_id === game.higher_seed_team_id)
-      const lowerSeedEntry = assignments.find(a => a.team_id === game.lower_seed_team_id)
+    for (const game of allGames) {
+      // For R64 games, find entries for each team
+      // Later rounds have null teams/entries until populated by trigger
+      let higherSeedEntryId: string | undefined
+      let lowerSeedEntryId: string | undefined
+
+      if (game.round === 'R64' && game.higher_seed_team_id && game.lower_seed_team_id) {
+        const higherSeedEntry = assignments.find(a => a.team_id === game.higher_seed_team_id)
+        const lowerSeedEntry = assignments.find(a => a.team_id === game.lower_seed_team_id)
+        higherSeedEntryId = higherSeedEntry?.entry_id
+        lowerSeedEntryId = lowerSeedEntry?.entry_id
+      }
 
       const { error: gameError } = await supabase.from('mm_games').insert({
         mm_pool_id: mmPoolId,
@@ -171,8 +179,8 @@ export async function POST(request: NextRequest) {
         higher_seed_team_id: game.higher_seed_team_id,
         lower_seed_team_id: game.lower_seed_team_id,
         spread: game.spread,
-        higher_seed_entry_id: higherSeedEntry?.entry_id,
-        lower_seed_entry_id: lowerSeedEntry?.entry_id,
+        higher_seed_entry_id: higherSeedEntryId,
+        lower_seed_entry_id: lowerSeedEntryId,
         status: 'scheduled',
       })
 
@@ -180,6 +188,8 @@ export async function POST(request: NextRequest) {
         console.error('Error creating game:', gameError)
       }
     }
+
+    const r64Count = allGames.filter(g => g.round === 'R64').length
 
     // Mark draw as completed
     const { error: completeError } = await supabase
@@ -202,7 +212,8 @@ export async function POST(request: NextRequest) {
       success: true,
       message: 'Draw completed successfully',
       assignments,
-      games_created: round64Games.length,
+      games_created: allGames.length,
+      r64_games: r64Count,
     })
   } catch (error) {
     console.error('Draw error:', error)

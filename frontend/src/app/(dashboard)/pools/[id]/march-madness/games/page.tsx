@@ -188,15 +188,15 @@ export default async function MarchMadnessGamesPage({ params }: PageProps) {
               <CardContent>
                 <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                   {roundGames.map((game) => {
-                    const higherTeam = teamById.get(game.higher_seed_team_id)
-                    const lowerTeam = teamById.get(game.lower_seed_team_id)
+                    const higherTeam = game.higher_seed_team_id ? teamById.get(game.higher_seed_team_id) : undefined
+                    const lowerTeam = game.lower_seed_team_id ? teamById.get(game.lower_seed_team_id) : undefined
 
                     const isFinal = game.status === 'final'
                     const isLive = game.status === 'in_progress'
                     const hasScores = game.higher_seed_score !== null && game.lower_seed_score !== null
 
-                    const higherWins = hasScores && game.higher_seed_score > game.lower_seed_score
-                    const lowerWins = hasScores && game.lower_seed_score > game.higher_seed_score
+                    const higherWins = hasScores && game.higher_seed_score! > game.lower_seed_score!
+                    const lowerWins = hasScores && game.lower_seed_score! > game.higher_seed_score!
 
                     return (
                       <div
@@ -224,7 +224,7 @@ export default async function MarchMadnessGamesPage({ params }: PageProps) {
 
                         {/* Teams */}
                         <div className="space-y-2 mb-3">
-                          {/* Higher seed */}
+                          {/* Higher seed (favorite) */}
                           <div className={`flex items-center justify-between ${
                             higherWins && isFinal ? 'font-semibold text-emerald-700' : ''
                           }`}>
@@ -235,6 +235,11 @@ export default async function MarchMadnessGamesPage({ params }: PageProps) {
                               <span className="truncate text-sm">
                                 {higherTeam?.bb_teams?.abbrev || higherTeam?.bb_teams?.name || 'TBD'}
                               </span>
+                              {game.spread !== null && (
+                                <span className="text-xs text-muted-foreground">
+                                  ({game.spread > 0 ? '+' : ''}{game.spread})
+                                </span>
+                              )}
                             </div>
                             <span className="font-mono font-bold">
                               {game.higher_seed_score ?? '-'}
@@ -258,13 +263,6 @@ export default async function MarchMadnessGamesPage({ params }: PageProps) {
                             </span>
                           </div>
                         </div>
-
-                        {/* Spread info */}
-                        {game.spread !== null && (
-                          <div className="text-xs text-muted-foreground mb-2">
-                            Spread: {game.spread > 0 ? '+' : ''}{game.spread}
-                          </div>
-                        )}
 
                         {/* Actions */}
                         <div className="flex gap-2">

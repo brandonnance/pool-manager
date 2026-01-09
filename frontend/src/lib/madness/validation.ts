@@ -2,7 +2,7 @@
 
 import type { Round, Region } from './types'
 
-export const VALID_ROUNDS: Round[] = ['R64', 'R32', 'S16', 'E8', 'F4', 'FINAL']
+export const VALID_ROUNDS: Round[] = ['R64', 'R32', 'S16', 'E8', 'F4', 'Final']
 export const VALID_REGIONS: Region[] = ['East', 'West', 'South', 'Midwest']
 
 // Number of games per round
@@ -12,7 +12,7 @@ export const GAMES_PER_ROUND: Record<Round, number> = {
   S16: 8,
   E8: 4,
   F4: 2,
-  FINAL: 1,
+  Final: 1,
 }
 
 // Total games in tournament
@@ -183,7 +183,7 @@ export function getExpectedMatchupSeeds(
         [1, 1], // Region winners
         [1, 1],
       ]
-    case 'FINAL':
+    case 'Final':
       return [[1, 1]] // Final Four winners
     default:
       return []

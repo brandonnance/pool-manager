@@ -1,6 +1,6 @@
 // March Madness Blind Draw Types
 
-export type Round = 'R64' | 'R32' | 'S16' | 'E8' | 'F4' | 'FINAL'
+export type Round = 'R64' | 'R32' | 'S16' | 'E8' | 'F4' | 'Final'
 export type Region = 'East' | 'West' | 'South' | 'Midwest'
 export type GameStatus = 'scheduled' | 'in_progress' | 'final'
 export type PushRule = 'favorite_advances' | 'underdog_advances' | 'coin_flip'

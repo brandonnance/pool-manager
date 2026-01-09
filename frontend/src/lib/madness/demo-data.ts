@@ -197,3 +197,127 @@ export function shuffleArray<T>(array: T[]): T[] {
   }
   return shuffled
 }
+
+/**
+ * Generate ALL 63 tournament games (R64, R32, S16, E8, F4, FINAL)
+ * R64 games include team assignments; later rounds have null teams (TBD)
+ */
+export function generateAllTournamentGames(
+  teams: Array<{ id: string; seed: number; region: string }>
+): Array<{
+  round: Round
+  region: string | null
+  game_number: number
+  higher_seed_team_id: string | null
+  lower_seed_team_id: string | null
+  spread: number | null
+}> {
+  const games: Array<{
+    round: Round
+    region: string | null
+    game_number: number
+    higher_seed_team_id: string | null
+    lower_seed_team_id: string | null
+    spread: number | null
+  }> = []
+
+  const matchups = getFirstRoundMatchups()
+  const regions: Region[] = ['East', 'West', 'South', 'Midwest']
+
+  // R64: 32 games (8 per region)
+  let gameNumber = 1
+  for (const region of regions) {
+    const regionTeams = teams.filter(t => t.region === region)
+    const teamBySeed = new Map(regionTeams.map(t => [t.seed, t]))
+
+    for (const [higherSeed, lowerSeed] of matchups) {
+      const higherTeam = teamBySeed.get(higherSeed)
+      const lowerTeam = teamBySeed.get(lowerSeed)
+
+      if (higherTeam && lowerTeam) {
+        games.push({
+          round: 'R64',
+          region,
+          game_number: gameNumber++,
+          higher_seed_team_id: higherTeam.id,
+          lower_seed_team_id: lowerTeam.id,
+          spread: generateSpreadFromSeeds(higherSeed, lowerSeed),
+        })
+      }
+    }
+  }
+
+  // R32: 16 games (4 per region) - teams TBD
+  gameNumber = 1
+  for (const region of regions) {
+    for (let i = 0; i < 4; i++) {
+      games.push({
+        round: 'R32',
+        region,
+        game_number: gameNumber++,
+        higher_seed_team_id: null,
+        lower_seed_team_id: null,
+        spread: null,
+      })
+    }
+  }
+
+  // S16: 8 games (2 per region) - teams TBD
+  gameNumber = 1
+  for (const region of regions) {
+    for (let i = 0; i < 2; i++) {
+      games.push({
+        round: 'S16',
+        region,
+        game_number: gameNumber++,
+        higher_seed_team_id: null,
+        lower_seed_team_id: null,
+        spread: null,
+      })
+    }
+  }
+
+  // E8: 4 games (1 per region) - teams TBD
+  gameNumber = 1
+  for (const region of regions) {
+    games.push({
+      round: 'E8',
+      region,
+      game_number: gameNumber++,
+      higher_seed_team_id: null,
+      lower_seed_team_id: null,
+      spread: null,
+    })
+  }
+
+  // F4: 2 games (cross-region) - teams TBD
+  // Game 1: East vs West, Game 2: South vs Midwest
+  games.push({
+    round: 'F4',
+    region: null,
+    game_number: 1,
+    higher_seed_team_id: null,
+    lower_seed_team_id: null,
+    spread: null,
+  })
+  games.push({
+    round: 'F4',
+    region: null,
+    game_number: 2,
+    higher_seed_team_id: null,
+    lower_seed_team_id: null,
+    spread: null,
+  })
+
+  // Final: 1 game - teams TBD
+  games.push({
+    round: 'Final',
+    region: null,
+    game_number: 1,
+    higher_seed_team_id: null,
+    lower_seed_team_id: null,
+    spread: null,
+  })
+
+  return games
+}

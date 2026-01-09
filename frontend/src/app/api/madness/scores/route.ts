@@ -131,13 +131,14 @@ export async function POST(request: NextRequest) {
 
         updates.advancing_entry_id = advancingEntryId
 
-        // Update eliminated entry
+        // Update eliminated entry - clear their current_team_id since they no longer own a team
         if (eliminatedEntryId) {
           await supabase
             .from('mm_entries')
             .update({
               eliminated: true,
               eliminated_round: game.round,
+              current_team_id: null,
             })
             .eq('id', eliminatedEntryId)
         }

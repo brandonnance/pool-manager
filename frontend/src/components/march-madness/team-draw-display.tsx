@@ -41,18 +41,29 @@ export function TeamDrawDisplay({
 
   // Create lookups
   const teamById = new Map(poolTeams.map(t => [t.id, t]))
-  const entryByTeamId = new Map(
+
+  // Map current_team_id to entry (the entry currently riding this team)
+  // Only include non-eliminated entries - they are the actual current owners
+  // (Eliminated entries may still have current_team_id set from before elimination)
+  const entryByCurrentTeamId = new Map(
     entries
-      .filter(e => e.current_team_id)
+      .filter(e => e.current_team_id && !e.eliminated)
       .map(e => [e.current_team_id!, e])
   )
 
-  // Group teams by region
+  // Group teams by region, sorted by: active teams first (by seed), then eliminated teams (by seed)
   const teamsByRegion = new Map<string, MmPoolTeam[]>()
   REGIONS.forEach(region => {
     const regionTeams = poolTeams
       .filter(t => t.region === region)
-      .sort((a, b) => a.seed - b.seed)
+      .sort((a, b) => {
+        // First sort by eliminated status (active first)
+        if (a.eliminated !== b.eliminated) {
+          return a.eliminated ? 1 : -1
+        }
+        // Then sort by seed
+        return a.seed - b.seed
+      })
     teamsByRegion.set(region, regionTeams)
   })
 
@@ -114,8 +125,10 @@ export function TeamDrawDisplay({
               <CardContent>
                 <div className="space-y-1">
                   {regionTeams.map(team => {
-                    const entry = entryByTeamId.get(team.id)
+                    // Get the entry currently riding this team (if any)
+                    const currentEntry = entryByCurrentTeamId.get(team.id)
                     const isUserTeam = team.id === userCurrentTeam?.id
+                    const isTeamEliminated = team.eliminated
 
                     return (
                       <div
@@ -123,28 +136,33 @@ export function TeamDrawDisplay({
                         className={`flex items-center justify-between p-2 rounded-md text-sm ${
                           isUserTeam
                             ? 'bg-sky-100 border border-sky-300'
-                            : team.eliminated
+                            : isTeamEliminated
                             ? 'bg-muted/30 opacity-50'
                             : 'bg-muted/50'
                         }`}
                       >
                         <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <span className="font-bold text-muted-foreground w-6 text-center">
+                          <span className={`font-bold w-6 text-center ${
+                            isTeamEliminated ? 'text-muted-foreground/50' : 'text-muted-foreground'
+                          }`}>
                             {team.seed}
                           </span>
-                          <span className={`truncate ${team.eliminated ? 'line-through' : ''}`}>
+                          <span className={`truncate ${
+                            isTeamEliminated ? 'line-through text-muted-foreground' : ''
+                          }`}>
                             {team.bb_teams?.name || 'Unknown'}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
-                          {entry && (
+                          {/* Show current owner for active teams, blank for eliminated teams */}
+                          {!isTeamEliminated && currentEntry && (
                             <span className={`text-xs truncate max-w-24 ${
                               isUserTeam ? 'font-semibold text-sky-700' : 'text-muted-foreground'
                             }`}>
-                              {entry.display_name || 'Unknown'}
+                              {currentEntry.display_name || 'Unknown'}
                             </span>
                           )}
-                          {team.eliminated && (
+                          {isTeamEliminated && (
                             <Badge variant="outline" className="text-xs text-red-600 border-red-200">
                               Out
                             </Badge>

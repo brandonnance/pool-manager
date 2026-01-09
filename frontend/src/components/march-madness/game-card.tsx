@@ -131,6 +131,14 @@ export function GameCard({
     }
   }
 
+  // Spread upset: winner !== spread coverer (team won but their owner doesn't advance)
+  const isSpreadUpset = isFinal && winner !== null && spreadCover !== null && winner !== spreadCover
+
+  // For higher seed: spread upset if they won but lower covered, OR they lost but they covered
+  const higherSpreadUpset = isSpreadUpset && (winner === 'higher' || spreadCover === 'higher')
+  // For lower seed: spread upset if they won but higher covered, OR they lost but they covered
+  const lowerSpreadUpset = isSpreadUpset && (winner === 'lower' || spreadCover === 'lower')
+
   return (
     <Card
       className={`overflow-hidden transition-all ${
@@ -171,31 +179,37 @@ export function GameCard({
         <div className="space-y-3">
           {/* Higher seed team */}
           <div className={`flex items-center justify-between p-2 rounded-lg ${
-            winner === 'higher'
-              ? 'bg-emerald-50 border border-emerald-200'
+            higherSpreadUpset && winner === 'higher'
+              ? 'bg-amber-50 border border-amber-300' // Team won but owner eliminated (spread upset)
+              : winner === 'higher' && !isSpreadUpset
+              ? 'bg-emerald-50 border border-emerald-200' // Normal win + cover
+              : isFinal && winner === 'lower'
+              ? 'bg-muted/40 border border-muted' // Team lost (even if owner advances via spread)
               : userIsHigherSeed
               ? 'bg-sky-50 border border-sky-200'
               : 'bg-muted/30'
           }`}>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                <span className={`text-xs font-bold bg-muted px-1.5 py-0.5 rounded ${
+                  higherSpreadUpset && winner === 'higher' ? 'text-amber-700' : winner === 'higher' ? 'text-emerald-700' : 'text-muted-foreground'
+                } ${isFinal && winner === 'lower' ? 'opacity-50' : ''}`}>
                   #{higherSeedTeam?.seed || '?'}
                 </span>
                 <span className={`font-semibold truncate ${
-                  winner === 'higher' ? 'text-emerald-700' : ''
-                }`}>
+                  higherSpreadUpset && winner === 'higher' ? 'text-amber-700' : winner === 'higher' ? 'text-emerald-700' : ''
+                } ${isFinal && winner === 'lower' ? 'line-through decoration-red-400/70 text-muted-foreground' : ''}`}>
                   {higherSeedTeam?.bb_teams?.name || 'TBD'}
                 </span>
               </div>
-              <div className="text-xs text-muted-foreground mt-0.5 truncate">
+              <div className={`text-xs mt-0.5 truncate text-muted-foreground ${isFinal && advancingEntry?.id !== higherSeedEntry?.id ? 'line-through decoration-red-400/70' : ''}`}>
                 {higherSeedEntry?.display_name || 'Unassigned'}
                 {userIsHigherSeed && <span className="ml-1 text-sky-600">(You)</span>}
               </div>
             </div>
             <div className={`text-2xl font-bold tabular-nums ${
-              winner === 'higher' ? 'text-emerald-700' : ''
-            }`}>
+              higherSpreadUpset && winner === 'higher' ? 'text-amber-700' : winner === 'higher' ? 'text-emerald-700' : ''
+            } ${isFinal && winner === 'lower' ? 'opacity-50' : ''}`}>
               {game.higher_seed_score ?? '-'}
             </div>
           </div>
@@ -209,31 +223,37 @@ export function GameCard({
 
           {/* Lower seed team */}
           <div className={`flex items-center justify-between p-2 rounded-lg ${
-            winner === 'lower'
-              ? 'bg-emerald-50 border border-emerald-200'
+            lowerSpreadUpset && winner === 'lower'
+              ? 'bg-amber-50 border border-amber-300' // Team won but owner eliminated (spread upset)
+              : winner === 'lower' && !isSpreadUpset
+              ? 'bg-emerald-50 border border-emerald-200' // Normal win + cover
+              : isFinal && winner === 'higher'
+              ? 'bg-muted/40 border border-muted' // Team lost (even if owner advances via spread)
               : userIsLowerSeed
               ? 'bg-sky-50 border border-sky-200'
               : 'bg-muted/30'
           }`}>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                <span className={`text-xs font-bold bg-muted px-1.5 py-0.5 rounded ${
+                  lowerSpreadUpset && winner === 'lower' ? 'text-amber-700' : winner === 'lower' ? 'text-emerald-700' : 'text-muted-foreground'
+                } ${isFinal && winner === 'higher' ? 'opacity-50' : ''}`}>
                   #{lowerSeedTeam?.seed || '?'}
                 </span>
                 <span className={`font-semibold truncate ${
-                  winner === 'lower' ? 'text-emerald-700' : ''
-                }`}>
+                  lowerSpreadUpset && winner === 'lower' ? 'text-amber-700' : winner === 'lower' ? 'text-emerald-700' : ''
+                } ${isFinal && winner === 'higher' ? 'line-through decoration-red-400/70 text-muted-foreground' : ''}`}>
                   {lowerSeedTeam?.bb_teams?.name || 'TBD'}
                 </span>
               </div>
-              <div className="text-xs text-muted-foreground mt-0.5 truncate">
+              <div className={`text-xs mt-0.5 truncate text-muted-foreground ${isFinal && advancingEntry?.id !== lowerSeedEntry?.id ? 'line-through decoration-red-400/70' : ''}`}>
                 {lowerSeedEntry?.display_name || 'Unassigned'}
                 {userIsLowerSeed && <span className="ml-1 text-sky-600">(You)</span>}
               </div>
             </div>
             <div className={`text-2xl font-bold tabular-nums ${
-              winner === 'lower' ? 'text-emerald-700' : ''
-            }`}>
+              lowerSpreadUpset && winner === 'lower' ? 'text-amber-700' : winner === 'lower' ? 'text-emerald-700' : ''
+            } ${isFinal && winner === 'higher' ? 'opacity-50' : ''}`}>
               {game.lower_seed_score ?? '-'}
             </div>
           </div>
@@ -242,17 +262,17 @@ export function GameCard({
         {/* Spread Cover Result */}
         {isFinal && spreadCover && (
           <div className={`mt-4 p-2 rounded-lg text-center text-sm ${
-            spreadCover === 'higher'
-              ? 'bg-emerald-100 text-emerald-800'
-              : 'bg-amber-100 text-amber-800'
+            isSpreadUpset
+              ? 'bg-amber-100 text-amber-800 border border-amber-300'
+              : 'bg-emerald-100 text-emerald-800'
           }`}>
             <span className="font-semibold">
               {spreadCover === 'higher' ? higherSeedTeam?.bb_teams?.name : lowerSeedTeam?.bb_teams?.name}
             </span>
             {' '}covered the spread
-            {winner !== spreadCover && (
-              <span className="block text-xs mt-0.5 opacity-80">
-                (Upset via spread!)
+            {isSpreadUpset && (
+              <span className="block text-xs mt-0.5 font-medium">
+                Spread upset! {spreadCover === 'higher' ? higherSeedEntry?.display_name : lowerSeedEntry?.display_name} advances with {winner === 'higher' ? higherSeedTeam?.bb_teams?.name : lowerSeedTeam?.bb_teams?.name}
               </span>
             )}
           </div>
@@ -261,8 +281,12 @@ export function GameCard({
         {/* Advancing entry */}
         {isFinal && advancingEntry && (
           <div className={`mt-3 p-2 rounded-lg text-center text-sm font-medium ${
-            userAdvanced
+            userAdvanced && isSpreadUpset
+              ? 'bg-amber-100 text-amber-800 border border-amber-300'
+              : userAdvanced
               ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+              : isSpreadUpset
+              ? 'bg-amber-50 text-amber-800 border border-amber-200'
               : 'bg-muted text-foreground'
           }`}>
             {userAdvanced ? '🎉 You advance!' : `${advancingEntry.display_name} advances`}

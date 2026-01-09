@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { X, Search } from "lucide-react";
 import type { MmGame, MmEntry, MmPoolTeam } from "./game-card";
 
 interface BracketViewProps {
@@ -10,6 +12,109 @@ interface BracketViewProps {
   entries: MmEntry[];
   poolTeams: MmPoolTeam[];
   currentUserId: string | null;
+}
+
+// Entry search component
+interface EntrySearchProps {
+  entries: MmEntry[];
+  selectedEntryId: string | null;
+  onSelect: (entryId: string | null) => void;
+}
+
+function EntrySearch({ entries, selectedEntryId, onSelect }: EntrySearchProps) {
+  const [query, setQuery] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Get the selected entry's display name
+  const selectedEntry = entries.find((e) => e.id === selectedEntryId);
+
+  // Filter entries based on query
+  const filteredEntries = useMemo(() => {
+    if (!query.trim()) return [];
+    const lowerQuery = query.toLowerCase();
+    return entries
+      .filter((e) => e.display_name?.toLowerCase().includes(lowerQuery))
+      .slice(0, 8); // Limit to 8 suggestions
+  }, [entries, query]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node) &&
+        inputRef.current &&
+        !inputRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleSelect = (entry: MmEntry) => {
+    onSelect(entry.id);
+    setQuery("");
+    setIsOpen(false);
+  };
+
+  const handleClear = () => {
+    onSelect(null);
+    setQuery("");
+  };
+
+  return (
+    <div className="relative w-full max-w-xs">
+      <div className="relative">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        {selectedEntry ? (
+          <div className="flex items-center gap-2 pl-8 pr-8 py-2 border rounded-md bg-sky-50 border-sky-200">
+            <span className="text-sm font-medium text-sky-700 truncate">
+              {selectedEntry.display_name}
+            </span>
+            <button
+              onClick={handleClear}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 hover:bg-sky-100 rounded"
+            >
+              <X className="h-4 w-4 text-sky-600" />
+            </button>
+          </div>
+        ) : (
+          <Input
+            ref={inputRef}
+            type="text"
+            placeholder="Search participant..."
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setIsOpen(true);
+            }}
+            onFocus={() => setIsOpen(true)}
+            className="pl-8 pr-4"
+          />
+        )}
+      </div>
+      {isOpen && filteredEntries.length > 0 && !selectedEntry && (
+        <div
+          ref={dropdownRef}
+          className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-auto"
+        >
+          {filteredEntries.map((entry) => (
+            <button
+              key={entry.id}
+              onClick={() => handleSelect(entry)}
+              className="w-full px-3 py-2 text-left text-sm hover:bg-muted transition-colors"
+            >
+              {entry.display_name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 type Region = "East" | "West" | "South" | "Midwest";
@@ -25,6 +130,8 @@ interface TeamSlotProps {
   isAdvancing: boolean;
   isCurrentUser: boolean;
   isEliminated: boolean;
+  isSpreadUpset: boolean; // Team won but owner doesn't advance, OR team lost but owner advances
+  spread?: number | null; // Spread to display (only for higher seed/favorite)
 }
 
 // Matchup box height constant for gap calculations
@@ -40,20 +147,63 @@ function TeamSlot({
   isAdvancing,
   isCurrentUser,
   isEliminated,
+  isSpreadUpset,
+  spread,
 }: TeamSlotProps) {
-  const bgClass = isAdvancing
-    ? "bg-emerald-50"
+  // Determine background and border colors based on state
+  // In spread upset: highlight the WINNING team (amber), mute the losing team
+  // Priority: winner in spread upset (amber) > normal advancing (green) > eliminated (muted) > current user (sky)
+  const bgClass = isSpreadUpset && isWinner
+    ? "bg-amber-50" // Team won (but owner eliminated due to spread)
+    : isSpreadUpset && isAdvancing
+    ? "bg-muted/50 opacity-60" // Team lost but owner advances - still mute the losing team
+    : isAdvancing
+    ? "bg-emerald-50" // Normal advance (team won + covered)
     : isEliminated
     ? "bg-muted/50 opacity-60"
     : isCurrentUser
     ? "bg-sky-50"
     : "bg-background";
 
-  const borderClass = isAdvancing
+  const borderClass = isSpreadUpset && isWinner
+    ? "border-l-amber-500" // Winning team in spread upset
+    : isAdvancing && !isSpreadUpset
     ? "border-l-emerald-500"
     : isCurrentUser
     ? "border-l-sky-500"
     : "border-l-transparent";
+
+  // Separate strikethrough logic for team vs owner
+  // Game is over if someone was eliminated or someone advanced
+  const gameIsOver = isEliminated || isAdvancing;
+  // Team strikethrough: team lost the game (regardless of whether owner advances via spread)
+  const teamLost = gameIsOver && !isWinner;
+  const teamStrikethrough = teamLost ? "line-through decoration-red-400/70" : "";
+  // Owner strikethrough: owner doesn't advance (regardless of team winning)
+  const ownerEliminated = isEliminated && !isAdvancing;
+  const ownerStrikethrough = ownerEliminated ? "line-through decoration-red-400/70" : "";
+
+  // Determine if this team lost (for styling purposes)
+  const isLoser = teamLost;
+
+  // Text colors - winning team gets highlighted, losing team is muted
+  const teamTextClass = isSpreadUpset && isWinner
+    ? "text-amber-700" // Team won but owner eliminated (spread upset)
+    : isSpreadUpset && isAdvancing
+    ? "text-muted-foreground" // Team lost but owner advances - still mute the loser
+    : isWinner && isAdvancing
+    ? "text-emerald-700" // Normal winner + advancer
+    : isWinner
+    ? "text-emerald-700"
+    : isLoser
+    ? "text-muted-foreground"
+    : "";
+
+  const seedTextClass = isSpreadUpset && isWinner
+    ? "text-amber-600" // Winning team in spread upset
+    : isWinner
+    ? "text-emerald-600"
+    : "text-muted-foreground";
 
   return (
     <div
@@ -64,27 +214,28 @@ function TeamSlot({
       <div className="flex items-center justify-between gap-0.5">
         <div className="flex items-center gap-1 min-w-0 flex-1">
           <span
-            className={`text-[10px] font-bold text-muted-foreground shrink-0 w-3 ${
-              isWinner ? "text-emerald-600" : ""
-            }`}
+            className={`text-[10px] font-bold shrink-0 w-3 ${seedTextClass} ${isLoser ? "opacity-50" : ""}`}
           >
             {team?.seed || "?"}
           </span>
           <span
-            className={`truncate text-xs font-medium ${
-              isWinner ? "text-emerald-700" : ""
-            }`}
+            className={`truncate text-xs font-medium ${teamTextClass} ${teamStrikethrough}`}
           >
             {team?.bb_teams?.abbrev ||
               team?.bb_teams?.name?.slice(0, 5) ||
               "TBD"}
+            {spread !== null && spread !== undefined && (
+              <span className="ml-0.5 text-[9px] text-muted-foreground font-normal">
+                ({spread > 0 ? "+" : ""}{spread})
+              </span>
+            )}
           </span>
         </div>
         {score !== null && (
           <span
             className={`font-mono font-bold text-xs ${
-              isWinner ? "text-emerald-700" : "text-muted-foreground"
-            }`}
+              isSpreadUpset ? "text-amber-700" : isWinner ? "text-emerald-700" : "text-muted-foreground"
+            } ${isLoser ? "opacity-50" : ""}`}
           >
             {score}
           </span>
@@ -92,8 +243,12 @@ function TeamSlot({
       </div>
       <div
         className={`truncate text-[10px] leading-tight ${
-          isCurrentUser ? "text-sky-600 font-medium" : "text-muted-foreground"
-        }`}
+          isSpreadUpset && isAdvancing
+            ? "text-amber-700 font-medium"
+            : isCurrentUser
+            ? "text-sky-600 font-medium"
+            : "text-muted-foreground"
+        } ${ownerStrikethrough}`}
       >
         {entry?.display_name || "—"}
       </div>
@@ -107,6 +262,7 @@ interface MatchupProps {
   poolTeams: MmPoolTeam[];
   entries: MmEntry[];
   currentUserId: string | null;
+  highlightEntryId?: string | null;
   width?: string;
 }
 
@@ -115,6 +271,7 @@ function Matchup({
   poolTeams,
   entries,
   currentUserId,
+  highlightEntryId,
   width = "w-[100px]",
 }: MatchupProps) {
   if (!game) {
@@ -149,17 +306,28 @@ function Matchup({
   const higherAdvances = advancingEntry?.id === higherEntry?.id;
   const lowerAdvances = advancingEntry?.id === lowerEntry?.id;
 
-  const higherIsUser = higherEntry?.user_id === currentUserId;
-  const lowerIsUser = lowerEntry?.user_id === currentUserId;
+  // Highlight based on selected entry (from search) or current user
+  const higherIsHighlighted = highlightEntryId
+    ? higherEntry?.id === highlightEntryId
+    : higherEntry?.user_id === currentUserId;
+  const lowerIsHighlighted = highlightEntryId
+    ? lowerEntry?.id === highlightEntryId
+    : lowerEntry?.user_id === currentUserId;
 
   const isLive = game.status === "in_progress";
-  const hasUserInMatchup = higherIsUser || lowerIsUser;
+  const hasHighlightedEntry = higherIsHighlighted || lowerIsHighlighted;
+
+  // Spread upset: winning team !== spread covering team
+  // This means the winner's owner is eliminated and loser's owner advances
+  const isSpreadUpset = isFinal && game.winning_team_id !== null &&
+    game.spread_covering_team_id !== null &&
+    game.winning_team_id !== game.spread_covering_team_id;
 
   return (
     <div
       className={`${width} rounded-lg border bg-card shadow-md hover:shadow-lg transition-shadow relative shrink-0 ${
         isLive ? "ring-2 ring-amber-400 ring-offset-1" : ""
-      } ${hasUserInMatchup ? "ring-1 ring-sky-300" : ""}`}
+      } ${hasHighlightedEntry ? "ring-1 ring-sky-300" : ""}`}
     >
       <TeamSlot
         team={higherTeam}
@@ -167,8 +335,10 @@ function Matchup({
         score={game.higher_seed_score}
         isWinner={higherWins}
         isAdvancing={higherAdvances && isFinal}
-        isCurrentUser={higherIsUser}
+        isCurrentUser={higherIsHighlighted}
         isEliminated={isFinal && !higherAdvances}
+        isSpreadUpset={isSpreadUpset && (higherWins || higherAdvances)}
+        spread={game.spread}
       />
       <TeamSlot
         team={lowerTeam}
@@ -176,8 +346,9 @@ function Matchup({
         score={game.lower_seed_score}
         isWinner={lowerWins}
         isAdvancing={lowerAdvances && isFinal}
-        isCurrentUser={lowerIsUser}
+        isCurrentUser={lowerIsHighlighted}
         isEliminated={isFinal && !lowerAdvances}
+        isSpreadUpset={isSpreadUpset && (lowerWins || lowerAdvances)}
       />
       {isLive && (
         <div className="bg-amber-500 text-white text-center text-[9px] font-bold py-0.5 uppercase tracking-wide rounded-b-lg">
@@ -195,6 +366,7 @@ interface RegionColumnProps {
   poolTeams: MmPoolTeam[];
   entries: MmEntry[];
   currentUserId: string | null;
+  highlightEntryId: string | null;
   flowDirection: "right" | "left";
 }
 
@@ -207,10 +379,10 @@ const GAP_S16 = MATCHUP_HEIGHT + GAP_R32 - 80; // 158
 const GAP_E8 = MATCHUP_HEIGHT + GAP_S16; // 234
 
 // Box widths - using fixed pixel values to control total width
-const WIDTH_R64 = "w-[110px]";
-const WIDTH_R32 = "w-[115px]";
-const WIDTH_S16 = "w-[120px]";
-const WIDTH_E8 = "w-[125px]";
+const WIDTH_R64 = "w-[120px]";
+const WIDTH_R32 = "w-[125px]";
+const WIDTH_S16 = "w-[130px]";
+const WIDTH_E8 = "w-[135px]";
 
 function RegionColumn({
   region,
@@ -218,6 +390,7 @@ function RegionColumn({
   poolTeams,
   entries,
   currentUserId,
+  highlightEntryId,
   flowDirection,
 }: RegionColumnProps) {
   // Get games by round for this region
@@ -287,6 +460,7 @@ function RegionColumn({
                         poolTeams={poolTeams}
                         entries={entries}
                         currentUserId={currentUserId}
+                        highlightEntryId={highlightEntryId}
                         width={roundData.width}
                       />
                       {/* Connector line to next round */}
@@ -307,6 +481,7 @@ function RegionColumn({
                         poolTeams={poolTeams}
                         entries={entries}
                         currentUserId={currentUserId}
+                        highlightEntryId={highlightEntryId}
                         width={roundData.width}
                       />
                     </div>
@@ -325,6 +500,7 @@ interface FinalFourProps {
   poolTeams: MmPoolTeam[];
   entries: MmEntry[];
   currentUserId: string | null;
+  highlightEntryId: string | null;
 }
 
 function FinalFour({
@@ -332,6 +508,7 @@ function FinalFour({
   poolTeams,
   entries,
   currentUserId,
+  highlightEntryId,
 }: FinalFourProps) {
   const f4Games = games
     .filter((g) => g.round === "F4")
@@ -361,6 +538,7 @@ function FinalFour({
           poolTeams={poolTeams}
           entries={entries}
           currentUserId={currentUserId}
+          highlightEntryId={highlightEntryId}
           width="w-[115px]"
         />
 
@@ -379,6 +557,7 @@ function FinalFour({
             poolTeams={poolTeams}
             entries={entries}
             currentUserId={currentUserId}
+            highlightEntryId={highlightEntryId}
             width="w-[120px]"
           />
           {/* Champion display */}
@@ -405,6 +584,7 @@ function FinalFour({
           poolTeams={poolTeams}
           entries={entries}
           currentUserId={currentUserId}
+          highlightEntryId={highlightEntryId}
           width="w-[115px]"
         />
       </div>
@@ -418,6 +598,9 @@ export function BracketView({
   poolTeams,
   currentUserId,
 }: BracketViewProps) {
+  // State for highlighted entry (from search)
+  const [highlightEntryId, setHighlightEntryId] = useState<string | null>(null);
+
   // Check if bracket is empty
   if (games.length === 0) {
     return (
@@ -444,17 +627,32 @@ export function BracketView({
 
   return (
     <div className="space-y-4">
+      {/* Search box for highlighting a participant's path */}
+      <div className="flex items-center gap-3">
+        <EntrySearch
+          entries={entries}
+          selectedEntryId={highlightEntryId}
+          onSelect={setHighlightEntryId}
+        />
+        {highlightEntryId && (
+          <span className="text-sm text-muted-foreground">
+            Showing path for selected participant
+          </span>
+        )}
+      </div>
+
       {/* Desktop bracket view - true bracket layout */}
       <div className="hidden xl:block overflow-x-auto">
-        <div className="min-w-[1100px]">
+        <div className="min-w-[1200px] px-2">
           {/* Top half: East (left→) and South (←right) */}
-          <div className="flex justify-center gap-8 items-start mb-4">
+          <div className="flex justify-center gap-4 items-start mb-4">
             <RegionColumn
               region="East"
               games={gamesByRegion.get("East") || []}
               poolTeams={poolTeams}
               entries={entries}
               currentUserId={currentUserId}
+              highlightEntryId={highlightEntryId}
               flowDirection="right"
             />
             <RegionColumn
@@ -463,6 +661,7 @@ export function BracketView({
               poolTeams={poolTeams}
               entries={entries}
               currentUserId={currentUserId}
+              highlightEntryId={highlightEntryId}
               flowDirection="left"
             />
           </div>
@@ -474,17 +673,19 @@ export function BracketView({
               poolTeams={poolTeams}
               entries={entries}
               currentUserId={currentUserId}
+              highlightEntryId={highlightEntryId}
             />
           </div>
 
           {/* Bottom half: West (left→) and Midwest (←right) */}
-          <div className="flex justify-center gap-8 items-end mt-4">
+          <div className="flex justify-center gap-4 items-end mt-4">
             <RegionColumn
               region="West"
               games={gamesByRegion.get("West") || []}
               poolTeams={poolTeams}
               entries={entries}
               currentUserId={currentUserId}
+              highlightEntryId={highlightEntryId}
               flowDirection="right"
             />
             <RegionColumn
@@ -493,6 +694,7 @@ export function BracketView({
               poolTeams={poolTeams}
               entries={entries}
               currentUserId={currentUserId}
+              highlightEntryId={highlightEntryId}
               flowDirection="left"
             />
           </div>
@@ -508,6 +710,7 @@ export function BracketView({
           poolTeams={poolTeams}
           entries={entries}
           currentUserId={currentUserId}
+          highlightEntryId={highlightEntryId}
         />
         <MobileRoundView
           round="R32"
@@ -516,6 +719,7 @@ export function BracketView({
           poolTeams={poolTeams}
           entries={entries}
           currentUserId={currentUserId}
+          highlightEntryId={highlightEntryId}
         />
         <MobileRoundView
           round="S16"
@@ -524,6 +728,7 @@ export function BracketView({
           poolTeams={poolTeams}
           entries={entries}
           currentUserId={currentUserId}
+          highlightEntryId={highlightEntryId}
         />
         <MobileRoundView
           round="E8"
@@ -532,6 +737,7 @@ export function BracketView({
           poolTeams={poolTeams}
           entries={entries}
           currentUserId={currentUserId}
+          highlightEntryId={highlightEntryId}
         />
         <MobileRoundView
           round="F4"
@@ -540,6 +746,7 @@ export function BracketView({
           poolTeams={poolTeams}
           entries={entries}
           currentUserId={currentUserId}
+          highlightEntryId={highlightEntryId}
         />
         <MobileRoundView
           round="Final"
@@ -548,6 +755,7 @@ export function BracketView({
           poolTeams={poolTeams}
           entries={entries}
           currentUserId={currentUserId}
+          highlightEntryId={highlightEntryId}
         />
       </div>
 
@@ -560,7 +768,11 @@ export function BracketView({
           </div>
           <div className="flex items-center gap-1.5">
             <div className="w-3 h-3 rounded border-l-2 border-l-emerald-500 bg-emerald-50 border border-border" />
-            <span>Advanced</span>
+            <span>Won + covered</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded border-l-2 border-l-amber-500 bg-amber-50 border border-border" />
+            <span>Spread upset</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="w-3 h-3 rounded bg-muted/50 border border-border opacity-60" />
@@ -584,6 +796,7 @@ interface MobileRoundViewProps {
   poolTeams: MmPoolTeam[];
   entries: MmEntry[];
   currentUserId: string | null;
+  highlightEntryId: string | null;
 }
 
 function MobileRoundView({
@@ -593,6 +806,7 @@ function MobileRoundView({
   poolTeams,
   entries,
   currentUserId,
+  highlightEntryId,
 }: MobileRoundViewProps) {
   const roundGames = games
     .filter((g) => g.round === round)
@@ -641,6 +855,7 @@ function MobileRoundView({
                 poolTeams={poolTeams}
                 entries={entries}
                 currentUserId={currentUserId}
+                highlightEntryId={highlightEntryId}
                 width="w-40"
               />
             ))}
@@ -660,6 +875,7 @@ function MobileRoundView({
                       poolTeams={poolTeams}
                       entries={entries}
                       currentUserId={currentUserId}
+                      highlightEntryId={highlightEntryId}
                       width="w-full"
                     />
                   ))}
