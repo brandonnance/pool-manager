@@ -307,12 +307,13 @@ function Matchup({
   const lowerAdvances = advancingEntry?.id === lowerEntry?.id;
 
   // Highlight based on selected entry (from search) or current user
+  // Note: Only highlight by user_id if currentUserId is not null (to avoid null === null being true)
   const higherIsHighlighted = highlightEntryId
     ? higherEntry?.id === highlightEntryId
-    : higherEntry?.user_id === currentUserId;
+    : currentUserId !== null && higherEntry?.user_id === currentUserId;
   const lowerIsHighlighted = highlightEntryId
     ? lowerEntry?.id === highlightEntryId
-    : lowerEntry?.user_id === currentUserId;
+    : currentUserId !== null && lowerEntry?.user_id === currentUserId;
 
   const isLive = game.status === "in_progress";
   const hasHighlightedEntry = higherIsHighlighted || lowerIsHighlighted;

@@ -67,8 +67,10 @@ export function TeamDrawDisplay({
     teamsByRegion.set(region, regionTeams)
   })
 
-  // Find current user's entry
-  const userEntry = entries.find(e => e.user_id === currentUserId)
+  // Find current user's entry (only if currentUserId is not null to avoid null === null matching)
+  const userEntry = currentUserId !== null
+    ? entries.find(e => e.user_id === currentUserId)
+    : undefined
   const userCurrentTeam = userEntry?.current_team_id
     ? teamById.get(userEntry.current_team_id)
     : null

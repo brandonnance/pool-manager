@@ -2,10 +2,16 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Copy, ExternalLink, Check, X, Edit2 } from 'lucide-react'
 import { BracketView } from './bracket-view'
 import { StandingsTable } from './standings-table'
 import { TeamDrawDisplay } from './team-draw-display'
@@ -25,6 +31,7 @@ interface MmPool {
   champion_payout_pct: number
   push_rule: string
   auto_sync_enabled: boolean
+  public_slug: string | null
 }
 
 interface MarchMadnessContentProps {
@@ -35,6 +42,223 @@ interface MarchMadnessContentProps {
   games: MmGame[]
   currentUserId: string
   isCommissioner: boolean
+}
+
+// Commissioner Tools Card with Public URL management
+interface CommissionerToolsCardProps {
+  mmPoolId: string
+  poolId: string
+  publicSlug: string | null
+}
+
+function CommissionerToolsCard({ mmPoolId, poolId, publicSlug }: CommissionerToolsCardProps) {
+  const router = useRouter()
+  const [isEditingSlug, setIsEditingSlug] = useState(false)
+  const [slugInput, setSlugInput] = useState(publicSlug ?? '')
+  const [isUpdatingSlug, setIsUpdatingSlug] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  const publicUrl = publicSlug
+    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/view/mm/${publicSlug}`
+    : null
+
+  const copyToClipboard = async () => {
+    if (!publicUrl) return
+    try {
+      await navigator.clipboard.writeText(publicUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      setError('Failed to copy to clipboard')
+    }
+  }
+
+  const handleUpdateSlug = async () => {
+    const trimmedSlug = slugInput.trim().toLowerCase()
+    if (!trimmedSlug) {
+      setError('Please enter a valid slug')
+      return
+    }
+
+    // Validate format
+    if (!/^[a-z0-9-]+$/.test(trimmedSlug)) {
+      setError('Slug can only contain lowercase letters, numbers, and hyphens')
+      return
+    }
+    if (trimmedSlug.length < 3 || trimmedSlug.length > 50) {
+      setError('Slug must be between 3 and 50 characters')
+      return
+    }
+
+    setIsUpdatingSlug(true)
+    setError(null)
+
+    const supabase = createClient()
+
+    const { error: updateError } = await supabase
+      .from('mm_pools')
+      .update({ public_slug: trimmedSlug })
+      .eq('id', mmPoolId)
+
+    if (updateError) {
+      if (updateError.code === '23505') {
+        setError('This slug is already in use. Please choose a different one.')
+      } else {
+        setError(updateError.message)
+      }
+      setIsUpdatingSlug(false)
+      return
+    }
+
+    setIsUpdatingSlug(false)
+    setIsEditingSlug(false)
+    router.refresh()
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg">Commissioner Tools</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Action buttons */}
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/pools/${poolId}/march-madness/games`}>
+              Enter Scores
+            </Link>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/pools/${poolId}/march-madness/entries`}>
+              Manage Entries
+            </Link>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/pools/${poolId}/march-madness/setup`}>
+              Edit Teams
+            </Link>
+          </Button>
+        </div>
+
+        {/* Public URL Section */}
+        <div className="pt-4 border-t space-y-3">
+          <Label>Public View URL</Label>
+          {isEditingSlug ? (
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <Input
+                  value={slugInput}
+                  onChange={(e) => setSlugInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                  placeholder="your-pool-name"
+                  disabled={isUpdatingSlug}
+                  className="flex-1"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  onClick={handleUpdateSlug}
+                  disabled={isUpdatingSlug}
+                  className="flex-1"
+                >
+                  <Check className="size-4 mr-1" />
+                  {isUpdatingSlug ? 'Saving...' : 'Save'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setIsEditingSlug(false)
+                    setSlugInput(publicSlug ?? '')
+                    setError(null)
+                  }}
+                  disabled={isUpdatingSlug}
+                  className="flex-1"
+                >
+                  <X className="size-4 mr-1" />
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : publicUrl ? (
+            <div className="space-y-2">
+              {/* URL Display */}
+              <div className="p-3 bg-muted rounded-md border">
+                <p className="text-sm font-mono break-all text-foreground">
+                  {publicUrl}
+                </p>
+              </div>
+              {/* Action buttons */}
+              <div className="grid grid-cols-3 gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={copyToClipboard}
+                  className="w-full"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="size-4 mr-1.5" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="size-4 mr-1.5" />
+                      Copy
+                    </>
+                  )}
+                </Button>
+                <Button size="sm" variant="outline" className="w-full" asChild>
+                  <a href={publicUrl} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="size-4 mr-1.5" />
+                    Open
+                  </a>
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setIsEditingSlug(true)}
+                  className="w-full"
+                >
+                  <Edit2 className="size-4 mr-1.5" />
+                  Edit
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Input
+                value={slugInput}
+                onChange={(e) => setSlugInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                placeholder="your-pool-name"
+                disabled={isUpdatingSlug}
+              />
+              <p className="text-xs text-muted-foreground">
+                Your URL will be: {typeof window !== 'undefined' ? window.location.origin : ''}/view/mm/<span className="font-medium">{slugInput || 'your-pool-name'}</span>
+              </p>
+              <Button
+                onClick={handleUpdateSlug}
+                disabled={isUpdatingSlug || !slugInput.trim()}
+                className="w-full"
+              >
+                {isUpdatingSlug ? 'Saving...' : 'Set Public URL'}
+              </Button>
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground">
+            Share this URL with participants to view the bracket
+          </p>
+
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
 }
 
 export function MarchMadnessContent({
@@ -225,28 +449,11 @@ export function MarchMadnessContent({
 
       {/* Commissioner tools */}
       {isCommissioner && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Commissioner Tools</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/pools/${poolId}/march-madness/games`}>
-                Enter Scores
-              </Link>
-            </Button>
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/pools/${poolId}/march-madness/entries`}>
-                Manage Entries
-              </Link>
-            </Button>
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/pools/${poolId}/march-madness/setup`}>
-                Edit Teams
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
+        <CommissionerToolsCard
+          mmPoolId={mmPool.id}
+          poolId={poolId}
+          publicSlug={mmPool.public_slug}
+        />
       )}
     </div>
   )

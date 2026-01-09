@@ -99,7 +99,8 @@ export function StandingsTable({
             const originalTeam = entry.original_team_id
               ? teamById.get(entry.original_team_id)
               : null
-            const isCurrentUser = entry.user_id === currentUserId
+            // Only highlight if currentUserId is not null (to avoid null === null being true)
+            const isCurrentUser = currentUserId !== null && entry.user_id === currentUserId
 
             return (
               <TableRow
