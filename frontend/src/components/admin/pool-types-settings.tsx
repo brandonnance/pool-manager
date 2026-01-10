@@ -12,8 +12,12 @@ interface PoolTypesSettingsProps {
   initialPoolTypes: {
     bowl_buster: boolean
     playoff_squares: boolean
+    golf: boolean
+    march_madness: boolean
   }
 }
+
+type PoolTypeKey = 'bowl_buster' | 'playoff_squares' | 'golf' | 'march_madness'
 
 export function PoolTypesSettings({ initialPoolTypes }: PoolTypesSettingsProps) {
   const router = useRouter()
@@ -21,12 +25,14 @@ export function PoolTypesSettings({ initialPoolTypes }: PoolTypesSettingsProps) 
   const [isSaving, setIsSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
 
-  const handleToggle = (key: 'bowl_buster' | 'playoff_squares') => {
+  const handleToggle = (key: PoolTypeKey) => {
     setPoolTypes(prev => {
       const updated = { ...prev, [key]: !prev[key] }
       setHasChanges(
         updated.bowl_buster !== initialPoolTypes.bowl_buster ||
-        updated.playoff_squares !== initialPoolTypes.playoff_squares
+        updated.playoff_squares !== initialPoolTypes.playoff_squares ||
+        updated.golf !== initialPoolTypes.golf ||
+        updated.march_madness !== initialPoolTypes.march_madness
       )
       return updated
     })
@@ -39,7 +45,7 @@ export function PoolTypesSettings({ initialPoolTypes }: PoolTypesSettingsProps) 
     const { error } = await supabase
       .from('site_settings')
       .update({ value: poolTypes })
-      .eq('key', 'pool_types')
+      .eq('key', 'enabled_pool_types')
 
     if (error) {
       console.error('Error saving pool types:', error)
@@ -84,6 +90,38 @@ export function PoolTypesSettings({ initialPoolTypes }: PoolTypesSettingsProps) 
             id="playoff_squares"
             checked={poolTypes.playoff_squares}
             onCheckedChange={() => handleToggle('playoff_squares')}
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="golf" className="text-base font-medium">
+              Golf Pool
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              Pick golfers by tier for PGA tournaments
+            </p>
+          </div>
+          <Switch
+            id="golf"
+            checked={poolTypes.golf}
+            onCheckedChange={() => handleToggle('golf')}
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="march_madness" className="text-base font-medium">
+              March Madness Blind Draw
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              64-participant blind draw bracket pool with random team assignment
+            </p>
+          </div>
+          <Switch
+            id="march_madness"
+            checked={poolTypes.march_madness}
+            onCheckedChange={() => handleToggle('march_madness')}
           />
         </div>
       </div>
