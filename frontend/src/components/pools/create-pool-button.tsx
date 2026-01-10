@@ -81,9 +81,9 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
     }
   }, [enabledPoolTypes])
 
-  // Auto-generate slug from pool name for squares pools
+  // Auto-generate slug from pool name for squares and march madness pools
   useEffect(() => {
-    if (poolType === 'playoff_squares' && name) {
+    if ((poolType === 'playoff_squares' || poolType === 'march_madness') && name) {
       const slug = generateSlug(name)
       setPublicSlug(slug)
       // Clear slug error when auto-generating
@@ -229,11 +229,26 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
 
     // For March Madness pools, create mm_pools record
     if (poolType === 'march_madness') {
+      // Validate slug format
+      if (publicSlug) {
+        if (!/^[a-z0-9-]+$/.test(publicSlug)) {
+          setError('Slug can only contain lowercase letters, numbers, and hyphens')
+          setIsLoading(false)
+          return
+        }
+        if (publicSlug.length < 3 || publicSlug.length > 50) {
+          setError('Slug must be between 3 and 50 characters')
+          setIsLoading(false)
+          return
+        }
+      }
+
       const { error: mmPoolError } = await supabase
         .from('mm_pools')
         .insert({
           pool_id: pool.id,
           tournament_year: new Date().getFullYear(),
+          public_slug: publicSlug || null,
         })
 
       if (mmPoolError) {
@@ -267,7 +282,7 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
   }
 
   // Check if slug is available
-  const checkSlugAvailability = useCallback(async (slug: string) => {
+  const checkSlugAvailability = useCallback(async (slug: string, type: PoolType) => {
     if (!slug || slug.length < 3) {
       setSlugAvailable(null)
       return
@@ -276,8 +291,10 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
     setCheckingSlug(true)
     const supabase = createClient()
 
+    // Check appropriate table based on pool type
+    const table = type === 'march_madness' ? 'mm_pools' : 'sq_pools'
     const { data, error } = await supabase
-      .from('sq_pools')
+      .from(table)
       .select('id')
       .eq('public_slug', slug)
       .maybeSingle()
@@ -294,13 +311,13 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
 
   // Debounced slug availability check
   useEffect(() => {
-    if (poolType !== 'playoff_squares' || !publicSlug || slugError) {
+    if ((poolType !== 'playoff_squares' && poolType !== 'march_madness') || !publicSlug || slugError) {
       setSlugAvailable(null)
       return
     }
 
     const timeoutId = setTimeout(() => {
-      checkSlugAvailability(publicSlug)
+      checkSlugAvailability(publicSlug, poolType)
     }, 500)
 
     return () => clearTimeout(timeoutId)
@@ -611,6 +628,47 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
               </div>
             )}
 
+            {/* March Madness specific options */}
+            {poolType === 'march_madness' && (
+              <div className="space-y-4 border-t pt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="mmPublicSlug">Public URL Slug</Label>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">/view/mm/</span>
+                    <Input
+                      id="mmPublicSlug"
+                      value={publicSlug}
+                      onChange={(e) => handleSlugChange(e.target.value)}
+                      placeholder="my-pool-name"
+                      className={`font-mono text-sm ${
+                        slugError ? 'border-destructive' :
+                        slugAvailable === false ? 'border-destructive' :
+                        slugAvailable === true ? 'border-green-500' : ''
+                      }`}
+                    />
+                    {checkingSlug && (
+                      <div className="text-xs text-muted-foreground animate-pulse">...</div>
+                    )}
+                  </div>
+                  {slugError ? (
+                    <div className="text-xs text-destructive">{slugError}</div>
+                  ) : slugAvailable === false ? (
+                    <div className="text-xs text-destructive">
+                      This slug is already taken. Try a different one.
+                    </div>
+                  ) : slugAvailable === true ? (
+                    <div className="text-xs text-green-600">
+                      This slug is available!
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted-foreground">
+                      Share this link for anyone to view the bracket
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {error && (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
@@ -631,7 +689,7 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
               disabled={
                 isLoading ||
                 !name.trim() ||
-                (poolType === 'playoff_squares' && (!!slugError || slugAvailable === false || checkingSlug))
+                ((poolType === 'playoff_squares' || poolType === 'march_madness') && (!!slugError || slugAvailable === false || checkingSlug))
               }
             >
               {isLoading ? 'Creating...' : 'Create Pool'}

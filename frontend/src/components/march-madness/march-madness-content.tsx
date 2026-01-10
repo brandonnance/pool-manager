@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -58,9 +58,15 @@ function CommissionerToolsCard({ mmPoolId, poolId, publicSlug }: CommissionerToo
   const [isUpdatingSlug, setIsUpdatingSlug] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [origin, setOrigin] = useState('')
 
-  const publicUrl = publicSlug
-    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/view/mm/${publicSlug}`
+  // Set origin on client-side only to avoid hydration mismatch
+  useEffect(() => {
+    setOrigin(window.location.origin)
+  }, [])
+
+  const publicUrl = publicSlug && origin
+    ? `${origin}/view/mm/${publicSlug}`
     : null
 
   const copyToClipboard = async () => {
@@ -235,7 +241,7 @@ function CommissionerToolsCard({ mmPoolId, poolId, publicSlug }: CommissionerToo
                 disabled={isUpdatingSlug}
               />
               <p className="text-xs text-muted-foreground">
-                Your URL will be: {typeof window !== 'undefined' ? window.location.origin : ''}/view/mm/<span className="font-medium">{slugInput || 'your-pool-name'}</span>
+                Your URL will be: {origin}/view/mm/<span className="font-medium">{slugInput || 'your-pool-name'}</span>
               </p>
               <Button
                 onClick={handleUpdateSlug}

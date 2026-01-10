@@ -243,10 +243,10 @@ function TeamSlot({
       </div>
       <div
         className={`truncate text-[10px] leading-tight ${
-          isSpreadUpset && isAdvancing
-            ? "text-amber-700 font-medium"
-            : isCurrentUser
+          isCurrentUser
             ? "text-sky-600 font-medium"
+            : isSpreadUpset && isAdvancing
+            ? "text-amber-700 font-medium"
             : "text-muted-foreground"
         } ${ownerStrikethrough}`}
       >
@@ -328,7 +328,7 @@ function Matchup({
     <div
       className={`${width} rounded-lg border bg-card shadow-md hover:shadow-lg transition-shadow relative shrink-0 ${
         isLive ? "ring-2 ring-amber-400 ring-offset-1" : ""
-      } ${hasHighlightedEntry ? "ring-1 ring-sky-300" : ""}`}
+      } ${hasHighlightedEntry ? "ring-[3px] ring-sky-500 ring-offset-1 shadow-[0_0_12px_rgba(14,165,233,0.5)]" : ""}`}
     >
       <TeamSlot
         team={higherTeam}
@@ -764,8 +764,8 @@ export function BracketView({
       <Card className="p-3">
         <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-muted-foreground">
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded border-l-2 border-l-sky-500 bg-sky-50 border border-border" />
-            <span>Your matchup</span>
+            <div className="w-3 h-3 rounded ring-[3px] ring-sky-500 ring-offset-1 shadow-[0_0_8px_rgba(14,165,233,0.5)] bg-white border border-border" />
+            <span>Highlighted</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="w-3 h-3 rounded border-l-2 border-l-emerald-500 bg-emerald-50 border border-border" />

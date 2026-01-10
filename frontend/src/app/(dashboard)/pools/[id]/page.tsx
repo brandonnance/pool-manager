@@ -8,6 +8,7 @@ import { CreateEntryButton } from '@/components/pools/create-entry-button'
 import { PoolStandings } from '@/components/standings/pool-standings'
 import { SingleGameContent } from '@/components/squares/single-game-content'
 import { PlayoffContent } from '@/components/squares/playoff-content'
+import { MmPublicUrlCard } from '@/components/march-madness/mm-public-url-card'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -244,6 +245,7 @@ export default async function PoolDetailPage({ params }: PageProps) {
     champion_payout_pct: number
     push_rule: string
     auto_sync_enabled: boolean
+    public_slug: string | null
   } | null = null
   let mmEntriesData: Array<{
     id: string
@@ -601,6 +603,14 @@ export default async function PoolDetailPage({ params }: PageProps) {
         </Card>
       ) : pool.type === 'march_madness' && mmPoolData ? (
         /* March Madness Blind Draw Content */
+        <div className="space-y-6">
+        {/* Full-width Public URL Card for Commissioners */}
+        {isCommissioner && (
+          <MmPublicUrlCard
+            mmPoolId={mmPoolData.id}
+            publicSlug={mmPoolData.public_slug ?? null}
+          />
+        )}
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Left Column - Main Content */}
           <div className="lg:col-span-2 space-y-6">
@@ -718,43 +728,6 @@ export default async function PoolDetailPage({ params }: PageProps) {
               </Card>
             )}
 
-            {/* Payout Structure */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Payout Structure</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Sweet 16 (16 players)</span>
-                    <span className="font-medium">{mmPoolData.sweet16_payout_pct}%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Elite 8 (8 players)</span>
-                    <span className="font-medium">{mmPoolData.elite8_payout_pct}%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Final Four (4 players)</span>
-                    <span className="font-medium">{mmPoolData.final4_payout_pct}%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Runner-up</span>
-                    <span className="font-medium">{mmPoolData.runnerup_payout_pct}%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Champion</span>
-                    <span className="font-medium">{mmPoolData.champion_payout_pct}%</span>
-                  </div>
-                  <div className="border-t pt-2 mt-2 flex justify-between font-medium">
-                    <span>Total</span>
-                    <span>
-                      {mmPoolData.sweet16_payout_pct + mmPoolData.elite8_payout_pct + mmPoolData.final4_payout_pct + mmPoolData.runnerup_payout_pct + mmPoolData.champion_payout_pct}%
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
             {/* Pool Rules */}
             <Card>
               <CardHeader>
@@ -764,34 +737,12 @@ export default async function PoolDetailPage({ params }: PageProps) {
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <p><strong className="text-foreground">Advancement:</strong> Based on covering the spread, not just winning</p>
                   <p><strong className="text-foreground">Team Inheritance:</strong> Advancing player takes the winning team</p>
-                  <p><strong className="text-foreground">Push Rule:</strong> {mmPoolData.push_rule === 'favorite_advances' ? 'Favorite advances on push' : mmPoolData.push_rule === 'underdog_advances' ? 'Underdog advances on push' : 'Coin flip on push'}</p>
+                  <p><strong className="text-foreground">Push Rule:</strong> {mmPoolData.push_rule === 'higher_seed_advances' ? 'Higher seed advances on push' : mmPoolData.push_rule === 'favorite_advances' ? 'Favorite advances on push' : mmPoolData.push_rule === 'underdog_advances' ? 'Underdog advances on push' : 'Coin flip on push'}</p>
                 </div>
               </CardContent>
             </Card>
-
-            {/* Members */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle>Members</CardTitle>
-                {isCommissioner && (
-                  <Link
-                    href={`/pools/${id}/members`}
-                    className="text-sm text-primary hover:text-primary/80 flex items-center gap-2"
-                  >
-                    Manage
-                    {(pendingMemberCount ?? 0) > 0 && (
-                      <Badge variant="outline" className="border-amber-500 text-amber-600 text-xs">
-                        {pendingMemberCount} pending
-                      </Badge>
-                    )}
-                  </Link>
-                )}
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">{memberCount} approved member{memberCount !== 1 ? 's' : ''}</p>
-              </CardContent>
-            </Card>
           </div>
+        </div>
         </div>
       ) : pool.type === 'march_madness' && !mmPoolData ? (
         <Card>
