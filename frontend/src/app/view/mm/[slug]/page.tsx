@@ -1,3 +1,28 @@
+/**
+ * @fileoverview Public March Madness Pool View Page
+ * @route /view/mm/[slug]
+ * @auth Public (no authentication required)
+ *
+ * @description
+ * Public-facing view for March Madness blind draw pools. Allows anyone with
+ * the link to view the bracket, standings, and team assignments without
+ * logging in. Uses anonymous Supabase client for data access.
+ *
+ * @features
+ * - View tournament bracket with all games
+ * - View standings showing who's still alive
+ * - View team/entry assignments (who has which team)
+ * - Stats bar (alive count, eliminated, games played/remaining)
+ * - Setup status indicator (shows progress if not ready)
+ *
+ * @url_params
+ * - slug: The public_slug from mm_pools (e.g., 'abc123')
+ *
+ * @components
+ * - BracketView: Full tournament bracket visualization
+ * - StandingsTable: Ranked list of entries by status
+ * - TeamDrawDisplay: Shows which entry has which team
+ */
 import { notFound } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
@@ -9,11 +34,17 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { MmGame, MmEntry, MmPoolTeam } from '@/components/march-madness/game-card'
 
+/** Page props with dynamic route parameters */
 interface PageProps {
   params: Promise<{ slug: string }>
 }
 
-// Create an anonymous Supabase client for public access
+/**
+ * Creates an anonymous Supabase client for public data access
+ * Uses the anon key which has limited permissions via RLS policies
+ *
+ * @returns Supabase client configured for anonymous access
+ */
 function createAnonClient() {
   return createClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,6 +52,19 @@ function createAnonClient() {
   )
 }
 
+/**
+ * Public March Madness pool view page component (Server Component)
+ *
+ * @param props.params - Contains the slug for pool lookup
+ * @returns Full-page layout with bracket, standings, and team tabs
+ *
+ * @data_fetching
+ * - mm_pools: Fetched by public_slug
+ * - pools: Parent pool name and status
+ * - mm_entries: All entries with elimination status
+ * - mm_pool_teams: All teams with bb_teams names
+ * - mm_games: All tournament games
+ */
 export default async function PublicMarchMadnessPage({ params }: PageProps) {
   const { slug } = await params
   const supabase = createAnonClient()

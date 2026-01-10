@@ -1,7 +1,51 @@
+/**
+ * @fileoverview March Madness Score Entry API Route
+ * @route POST /api/madness/scores
+ * @auth Requires commissioner role or super admin
+ *
+ * @description
+ * Handles score entry for March Madness tournament games. When a game is marked
+ * as final, this route calculates the spread cover, determines the advancing
+ * entry based on the spread (not just who won), and updates elimination status.
+ *
+ * @features
+ * - Update game scores (higher_seed_score, lower_seed_score)
+ * - Mark games as final
+ * - Calculate spread cover winner (who advances based on spread)
+ * - Transfer winning team to advancing entry
+ * - Mark eliminated entries and teams
+ *
+ * @request_body
+ * - gameId: string - The mm_games.id to update
+ * - higherSeedScore: number (optional) - Score for the higher seed
+ * - lowerSeedScore: number (optional) - Score for the lower seed
+ * - status: string (optional) - Game status (e.g., 'final')
+ */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { calculateSpreadCover } from '@/lib/madness'
 
+/**
+ * POST handler for updating March Madness game scores
+ *
+ * @param request - Next.js request object containing game score data
+ * @returns JSON response with success/error status and update details
+ *
+ * @flow
+ * 1. Validate request (gameId required)
+ * 2. Authenticate user
+ * 3. Fetch game with pool info for permission check
+ * 4. Verify user is commissioner (pool, org, or super admin)
+ * 5. Build update object from provided fields
+ * 6. If marking as final with spread:
+ *    - Calculate spread cover result
+ *    - Determine winning team and spread covering team
+ *    - Identify advancing and eliminated entries
+ *    - Update eliminated entry (set eliminated=true, clear current_team_id)
+ *    - Transfer winning team to advancing entry
+ *    - Mark eliminated team
+ * 7. Update the game record
+ */
 export async function POST(request: NextRequest) {
   try {
     const {

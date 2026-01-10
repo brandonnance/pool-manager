@@ -1,3 +1,29 @@
+/**
+ * @fileoverview Public March Madness Entry Request Page
+ * @route /madness/[slug]
+ * @auth Public (no authentication required)
+ *
+ * @description
+ * Public page where users can request to join a March Madness blind draw pool.
+ * Shows current entries, allows searching for existing entries, and lets users
+ * submit entry requests (which go to pending status for commissioner approval).
+ *
+ * @features
+ * - View pool name and entry count (X/64)
+ * - Search existing approved entries by name
+ * - Submit new entry request (goes to 'pending' status)
+ * - Prevents duplicate names (approved or pending)
+ * - Shows pool status (spots remaining, pool full, draw complete)
+ *
+ * @url_params
+ * - slug: The public_slug from mm_pools
+ *
+ * @states
+ * - loading: Initial data fetch in progress
+ * - pool not found: Invalid slug
+ * - pool full: 64 entries already approved
+ * - draw completed: Teams have been assigned, no new entries
+ */
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
@@ -7,21 +33,53 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { use } from 'react'
 
+// =============================================================================
+// TYPE DEFINITIONS
+// =============================================================================
+
+/** Entry data structure for display */
 interface Entry {
+  /** UUID of the mm_entries record */
   id: string
+  /** Display name shown in the list */
   display_name: string | null
+  /** Entry status (approved, pending, denied) */
   status: string
 }
 
+/** Pool data fetched from mm_pools with parent pool info */
 interface PoolData {
+  /** UUID of the mm_pools record */
   id: string
+  /** UUID of the parent pools record */
   pool_id: string
+  /** Whether the blind draw has been executed */
   draw_completed: boolean
+  /** Parent pool relationship */
   pools: {
+    /** Display name of the pool */
     name: string
   }
 }
 
+// =============================================================================
+// MAIN COMPONENT
+// =============================================================================
+
+/**
+ * Public entry request page component (Client Component)
+ *
+ * @param props.params - Contains the slug for pool lookup
+ * @returns Interactive UI for searching/requesting pool entry
+ *
+ * @state
+ * - pool: Loaded pool data or null if not found
+ * - entries: Array of approved entries for display
+ * - inputValue: Current search/name input
+ * - isSubmitting: Request submission in progress
+ * - message: Success/error feedback message
+ * - loading: Initial data fetch in progress
+ */
 export default function PublicEntryRequestPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params)
   const [pool, setPool] = useState<PoolData | null>(null)

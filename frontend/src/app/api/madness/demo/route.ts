@@ -1,3 +1,23 @@
+/**
+ * @fileoverview March Madness Demo Data API Route
+ * @route POST /api/madness/demo
+ * @auth Requires commissioner role or super admin
+ *
+ * @description
+ * Provides demo/testing utilities for March Madness pools. Allows commissioners
+ * to seed demo data, simulate rounds, and reset pools for testing purposes.
+ *
+ * @actions
+ * - seed: Full seed (teams + entries) - legacy action
+ * - seed_teams: Add 64 demo teams to the pool (real team names and seeds)
+ * - seed_entries: Add demo player entries (up to 64, using DEMO_PLAYER_NAMES)
+ * - simulate_round: Auto-generate scores for the next round of games
+ * - reset: Clear all games, payouts, reset entries and teams to pre-draw state
+ *
+ * @request_body
+ * - mmPoolId: string - The mm_pools.id to operate on
+ * - action: DemoAction - One of the actions listed above
+ */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import {
@@ -7,8 +27,15 @@ import {
   shuffleArray,
 } from '@/lib/madness'
 
+/** Valid demo action types */
 type DemoAction = 'seed' | 'seed_teams' | 'seed_entries' | 'simulate_round' | 'reset'
 
+/**
+ * POST handler for demo actions on March Madness pools
+ *
+ * @param request - Next.js request containing mmPoolId and action
+ * @returns JSON response with action results
+ */
 export async function POST(request: NextRequest) {
   try {
     const { mmPoolId, action } = await request.json() as { mmPoolId: string; action: DemoAction }
@@ -120,6 +147,18 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// =============================================================================
+// DEMO ACTION HANDLERS
+// =============================================================================
+
+/**
+ * Seeds both teams and entries for a demo pool (legacy combined action)
+ *
+ * @param supabase - Authenticated Supabase client
+ * @param mmPoolId - The mm_pools.id to seed
+ * @param poolId - The parent pools.id (unused, kept for signature compatibility)
+ * @returns JSON response with seeding results
+ */
 async function seedDemoData(
   supabase: Awaited<ReturnType<typeof createClient>>,
   mmPoolId: string,
@@ -215,6 +254,18 @@ async function seedDemoData(
   })
 }
 
+/**
+ * Simulates scores for the next round of games
+ *
+ * Finds all pending games that have teams assigned, identifies the earliest
+ * round, and generates random but realistic scores for those games.
+ * Note: This only sets scores - the score entry logic in /api/madness/scores
+ * should be called separately to process eliminations.
+ *
+ * @param supabase - Authenticated Supabase client
+ * @param mmPoolId - The mm_pools.id to simulate
+ * @returns JSON response with simulated game results
+ */
 async function simulateNextRound(
   supabase: Awaited<ReturnType<typeof createClient>>,
   mmPoolId: string
@@ -269,6 +320,17 @@ async function simulateNextRound(
   })
 }
 
+/**
+ * Resets a pool to its post-setup state (before draw)
+ *
+ * Deletes all games and payouts, clears team assignments from entries,
+ * resets elimination status on entries and teams, and marks draw as incomplete.
+ * Teams and entries themselves are preserved.
+ *
+ * @param supabase - Authenticated Supabase client
+ * @param mmPoolId - The mm_pools.id to reset
+ * @returns JSON response confirming reset
+ */
 async function resetPool(
   supabase: Awaited<ReturnType<typeof createClient>>,
   mmPoolId: string
@@ -315,6 +377,17 @@ async function resetPool(
   })
 }
 
+/**
+ * Seeds 64 demo teams for the bracket
+ *
+ * Creates bb_teams records if they don't exist, then creates mm_pool_teams
+ * linking those teams to this pool with proper seed and region assignments.
+ * Uses DEMO_TEAMS constant which has realistic team names, seeds, and regions.
+ *
+ * @param supabase - Authenticated Supabase client
+ * @param mmPoolId - The mm_pools.id to seed teams for
+ * @returns JSON response with team creation count
+ */
 async function seedDemoTeams(
   supabase: Awaited<ReturnType<typeof createClient>>,
   mmPoolId: string
@@ -390,6 +463,17 @@ async function seedDemoTeams(
   })
 }
 
+/**
+ * Seeds demo entries to fill remaining spots (up to 64)
+ *
+ * Adds demo player entries using names from DEMO_PLAYER_NAMES constant.
+ * Only adds entries for remaining spots (64 - current approved entries).
+ * Entries are created as 'approved' status with no user_id (placeholder entries).
+ *
+ * @param supabase - Authenticated Supabase client
+ * @param mmPoolId - The mm_pools.id to seed entries for
+ * @returns JSON response with entry creation count
+ */
 async function seedDemoEntries(
   supabase: Awaited<ReturnType<typeof createClient>>,
   mmPoolId: string

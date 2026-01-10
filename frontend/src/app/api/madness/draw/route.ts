@@ -1,7 +1,53 @@
+/**
+ * @fileoverview March Madness Blind Draw API Route
+ * @route POST /api/madness/draw
+ * @auth Requires commissioner role or super admin
+ *
+ * @description
+ * Executes the blind draw for a March Madness pool. This randomly assigns
+ * the 64 tournament teams to the 64 entries. Also generates all 63 tournament
+ * games (R64, R32, S16, E8, F4, FINAL) with appropriate spreads.
+ *
+ * @preconditions
+ * - Pool must have exactly 64 teams in mm_pool_teams
+ * - Pool must have exactly 64 approved entries in mm_entries
+ * - Draw must not already be completed (draw_completed = false)
+ *
+ * @features
+ * - Randomly shuffle teams using Fisher-Yates algorithm
+ * - Assign each team to an entry (current_team_id and original_team_id)
+ * - Generate all 63 tournament games with bracket structure
+ * - R64 games get team and entry assignments
+ * - Later round games have null teams/entries (populated when games finish)
+ * - Mark pool as draw_completed with timestamp
+ *
+ * @request_body
+ * - mmPoolId: string - The mm_pools.id to run the draw for
+ */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { shuffleArray, generateAllTournamentGames } from '@/lib/madness'
 
+/**
+ * POST handler for executing the March Madness blind draw
+ *
+ * @param request - Next.js request object containing mmPoolId
+ * @returns JSON response with assignments and game creation results
+ *
+ * @flow
+ * 1. Validate mmPoolId is provided
+ * 2. Authenticate user
+ * 3. Fetch mm_pool and verify draw not already completed
+ * 4. Verify user is commissioner (pool, org, or super admin)
+ * 5. Fetch all 64 teams and 64 entries
+ * 6. Validate exactly 64 of each
+ * 7. Shuffle teams randomly
+ * 8. Assign each shuffled team to an entry
+ * 9. Generate all 63 tournament games
+ * 10. Create game records (R64 with teams/entries, others empty)
+ * 11. Mark draw_completed = true
+ * 12. Return assignments and game count
+ */
 export async function POST(request: NextRequest) {
   try {
     const { mmPoolId } = await request.json()
