@@ -1,3 +1,35 @@
+/**
+ * @fileoverview Pool Members Management Page
+ * @route /pools/[id]/members
+ * @auth Requires pool commissioner or org admin
+ * @layout Dashboard layout with header/nav
+ *
+ * @description
+ * Comprehensive member management for pool commissioners. Handles pending
+ * approvals, member roles, invite links, and supports both account-based
+ * and no-account modes for squares pools.
+ *
+ * @features
+ * - View pending membership requests with approve/reject
+ * - View approved members with role badges
+ * - Promote members to commissioner (org admin only)
+ * - Remove members from pool
+ * - Generate and manage invite links
+ * - Add existing org members directly to pool
+ * - Squares-specific: show square counts per member
+ * - No-account mode: shows only commissioners
+ *
+ * @modes
+ * - Standard: Full member management with invite links
+ * - No-account (squares): Commissioners only, no invite links
+ *
+ * @components
+ * - MemberActions: Approve/reject/remove/promote buttons
+ * - GenerateLinkButton: Create new invite link
+ * - CopyLinkButton: Copy invite URL to clipboard
+ * - DeleteLinkButton: Remove invite link
+ * - AddOrgMemberButton: Add org member to pool directly
+ */
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
@@ -7,10 +39,25 @@ import { CopyLinkButton } from '@/components/members/copy-link-button'
 import { DeleteLinkButton } from '@/components/members/delete-link-button'
 import { AddOrgMemberButton } from '@/components/members/add-org-member-button'
 
+/** Page props with dynamic route parameters */
 interface PageProps {
   params: Promise<{ id: string }>
 }
 
+/**
+ * Pool members management page component (Server Component)
+ *
+ * @param props.params - Contains the pool id from the URL
+ * @returns Members management page with sections for pending/approved and invite links
+ *
+ * @data_fetching
+ * - pools: Pool details with org info
+ * - sq_pools: Squares config (for lock status, no-account mode)
+ * - pool_memberships: All memberships for this pool
+ * - profiles: Display names for all members
+ * - join_links: Active invite links
+ * - org_memberships: Org members available to add
+ */
 export default async function PoolMembersPage({ params }: PageProps) {
   const { id } = await params
   const supabase = await createClient()

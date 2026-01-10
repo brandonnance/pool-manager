@@ -1,13 +1,59 @@
+/**
+ * @fileoverview CFP Bracket Setup Page (Commissioner)
+ * @route /pools/[id]/cfp
+ * @auth Requires pool commissioner or org admin
+ * @layout Dashboard layout with header/nav
+ *
+ * @description
+ * Commissioner tool for setting up the College Football Playoff bracket.
+ * Allows enabling CFP for a pool, configuring teams for each slot,
+ * and linking games for score tracking.
+ *
+ * @features
+ * - Enable/disable CFP bracket for pool
+ * - Configure bye teams (seeds 1-4)
+ * - Configure Round 1 matchups (seeds 5-12)
+ * - Link games to bracket slots for score updates
+ * - Set CFP lock time for picks
+ * - Visual bracket display during setup
+ *
+ * @bracket_structure
+ * - Byes: Seeds 1-4 (skip first round)
+ * - R1: #5v#12, #6v#11, #7v#10, #8v#9
+ * - Quarterfinals: R1 winners vs bye teams
+ * - Semifinals: QF winners
+ * - Final: SF winners
+ *
+ * @components
+ * - EnableCfpButton: Button/modal to enable CFP
+ * - CfpBracketSetup: Full bracket configuration UI
+ */
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { EnableCfpButton } from '@/components/cfp/enable-cfp-button'
 import { CfpBracketSetup } from '@/components/cfp/cfp-bracket-setup'
 
+/** Page props with dynamic route parameters */
 interface PageProps {
   params: Promise<{ id: string }>
 }
 
+/**
+ * CFP bracket setup page component (Server Component)
+ *
+ * @param props.params - Contains the pool id from the URL
+ * @returns CFP setup page with enable button or bracket config
+ *
+ * @data_fetching
+ * - pools: Pool details
+ * - bb_cfp_pool_config: CFP config for this pool
+ * - bb_cfp_templates: Available bracket templates
+ * - bb_cfp_pool_round1: R1 matchup configuration
+ * - bb_cfp_pool_byes: Bye team configuration
+ * - bb_cfp_pool_slot_games: Game assignments for slots
+ * - bb_teams: All teams for selection
+ */
 export default async function PoolCfpPage({ params }: PageProps) {
   const { id } = await params
   const supabase = await createClient()

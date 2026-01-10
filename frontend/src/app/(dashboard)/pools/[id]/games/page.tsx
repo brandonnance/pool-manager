@@ -1,3 +1,33 @@
+/**
+ * @fileoverview Pool Games Management Page (Bowl Buster)
+ * @route /pools/[id]/games
+ * @auth Requires pool commissioner or org admin
+ * @layout Dashboard layout with header/nav
+ *
+ * @description
+ * Commissioner tool for managing bowl games in a Bowl Buster pool.
+ * Allows adding games, setting spreads, entering scores, and removing games.
+ * Supports both bowl games and CFP bracket games.
+ *
+ * @features
+ * - Add new bowl/CFP games with teams and kickoff times
+ * - Edit game details (matchup, spread, kickoff)
+ * - Enter final scores to update standings
+ * - Remove games from pool
+ * - CFP seed display for bracket games
+ * - Visual indicators for missing spreads
+ * - Responsive mobile card and desktop table views
+ *
+ * @game_types
+ * - bowl: Regular bowl games with spreads
+ * - cfp: College Football Playoff bracket games
+ *
+ * @components
+ * - AddGameButton: Modal to add new game
+ * - EditSpreadButton: Modal to edit game details
+ * - EnterScoreButton: Modal to enter/update scores
+ * - RemoveGameButton: Confirmation to remove game
+ */
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
@@ -6,6 +36,16 @@ import { RemoveGameButton } from '@/components/games/remove-game-button'
 import { EditSpreadButton } from '@/components/games/edit-spread-button'
 import { EnterScoreButton } from '@/components/games/enter-score-button'
 
+/**
+ * Formats a game matchup string with optional spread information
+ *
+ * @param awayTeam - Away team name
+ * @param homeTeam - Home team name
+ * @param homeSpread - Spread from home team perspective (negative = favored)
+ * @param awaySeed - Optional CFP seed for away team
+ * @param homeSeed - Optional CFP seed for home team
+ * @returns Formatted matchup string like "#5 Team A (-3.5) @ #12 Team B"
+ */
 function formatMatchupWithSpread(
   awayTeam: string,
   homeTeam: string,

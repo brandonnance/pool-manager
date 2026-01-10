@@ -1,13 +1,57 @@
+/**
+ * @fileoverview Pool Picks Page (Bowl Buster)
+ * @route /pools/[id]/picks
+ * @auth Requires pool membership (approved) or commissioner
+ * @layout Dashboard layout with header/nav
+ *
+ * @description
+ * The main picks page for Bowl Buster pools. Displays CFP bracket picker
+ * (if enabled) and bowl game picks form. Handles pick locking based on
+ * game kickoff times.
+ *
+ * @features
+ * - CFP bracket picker with visual bracket display
+ * - Bowl game picks with team selection
+ * - Automatic lock 5 minutes before kickoff
+ * - Demo mode bypasses lock times
+ * - Redirects to pool page if no entry exists
+ * - Shows existing picks for editing
+ *
+ * @locking
+ * - Bowl games: Lock 5 min before individual kickoff
+ * - CFP bracket: Locks at cfp_lock_at timestamp
+ * - Demo mode: Never locks
+ *
+ * @components
+ * - CfpBracketPicker: Interactive CFP bracket for making picks
+ * - BowlPicksForm: List of bowl games for picking winners
+ */
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { BowlPicksForm } from '@/components/picks/bowl-picks-form'
 import { CfpBracketPicker } from '@/components/picks/cfp-bracket-picker'
 
+/** Page props with dynamic route parameters */
 interface PageProps {
   params: Promise<{ id: string }>
 }
 
+/**
+ * Pool picks page component (Server Component)
+ *
+ * @param props.params - Contains the pool id from the URL
+ * @returns Picks page with CFP bracket and bowl games
+ *
+ * @data_fetching
+ * - pools: Pool details
+ * - bb_entries: User's entry (redirect if none)
+ * - bb_pool_games: Games in this pool
+ * - bb_bowl_picks: User's existing picks
+ * - bb_cfp_pool_config: CFP settings and lock time
+ * - bb_cfp_pool_byes/round1: CFP bracket structure
+ * - bb_cfp_entry_picks: User's CFP picks
+ */
 export default async function PoolPicksPage({ params }: PageProps) {
   const { id } = await params
   const supabase = await createClient()

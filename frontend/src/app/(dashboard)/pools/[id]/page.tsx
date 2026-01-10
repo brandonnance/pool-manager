@@ -1,3 +1,41 @@
+/**
+ * @fileoverview Pool Detail Page - Main hub for all pool types
+ * @route /pools/[id]
+ * @auth Requires authentication; membership varies by pool visibility
+ * @layout Dashboard layout with header/nav
+ *
+ * @description
+ * Central page for viewing and managing any pool type. Dynamically renders
+ * content based on pool type (bowl_buster, playoff_squares, march_madness, etc.).
+ * Handles membership status, commissioner tools, and type-specific features.
+ *
+ * @pool_types
+ * - bowl_buster: Bowl picks with margin-of-victory scoring
+ * - playoff_squares: Football squares (single_game or playoffs mode)
+ * - march_madness: 64-player blind draw tournament
+ *
+ * @features
+ * - Pool header with status, member count, commissioner badge
+ * - Join/request membership buttons
+ * - Type-specific content rendering
+ * - Standings display (for bowl_buster)
+ * - Commissioner tools sidebar
+ * - Pool settings management
+ *
+ * @permissions
+ * - Super Admin: Full access to all pools
+ * - Org Admin: Implicit commissioner on all org pools
+ * - Pool Commissioner: Manage pool settings, games, members
+ * - Member: View content, make picks
+ * - Pending: Limited view, awaiting approval
+ *
+ * @components
+ * - PoolSettings: Activate/complete pool controls
+ * - SingleGameContent: Squares for single game mode
+ * - PlayoffContent: Squares for playoff mode
+ * - PoolStandings: Bowl buster standings table
+ * - MmPublicUrlCard: March Madness public URL management
+ */
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
@@ -13,10 +51,24 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 
+/** Page props with dynamic route parameters */
 interface PageProps {
   params: Promise<{ id: string }>
 }
 
+/**
+ * Pool detail page component (Server Component)
+ *
+ * @param props.params - Contains the pool id from the URL
+ * @returns Dynamic pool page based on pool type
+ *
+ * @data_fetching
+ * - pools: Pool details with org info
+ * - pool_memberships: User's membership and role
+ * - org_memberships: Org-level permissions
+ * - profiles: Super admin status
+ * - Type-specific data (sq_pools, mm_pools, bb_entries, etc.)
+ */
 export default async function PoolDetailPage({ params }: PageProps) {
   const { id } = await params
   const supabase = await createClient()

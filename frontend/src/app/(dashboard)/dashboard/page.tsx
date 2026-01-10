@@ -1,3 +1,30 @@
+/**
+ * @fileoverview Main Dashboard Page
+ * @route /dashboard
+ * @auth Requires authentication
+ * @layout Dashboard layout with header/nav
+ *
+ * @description
+ * The main landing page after login. Displays an overview of user's
+ * organizations and pools, grouped by organization. Shows quick stats
+ * and allows navigation to specific pools or orgs.
+ *
+ * @features
+ * - Quick stats: org count, active pools, total pools
+ * - Pools grouped by organization with role badges
+ * - Discoverable pools (open_to_org) shown with "Join" badge
+ * - Pending member counts for commissioners
+ * - Empty state with create org button
+ * - Links to org and pool detail pages
+ *
+ * @pool_visibility
+ * - Shows pools user is a member of
+ * - Shows discoverable pools in user's orgs they haven't joined
+ * - Pending counts shown for pools user can manage
+ *
+ * @components
+ * - CreateOrgButton: Create new organization (empty state)
+ */
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -5,6 +32,17 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { CreateOrgButton } from '@/components/orgs/create-org-button'
 
+/**
+ * Dashboard page component (Server Component)
+ *
+ * @returns Dashboard with org/pool overview and stats
+ *
+ * @data_fetching
+ * - org_memberships: User's orgs with roles
+ * - pool_memberships: User's pools with membership status
+ * - pools: Discoverable pools in user's orgs
+ * - pool_memberships (pending): Pending counts for managed pools
+ */
 export default async function DashboardPage() {
   const supabase = await createClient()
 

@@ -1,12 +1,51 @@
+/**
+ * @fileoverview Organization Members Management Page
+ * @route /orgs/[id]/members
+ * @auth Requires org admin or super admin
+ * @layout Dashboard layout with header/nav
+ *
+ * @description
+ * Allows org admins to view and manage organization members.
+ * Shows separate sections for admins and regular members with
+ * role management and removal capabilities.
+ *
+ * @features
+ * - View all org members grouped by role (admin/member)
+ * - Promote members to admin
+ * - Demote admins to member (if not last admin)
+ * - Remove members from organization
+ * - Responsive design with mobile cards and desktop tables
+ * - Protection against removing last admin
+ *
+ * @permissions
+ * - Only org admins and super admins can access this page
+ * - Cannot demote last admin
+ * - Cannot remove super admins (unless you are one)
+ *
+ * @components
+ * - OrgMemberActions: Action buttons for each member (promote/demote/remove)
+ */
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { OrgMemberActions } from '@/components/orgs/org-member-actions'
 
+/** Page props with dynamic route parameters */
 interface PageProps {
   params: Promise<{ id: string }>
 }
 
+/**
+ * Organization members management page component (Server Component)
+ *
+ * @param props.params - Contains the org id from the URL
+ * @returns Members management page with admin and member sections
+ *
+ * @data_fetching
+ * - organizations: Org name for breadcrumb
+ * - org_memberships: All memberships for this org
+ * - profiles: Display names and super admin status for all members
+ */
 export default async function OrgMembersPage({ params }: PageProps) {
   const { id } = await params
   const supabase = await createClient()

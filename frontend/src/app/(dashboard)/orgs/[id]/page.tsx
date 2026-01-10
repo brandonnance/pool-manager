@@ -1,3 +1,34 @@
+/**
+ * @fileoverview Organization Detail Page
+ * @route /orgs/[id]
+ * @auth Requires authentication; org membership for access
+ * @layout Dashboard layout with header/nav
+ *
+ * @description
+ * Displays organization details and lists all pools within the org.
+ * Admins can create/delete pools and manage members. Regular members
+ * see only pools they're members of or pools marked as open_to_org.
+ *
+ * @features
+ * - View organization name, member count, creation date
+ * - List pools with member counts and status badges
+ * - Create new pools (admin only)
+ * - Delete pools (admin only)
+ * - Manage members link (admin only)
+ * - Super admin can join org and delete org
+ * - Pending member notification badges on pool cards
+ *
+ * @permissions
+ * - Super Admin: Full access, can delete org
+ * - Org Admin: Create/delete pools, manage members
+ * - Member: View accessible pools only
+ *
+ * @components
+ * - CreatePoolButton: Modal to create new pool
+ * - DeletePoolButton: Confirmation to delete pool
+ * - DeleteOrgButton: Confirmation to delete org (super admin)
+ * - SuperAdminJoinOrgButton: Join org as super admin
+ */
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
@@ -9,10 +40,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 
+/** Page props with dynamic route parameters */
 interface PageProps {
   params: Promise<{ id: string }>
 }
 
+/**
+ * Organization detail page component (Server Component)
+ *
+ * @param props.params - Contains the org id from the URL
+ * @returns Full organization page with pools list
+ *
+ * @data_fetching
+ * - organizations: Org details by id
+ * - org_memberships: User's role in this org
+ * - profiles: Super admin status check
+ * - pools: All pools in org with memberships
+ */
 export default async function OrgDetailPage({ params }: PageProps) {
   const { id } = await params
   const supabase = await createClient()

@@ -1,3 +1,33 @@
+/**
+ * @fileoverview Onboarding Wizard Page
+ * @route /onboarding
+ * @auth Requires authentication (redirects to login if not)
+ * @layout Standalone (no dashboard layout)
+ *
+ * @description
+ * Four-step wizard for new users to set up their first organization and pool.
+ * Guides users through creating an org, pool, adding games, and generating
+ * an invite link. State is maintained via URL search params.
+ *
+ * @steps
+ * 1. Organization: Create a new organization (user becomes admin)
+ * 2. Pool: Create first pool (Bowl Buster or Squares)
+ * 3. Games: Add bowl games (skipped for Squares)
+ * 4. Invite: Generate and copy invite link
+ *
+ * @url_params
+ * - step: Current step number (1-4)
+ * - orgId: Created org ID (from step 1)
+ * - poolId: Created pool ID (from step 2)
+ * - poolType: Selected pool type
+ *
+ * @features
+ * - Visual progress indicator
+ * - Pool type selection (Bowl Buster, Squares)
+ * - Auto-generates invite link with 7-day expiry
+ * - Skip to dashboard option
+ * - Squares pools skip the games step
+ */
 'use client'
 
 import { useState, useEffect, Suspense } from 'react'
@@ -9,6 +39,7 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
+/** Available pool types during onboarding */
 type PoolType = 'bowl_buster' | 'playoff_squares'
 
 function generateToken(): string {
