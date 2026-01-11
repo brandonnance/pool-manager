@@ -131,7 +131,7 @@ export function SquareCell({
     if (isCommissioner) {
       // Commissioner sees verified status
       if (verified) {
-        return cn(base, 'bg-green-50 border-green-300')
+        return cn(base, 'bg-white border-gray-300')
       } else {
         // Unverified - white with red diagonal stripe
         return cn(base, 'bg-white border-red-300')
@@ -159,7 +159,7 @@ export function SquareCell({
       return 'truncate text-red-600'
     }
     if (isCommissioner && verified) {
-      return 'truncate text-green-700'
+      return 'truncate text-gray-700'
     }
     // Highlighted squares in public view
     if (isHighlighted) {
@@ -196,12 +196,12 @@ export function SquareCell({
       data-row={rowIndex}
       data-col={colIndex}
     >
-      {/* Red diagonal stripe for unverified commissioner view */}
-      {isCommissioner && isAssigned && !verified && !isWinning && (
+      {/* Red diagonal stripe for unverified commissioner view - always on top */}
+      {isCommissioner && isAssigned && !verified && (
         <div
-          className="absolute inset-0 pointer-events-none"
+          className="absolute inset-0 pointer-events-none z-20"
           style={{
-            background: 'linear-gradient(135deg, transparent 45%, rgb(239 68 68 / 0.3) 45%, rgb(239 68 68 / 0.3) 55%, transparent 55%)',
+            background: 'linear-gradient(135deg, transparent 45%, rgb(239 68 68 / 0.5) 45%, rgb(239 68 68 / 0.5) 55%, transparent 55%)',
           }}
         />
       )}

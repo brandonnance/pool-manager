@@ -298,14 +298,10 @@ export function SquaresGrid({
         </div>
         <div className="flex items-center gap-1">
           <div className="size-3 sm:size-4 rounded border border-gray-300 bg-white" />
-          <span>Claimed</span>
+          <span>Claimed/Verified</span>
         </div>
         {isCommissioner && (
           <>
-            <div className="flex items-center gap-1">
-              <div className="size-3 sm:size-4 rounded border border-green-300 bg-green-50" />
-              <span>Verified</span>
-            </div>
             <div className="flex items-center gap-1">
               <div
                 className="size-3 sm:size-4 rounded border border-red-300 bg-white"
