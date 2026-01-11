@@ -205,6 +205,9 @@ export default async function PoolDetailPage({ params }: PageProps) {
     status: string | null
     pays_halftime: boolean | null
     display_order: number | null
+    espn_game_id: string | null
+    current_period: number | null
+    current_clock: string | null
   }> = []
   let sqScoreChangesData: Array<{
     id: string

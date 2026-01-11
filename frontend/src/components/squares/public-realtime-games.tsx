@@ -22,6 +22,16 @@ interface Game {
   q3_away_score: number | null
   status: string | null
   round: string
+  current_period: number | null
+  current_clock: string | null
+}
+
+// Format quarter/period display
+function formatGameClock(period: number | null, clock: string | null): string | null {
+  if (period === null || clock === null) return null
+
+  const periodLabel = period <= 4 ? `Q${period}` : period === 5 ? 'OT' : `OT${period - 4}`
+  return `${periodLabel} ${clock}`
 }
 
 interface Winner {
@@ -153,6 +163,8 @@ export function PublicRealtimeGames({
                     home_team: updated.home_team,
                     away_team: updated.away_team,
                     game_name: updated.game_name,
+                    current_period: updated.current_period,
+                    current_clock: updated.current_clock,
                   }
                 : g
             )
@@ -387,7 +399,11 @@ export function PublicRealtimeGames({
                         isFinal && 'bg-emerald-100 text-emerald-700 border-emerald-200'
                       )}
                     >
-                      {isFinal ? '✓ Final' : isLive ? '● Live' : 'Scheduled'}
+                      {isFinal
+                        ? '✓ Final'
+                        : isLive
+                        ? `● ${formatGameClock(game.current_period, game.current_clock) || 'Live'}`
+                        : 'Scheduled'}
                     </Badge>
                   </div>
                 </div>

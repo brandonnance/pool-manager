@@ -116,6 +116,8 @@ export default async function PublicViewPage({ params }: PageProps) {
     q3_away_score: number | null
     status: string | null
     round: string
+    current_period: number | null
+    current_clock: string | null
   }> = []
   let winners: Array<{
     id: string

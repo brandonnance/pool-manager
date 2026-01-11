@@ -42,6 +42,9 @@ interface SqGame {
   q3_away_score: number | null
   status: string | null
   round: string
+  espn_game_id: string | null
+  current_period: number | null
+  current_clock: string | null
 }
 
 interface SqWinner {
@@ -1190,6 +1193,7 @@ export function SingleGameContent({
                       gameName={firstGame.game_name}
                       homeTeam={firstGame.home_team}
                       awayTeam={firstGame.away_team}
+                      espnGameId={firstGame.espn_game_id}
                     />
                   )}
                 </div>

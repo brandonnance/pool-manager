@@ -30,6 +30,7 @@ describe('GameScoreCard', () => {
     status: 'scheduled',
     pays_halftime: false,
     display_order: 1,
+    espn_game_id: null,
   }
 
   const defaultProps = {

@@ -1502,7 +1502,10 @@ export type Database = {
           away_score: number | null
           away_team: string
           created_at: string | null
+          current_clock: string | null
+          current_period: number | null
           display_order: number | null
+          espn_game_id: string | null
           game_name: string
           game_time: string | null
           halftime_away_score: number | null
@@ -1526,7 +1529,10 @@ export type Database = {
           away_score?: number | null
           away_team: string
           created_at?: string | null
+          current_clock?: string | null
+          current_period?: number | null
           display_order?: number | null
+          espn_game_id?: string | null
           game_name: string
           game_time?: string | null
           halftime_away_score?: number | null
@@ -1550,7 +1556,10 @@ export type Database = {
           away_score?: number | null
           away_team?: string
           created_at?: string | null
+          current_clock?: string | null
+          current_period?: number | null
           display_order?: number | null
+          espn_game_id?: string | null
           game_name?: string
           game_time?: string | null
           halftime_away_score?: number | null

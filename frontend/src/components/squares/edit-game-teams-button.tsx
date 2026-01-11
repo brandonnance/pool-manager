@@ -22,6 +22,7 @@ interface EditGameTeamsButtonProps {
   gameName: string
   homeTeam: string
   awayTeam: string
+  espnGameId: string | null
 }
 
 export function EditGameTeamsButton({
@@ -29,6 +30,7 @@ export function EditGameTeamsButton({
   gameName,
   homeTeam,
   awayTeam,
+  espnGameId,
 }: EditGameTeamsButtonProps) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -36,6 +38,7 @@ export function EditGameTeamsButton({
   const [error, setError] = useState<string | null>(null)
   const [home, setHome] = useState(homeTeam)
   const [away, setAway] = useState(awayTeam)
+  const [espnId, setEspnId] = useState(espnGameId ?? '')
 
   const handleSave = async () => {
     setIsLoading(true)
@@ -48,6 +51,7 @@ export function EditGameTeamsButton({
       .update({
         home_team: home.trim(),
         away_team: away.trim(),
+        espn_game_id: espnId.trim() || null,
       })
       .eq('id', gameId)
 
@@ -68,6 +72,7 @@ export function EditGameTeamsButton({
       // Reset to current values when opening
       setHome(homeTeam)
       setAway(awayTeam)
+      setEspnId(espnGameId ?? '')
       setError(null)
     }
   }
@@ -107,6 +112,21 @@ export function EditGameTeamsButton({
               onChange={(e) => setHome(e.target.value)}
               placeholder="e.g., Bills"
             />
+          </div>
+
+          <div className="pt-4 border-t space-y-2">
+            <Label htmlFor="espn-game-id">
+              ESPN Game ID <span className="text-muted-foreground font-normal">(optional)</span>
+            </Label>
+            <Input
+              id="espn-game-id"
+              value={espnId}
+              onChange={(e) => setEspnId(e.target.value)}
+              placeholder="e.g., 401772979"
+            />
+            <p className="text-xs text-muted-foreground">
+              Enter the ESPN game ID to enable live score syncing. Find this in the ESPN game URL.
+            </p>
           </div>
 
           {error && (

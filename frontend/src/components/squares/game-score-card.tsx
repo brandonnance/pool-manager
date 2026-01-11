@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { EnterSquaresScoreButton } from './enter-squares-score-button'
 import { EditGameTeamsButton } from './edit-game-teams-button'
+import { LiveScoringControl } from './live-scoring-control'
 import type { Square } from './squares-grid'
 
 interface SqGame {
@@ -19,6 +20,9 @@ interface SqGame {
   status: string | null
   pays_halftime: boolean | null
   display_order: number | null
+  espn_game_id: string | null
+  current_period: number | null
+  current_clock: string | null
 }
 
 interface SqWinner {
@@ -136,6 +140,7 @@ export function GameScoreCard({
               gameName={game.game_name}
               homeTeam={game.home_team}
               awayTeam={game.away_team}
+              espnGameId={game.espn_game_id}
             />
           )}
         </div>
@@ -261,23 +266,36 @@ export function GameScoreCard({
 
       {/* Commissioner controls at bottom */}
       {isCommissioner && numbersLocked && (
-        <div className="px-4 py-2 bg-muted/30 border-t flex justify-end">
-          <EnterSquaresScoreButton
+        <div className="px-4 py-2 bg-muted/30 border-t space-y-2">
+          {/* Live scoring control (only shows if ESPN ID is set) */}
+          <LiveScoringControl
             gameId={game.id}
             sqPoolId={sqPoolId}
-            gameName={game.game_name}
-            homeTeam={game.home_team}
-            awayTeam={game.away_team}
-            currentHomeScore={game.home_score}
-            currentAwayScore={game.away_score}
-            currentHalftimeHomeScore={game.halftime_home_score}
-            currentHalftimeAwayScore={game.halftime_away_score}
+            espnGameId={game.espn_game_id}
             currentStatus={game.status}
             paysHalftime={game.pays_halftime ?? false}
             reverseScoring={reverseScoring}
             rowNumbers={rowNumbers}
             colNumbers={colNumbers}
           />
+          <div className="flex justify-end">
+            <EnterSquaresScoreButton
+              gameId={game.id}
+              sqPoolId={sqPoolId}
+              gameName={game.game_name}
+              homeTeam={game.home_team}
+              awayTeam={game.away_team}
+              currentHomeScore={game.home_score}
+              currentAwayScore={game.away_score}
+              currentHalftimeHomeScore={game.halftime_home_score}
+              currentHalftimeAwayScore={game.halftime_away_score}
+              currentStatus={game.status}
+              paysHalftime={game.pays_halftime ?? false}
+              reverseScoring={reverseScoring}
+              rowNumbers={rowNumbers}
+              colNumbers={colNumbers}
+            />
+          </div>
         </div>
       )}
     </Card>

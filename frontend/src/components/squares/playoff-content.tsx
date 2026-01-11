@@ -9,6 +9,7 @@ import { PoolSettings } from './pool-settings'
 import { AssignNameDialog } from './assign-name-dialog'
 import { BulkAssignDialog } from './bulk-assign-dialog'
 import { EditGameTeamsButton } from './edit-game-teams-button'
+import { LiveScoringControl } from './live-scoring-control'
 import { ParticipantSummaryPanel } from './participant-summary-panel'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -40,6 +41,9 @@ interface SqGame {
   status: string | null
   pays_halftime: boolean | null
   display_order: number | null
+  espn_game_id: string | null
+  current_period: number | null
+  current_clock: string | null
 }
 
 interface SqWinner {
@@ -81,6 +85,14 @@ function getRoundLabel(round: string): string {
     default:
       return round
   }
+}
+
+// Format quarter/period display
+function formatGameClock(period: number | null, clock: string | null): string | null {
+  if (period === null || clock === null) return null
+
+  const periodLabel = period <= 4 ? `Q${period}` : period === 5 ? 'OT' : `OT${period - 4}`
+  return `${periodLabel} ${clock}`
 }
 
 // Score Entry Component for Playoff Games
@@ -423,11 +435,16 @@ function SimplePlayoffGameCard({
                 gameName={game.game_name}
                 homeTeam={game.home_team}
                 awayTeam={game.away_team}
+                espnGameId={game.espn_game_id}
               />
             </>
           )}
           <Badge variant={isFinal ? 'secondary' : game.status === 'in_progress' ? 'default' : 'outline'} className="text-xs">
-            {isFinal ? 'Final' : game.status === 'in_progress' ? 'Live' : 'Sched'}
+            {isFinal
+              ? 'Final'
+              : game.status === 'in_progress'
+              ? formatGameClock(game.current_period, game.current_clock) || 'Live'
+              : 'Sched'}
           </Badge>
         </div>
       </div>
@@ -449,6 +466,21 @@ function SimplePlayoffGameCard({
       {game.pays_halftime && game.halftime_home_score !== null && game.halftime_away_score !== null && (
         <div className="text-center text-xs text-muted-foreground mt-2">
           HT: {game.halftime_away_score} - {game.halftime_home_score}
+        </div>
+      )}
+      {/* Live scoring control for commissioners */}
+      {isCommissioner && game.espn_game_id && (
+        <div className="mt-2 pt-2 border-t">
+          <LiveScoringControl
+            gameId={game.id}
+            sqPoolId={sqPoolId}
+            espnGameId={game.espn_game_id}
+            currentStatus={game.status}
+            paysHalftime={game.pays_halftime ?? false}
+            reverseScoring={reverseScoring}
+            rowNumbers={rowNumbers}
+            colNumbers={colNumbers}
+          />
         </div>
       )}
     </div>

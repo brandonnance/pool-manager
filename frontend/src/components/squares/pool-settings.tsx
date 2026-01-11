@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -58,9 +58,17 @@ export function PoolSettings({
   const [isEditingSlug, setIsEditingSlug] = useState(false)
   const [slugInput, setSlugInput] = useState(publicSlug ?? '')
 
-  const publicUrl = publicSlug
-    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/view/${publicSlug}`
-    : null
+  // Use state for publicUrl to avoid hydration mismatch
+  const [publicUrl, setPublicUrl] = useState<string | null>(
+    publicSlug ? `/view/${publicSlug}` : null
+  )
+
+  // Update publicUrl with full origin after mount (client-side only)
+  useEffect(() => {
+    if (publicSlug) {
+      setPublicUrl(`${window.location.origin}/view/${publicSlug}`)
+    }
+  }, [publicSlug])
 
   const copyToClipboard = async () => {
     if (!publicUrl) return
