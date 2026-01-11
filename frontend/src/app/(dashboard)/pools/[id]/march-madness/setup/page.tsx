@@ -1,3 +1,30 @@
+/**
+ * @fileoverview March Madness tournament team setup page
+ * @route /pools/[id]/march-madness/setup
+ * @auth Commissioner only
+ * @layout Dashboard layout
+ *
+ * @description
+ * Commissioner page for setting up the 64 tournament teams.
+ * Teams are organized by region (East, West, South, Midwest) and seeded 1-16.
+ * Must be completed before the blind draw can be run.
+ *
+ * @features
+ * - Team selector for each region (seeds 1-16)
+ * - Progress indicator (X/64 teams added)
+ * - Team search from bb_teams master list
+ * - Demo seed button for testing (fills all 64 teams)
+ * - Warning when draw already completed
+ *
+ * @components
+ * - TeamSelector: Region-by-region team selection UI
+ * - DemoSeedButton: Quick-fill with demo teams for testing
+ *
+ * @data_fetching
+ * - pools: Pool details for breadcrumb/validation
+ * - mm_pools: Draw status to show warning if completed
+ * - mm_pool_teams: Existing team assignments with bb_teams join
+ */
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
@@ -9,6 +36,10 @@ interface PageProps {
   params: Promise<{ id: string }>
 }
 
+/**
+ * March Madness team setup page - Server Component
+ * Commissioner-only page for configuring the 64 tournament teams.
+ */
 export default async function MarchMadnessSetupPage({ params }: PageProps) {
   const { id } = await params
   const supabase = await createClient()

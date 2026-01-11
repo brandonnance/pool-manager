@@ -1,3 +1,38 @@
+/**
+ * @fileoverview March Madness entries management page
+ * @route /pools/[id]/march-madness/entries
+ * @auth Commissioner only
+ * @layout Dashboard layout
+ *
+ * @description
+ * Commissioner page for managing the 64 participant entries and running
+ * the random team draw. Supports manual entry addition and public link
+ * entry requests.
+ *
+ * @features
+ * - Add entries manually (participant display names)
+ * - Public link management for entry requests
+ * - Pending request approval/denial queue
+ * - Progress indicator (X/64 entries)
+ * - Random draw execution (requires 64 teams + 64 entries)
+ * - Draw status display with completion timestamp
+ * - Approved entries table with assigned teams (post-draw)
+ * - Delete entries (pre-draw only)
+ * - Demo seed button for testing
+ *
+ * @components
+ * - AddEntryDialog: Modal to add new participant name
+ * - PublicLinkManager: Generate/copy/delete public entry request link
+ * - EntryRequestActions: Approve/deny pending requests
+ * - RandomDrawButton: Execute the blind draw (assigns teams randomly)
+ * - DeleteEntryButton: Remove entry (pre-draw only)
+ * - DemoSeedButton: Quick-fill entries for testing
+ *
+ * @data_fetching
+ * - mm_pools: Draw status, public_slug
+ * - mm_entries: All entries (approved + pending), with team assignments
+ * - mm_pool_teams: Team count + details for assigned team display
+ */
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
@@ -18,6 +53,10 @@ interface PageProps {
   params: Promise<{ id: string }>
 }
 
+/**
+ * March Madness entries page - Server Component
+ * Commissioner-only page for managing participants and running the draw.
+ */
 export default async function MarchMadnessEntriesPage({ params }: PageProps) {
   const { id } = await params
   const supabase = await createClient()

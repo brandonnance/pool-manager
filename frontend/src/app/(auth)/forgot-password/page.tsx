@@ -1,3 +1,26 @@
+/**
+ * @fileoverview Forgot password page
+ * @route /forgot-password
+ * @auth Public
+ * @layout Auth layout (centered card with BN Pools branding)
+ *
+ * @description
+ * Password recovery initiation page. Sends a password reset email
+ * via Supabase Auth with a magic link that redirects to /reset-password.
+ *
+ * @features
+ * - Email input for password reset request
+ * - Supabase resetPasswordForEmail API call
+ * - Success state with confirmation message
+ * - Error handling for invalid emails
+ * - Back to login link
+ *
+ * @flow
+ * 1. User enters email and submits
+ * 2. Supabase sends reset email with link to /auth/callback?next=/reset-password
+ * 3. User clicks link, gets authenticated session
+ * 4. Redirected to /reset-password to set new password
+ */
 'use client'
 
 import { useState } from 'react'
@@ -8,6 +31,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
+/**
+ * Forgot password page - Client Component
+ * Handles password reset email request via Supabase Auth.
+ */
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
   const [error, setError] = useState<string | null>(null)

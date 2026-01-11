@@ -1,9 +1,40 @@
+/**
+ * @fileoverview Super Admin user management page
+ * @route /admin/users
+ * @auth Super Admin only (profiles.is_super_admin = true)
+ * @layout Dashboard layout with admin navigation
+ *
+ * @description
+ * Platform-wide user management interface for super administrators.
+ * Displays all users with their status, role, and org memberships.
+ * Allows deactivating/reactivating users and managing super admin roles.
+ *
+ * @features
+ * - User statistics cards (total, active, deactivated counts)
+ * - Responsive table/card view of all users
+ * - User status badges (Active/Deactivated)
+ * - Super Admin role badges
+ * - Organization membership counts per user
+ * - Action buttons for user management (via UserActions component)
+ *
+ * @components
+ * - UserActions: Dropdown with deactivate/reactivate/promote actions
+ *
+ * @data_fetching
+ * - profiles: All user profiles with display_name, email, status, role
+ * - org_memberships: Aggregated counts for each user
+ */
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { UserActions } from '@/components/admin/user-actions'
 
+/**
+ * Admin users page - Server Component
+ * Fetches all users and displays them in a management interface.
+ * Only accessible to super admins.
+ */
 export default async function AdminUsersPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

@@ -1,8 +1,33 @@
+/**
+ * @fileoverview Account deactivated notice page
+ * @route /account-deactivated
+ * @auth None (shown to users who have been deactivated)
+ * @layout Standalone (centered card)
+ *
+ * @description
+ * Static page shown to users whose accounts have been deactivated
+ * by a super admin. Users are redirected here by the middleware
+ * when their profile.deactivated_at is set.
+ *
+ * @features
+ * - Clear deactivation message
+ * - Instructions to contact administrator
+ * - Link back to login page
+ *
+ * @security
+ * Deactivated users cannot access any protected routes.
+ * The middleware checks profiles.deactivated_at on each request
+ * and redirects to this page if the account is deactivated.
+ */
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
+/**
+ * Account deactivated page - static notice
+ * Shown when user account has been deactivated by admin.
+ */
 export default function AccountDeactivatedPage() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">

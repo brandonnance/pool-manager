@@ -1,3 +1,35 @@
+/**
+ * @fileoverview Public squares grid view page
+ * @route /view/[slug]
+ * @auth Public (no authentication required)
+ * @layout Standalone (custom header/footer)
+ *
+ * @description
+ * Public view for NFL Playoff Squares pools in "no account mode".
+ * Allows anyone with the slug to view the grid, games, and winners
+ * without needing an account. Uses realtime subscriptions for live updates.
+ *
+ * @features
+ * - Anonymous access via public_slug
+ * - Realtime grid updates (squares claimed)
+ * - Realtime game/score updates
+ * - Winner highlighting with round-based colors
+ * - Support for multiple scoring modes (full_playoff, single_game, quarter, score_change)
+ * - Reverse scoring visualization
+ * - Status badges (Numbers Locked, Collecting Squares)
+ *
+ * @components
+ * - PublicRealtimeGrid: Realtime squares grid with winner highlighting
+ * - PublicRealtimeGames: Realtime games list with scores and winners
+ *
+ * @data_fetching
+ * - sq_pools: Pool settings by public_slug (no_account_mode must be true)
+ * - pools: Pool name and status
+ * - sq_squares: Grid squares with participant names
+ * - sq_games: Games with scores (if numbers locked)
+ * - sq_winners: Winner records for highlighting
+ * - sq_score_changes: Score change history (for score_change mode)
+ */
 import { notFound } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
@@ -11,7 +43,10 @@ interface PageProps {
   params: Promise<{ slug: string }>
 }
 
-// Create an anonymous Supabase client for public access
+/**
+ * Create an anonymous Supabase client for public access
+ * Uses anon key which respects RLS policies for public tables
+ */
 function createAnonClient() {
   return createClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

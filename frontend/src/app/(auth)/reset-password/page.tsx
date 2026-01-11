@@ -1,3 +1,27 @@
+/**
+ * @fileoverview Reset password page
+ * @route /reset-password
+ * @auth Requires valid password reset session (from email link)
+ * @layout Auth layout (centered card with BN Pools branding)
+ *
+ * @description
+ * Password update page accessed via email reset link.
+ * User must have a valid session from clicking the password reset email.
+ * Updates password via Supabase Auth updateUser API.
+ *
+ * @features
+ * - New password input with confirmation
+ * - Password validation (min 6 chars, match check)
+ * - Supabase updateUser API call
+ * - Redirect to dashboard on success with message
+ * - Error handling for invalid sessions or weak passwords
+ *
+ * @flow
+ * 1. User arrives from /auth/callback after clicking reset email
+ * 2. User enters and confirms new password
+ * 3. Supabase updates the password
+ * 4. User redirected to /dashboard?message=password-updated
+ */
 'use client'
 
 import { useState } from 'react'
@@ -9,6 +33,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
+/**
+ * Reset password page - Client Component
+ * Handles password update after user clicks reset link from email.
+ */
 export default function ResetPasswordPage() {
   const router = useRouter()
   const [password, setPassword] = useState('')

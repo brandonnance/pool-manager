@@ -1,3 +1,27 @@
+/**
+ * @fileoverview Account settings page
+ * @route /settings
+ * @auth Required (authenticated users only)
+ * @layout Dashboard layout
+ *
+ * @description
+ * User self-service account management page. Allows users to update
+ * their profile information, email address, and password.
+ *
+ * @features
+ * - Display name update (stored in profiles table)
+ * - Email address change (requires verification)
+ * - Password update (current password not required via Supabase)
+ *
+ * @components
+ * - UpdateProfileForm: Change display name
+ * - UpdateEmailForm: Change email (triggers verification email)
+ * - UpdatePasswordForm: Change password
+ *
+ * @data_fetching
+ * - auth.getUser(): Current user's auth data (email)
+ * - profiles: User's display_name
+ */
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { UpdateProfileForm } from '@/components/settings/update-profile-form'
@@ -6,6 +30,10 @@ import { UpdatePasswordForm } from '@/components/settings/update-password-form'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 
+/**
+ * Account settings page - Server Component
+ * Displays forms for updating profile, email, and password.
+ */
 export default async function SettingsPage() {
   const supabase = await createClient()
 

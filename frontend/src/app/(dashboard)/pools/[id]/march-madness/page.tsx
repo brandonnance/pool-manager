@@ -1,3 +1,31 @@
+/**
+ * @fileoverview March Madness pool main page
+ * @route /pools/[id]/march-madness
+ * @auth Pool member or commissioner
+ * @layout Dashboard layout
+ *
+ * @description
+ * Main hub for a March Madness blind draw pool. Shows standings, current
+ * tournament state, and navigation to commissioner tools. Entry point for
+ * participants to view their assigned team and tournament progress.
+ *
+ * @features
+ * - Tournament standings (entries sorted by team progress/payout)
+ * - Current round status and live games indicator
+ * - User's assigned team highlighted
+ * - Commissioner links to setup/entries/games management
+ * - Bracket visualization link
+ *
+ * @components
+ * - MarchMadnessContent: Main content component with standings and navigation
+ *
+ * @data_fetching
+ * - pools: Pool details for breadcrumb
+ * - mm_pools: March Madness config (tournament_year, draw_completed, etc.)
+ * - mm_entries: All entries with display names and team assignments
+ * - mm_pool_teams: Teams with seeds, regions, and elimination status
+ * - mm_games: All games with scores and status
+ */
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
@@ -7,6 +35,10 @@ interface PageProps {
   params: Promise<{ id: string }>
 }
 
+/**
+ * March Madness main page - Server Component
+ * Displays tournament standings and provides navigation to management pages.
+ */
 export default async function MarchMadnessPage({ params }: PageProps) {
   const { id } = await params
   const supabase = await createClient()

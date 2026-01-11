@@ -1,3 +1,39 @@
+/**
+ * @fileoverview March Madness score entry page
+ * @route /pools/[id]/march-madness/games
+ * @auth Commissioner only
+ * @layout Dashboard layout
+ *
+ * @description
+ * Commissioner page for entering game scores and spreads.
+ * Games are organized by tournament round (R64 → Final).
+ * Marking games final triggers entry elimination and bracket progression.
+ *
+ * @features
+ * - Games grouped by round (Round of 64, 32, Sweet 16, Elite 8, Final Four, Championship)
+ * - Score entry dialog for each game
+ * - Spread entry for betting line tracking
+ * - Game status badges (Scheduled, Live, Final)
+ * - Progress indicator (X/63 games complete)
+ * - Winner highlighting (green text on winning team)
+ * - Seed display and spread indicators
+ *
+ * @components
+ * - EnterScoreDialog: Modal to enter/update scores and mark final
+ * - EnterSpreadDialog: Modal to set betting spread before game starts
+ *
+ * @data_fetching
+ * - mm_pools: Draw status check
+ * - mm_games: All 63 tournament games with scores/status
+ * - mm_pool_teams: Team details for display (name, seed, abbrev)
+ *
+ * @game_flow
+ * When a game is marked final:
+ * 1. Losing entry is marked eliminated
+ * 2. Spread covering team is calculated
+ * 3. Winning entry advances to next round game
+ * 4. Payouts are calculated based on payout percentages
+ */
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
@@ -9,7 +45,10 @@ interface PageProps {
   params: Promise<{ id: string }>
 }
 
+/** Order of tournament rounds from first to last */
 const ROUND_ORDER = ['R64', 'R32', 'S16', 'E8', 'F4', 'Final']
+
+/** Human-readable labels for each round */
 const ROUND_LABELS: Record<string, string> = {
   'R64': 'Round of 64',
   'R32': 'Round of 32',

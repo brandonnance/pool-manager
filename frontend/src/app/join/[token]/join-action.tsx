@@ -1,14 +1,40 @@
+/**
+ * @fileoverview Join pool action component
+ * @route Used on /join/[token] page
+ * @auth Required (user must be authenticated)
+ *
+ * @description
+ * Client component that handles the pool join request submission.
+ * Calls the request_join_pool RPC to create a pending pool membership.
+ * Shows success message and redirects to dashboard on completion.
+ *
+ * @features
+ * - Calls request_join_pool RPC with invite token
+ * - Loading state during submission
+ * - Error handling with user-friendly messages
+ * - Success state with pending approval message
+ * - Auto-redirect to dashboard after join
+ *
+ * @flow
+ * 1. User clicks "Request to Join" button
+ * 2. RPC creates pool_membership with status='pending'
+ * 3. RPC also creates org_membership if user not already in org
+ * 4. Success message shown, redirect to dashboard after 2s
+ * 5. Commissioner approves request via /pools/[id]/members
+ */
 'use client'
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
+/** Props for JoinPoolAction component */
 interface JoinPoolActionProps {
   token: string
   poolId: string
 }
 
+/** Result from request_join_pool RPC */
 interface JoinResult {
   success: boolean
   error?: string
@@ -17,6 +43,10 @@ interface JoinResult {
   membership_id?: string
 }
 
+/**
+ * Join pool action button - Client Component
+ * Handles the RPC call to request pool membership.
+ */
 export function JoinPoolAction({ token, poolId }: JoinPoolActionProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)

@@ -1,3 +1,31 @@
+/**
+ * @fileoverview March Madness full bracket view page
+ * @route /pools/[id]/march-madness/bracket
+ * @auth Pool member or commissioner
+ * @layout Dashboard layout
+ *
+ * @description
+ * Full tournament bracket visualization for March Madness pools.
+ * Shows all 63 games across 6 rounds in traditional bracket format.
+ * Available to all pool members after the draw is completed.
+ *
+ * @features
+ * - Traditional bracket layout (4 regions → Final Four → Championship)
+ * - Team seeds and names displayed
+ * - Game scores for completed games
+ * - Winner highlighting
+ * - Current user's team highlighted
+ * - Responsive design for mobile viewing
+ *
+ * @components
+ * - BracketView: Full bracket visualization component
+ *
+ * @data_fetching
+ * - mm_pools: Draw status (bracket hidden until draw complete)
+ * - mm_games: All games with scores and matchups
+ * - mm_entries: Entry data for user highlighting
+ * - mm_pool_teams: Teams with names and seeds
+ */
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
@@ -8,6 +36,10 @@ interface PageProps {
   params: Promise<{ id: string }>
 }
 
+/**
+ * March Madness bracket page - Server Component
+ * Displays the full tournament bracket after draw completion.
+ */
 export default async function MarchMadnessBracketPage({ params }: PageProps) {
   const { id } = await params
   const supabase = await createClient()
