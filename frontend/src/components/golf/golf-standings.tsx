@@ -5,8 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ChevronDown, ChevronUp, Trophy } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { getTierColor, getTierLabel } from '@/lib/golf/types'
-import { formatRoundScore, formatScoreToPar } from '@/lib/golf/scoring'
+import { getTierColor } from '@/lib/golf/types'
 
 interface GolferScore {
   golferId: string
@@ -16,9 +15,19 @@ interface GolferScore {
   round2: number | null
   round3: number | null
   round4: number | null
-  totalScore: number
+  totalScore: number // This is now to-par, not stroke total
+  toPar?: number
+  thru?: number | null
+  position?: string | null
   madeCut: boolean
   counted: boolean
+}
+
+// Format a to-par score for display (E, +5, -3, etc.)
+function formatToPar(toPar: number): string {
+  if (toPar === 0) return 'E'
+  if (toPar > 0) return `+${toPar}`
+  return toPar.toString()
 }
 
 interface EntryStanding {
@@ -40,7 +49,7 @@ interface GolfStandingsProps {
   totalPar: number
 }
 
-export function GolfStandings({ standings, currentUserId, tournamentStatus, parPerRound, totalPar }: GolfStandingsProps) {
+export function GolfStandings({ standings, currentUserId, tournamentStatus }: GolfStandingsProps) {
   const [expandedEntries, setExpandedEntries] = useState<Set<string>>(new Set())
 
   function toggleEntry(entryId: string) {
@@ -84,11 +93,6 @@ export function GolfStandings({ standings, currentUserId, tournamentStatus, parP
             const isExpanded = expandedEntries.has(entry.entryId)
             const isCurrentUser = entry.userId === currentUserId
             const isWinner = entry.rank === 1 && tournamentStatus === 'completed'
-
-            // Calculate effective par for entry based on counted golfers' rounds played
-            const countedGolfers = entry.golferScores.filter(g => g.counted)
-            const totalRoundsPlayed = countedGolfers.reduce((sum, g) => sum + countRoundsPlayed(g), 0)
-            const entryEffectivePar = parPerRound * totalRoundsPlayed
 
             return (
               <div key={entry.entryId}>
@@ -136,20 +140,15 @@ export function GolfStandings({ standings, currentUserId, tournamentStatus, parP
                   </div>
 
                   <div className="flex items-center gap-3">
-                    {/* Score */}
+                    {/* Score - entry.score is already to-par */}
                     <div className="text-right">
-                      {entry.score !== null && totalRoundsPlayed > 0 ? (
-                        <div className="flex flex-col items-end">
-                          <div className={cn(
-                            'font-mono font-bold text-lg',
-                            entry.score < entryEffectivePar && 'text-green-600',
-                            entry.score > entryEffectivePar && 'text-red-600'
-                          )}>
-                            {formatScoreToPar(entry.score, entryEffectivePar)}
-                          </div>
-                          <div className="text-xs text-muted-foreground font-mono">
-                            {entry.score}
-                          </div>
+                      {entry.score !== null ? (
+                        <div className={cn(
+                          'font-mono font-bold text-lg',
+                          entry.score < 0 && 'text-green-600',
+                          entry.score > 0 && 'text-red-600'
+                        )}>
+                          {formatToPar(entry.score)}
                         </div>
                       ) : (
                         <div className="text-muted-foreground">-</div>
@@ -168,33 +167,36 @@ export function GolfStandings({ standings, currentUserId, tournamentStatus, parP
                 {/* Expanded Details */}
                 {isExpanded && entry.golferScores.length > 0 && (
                   <div className="px-2 pb-4">
+                    {/* Column Headers */}
+                    <div className="grid grid-cols-[2.5rem_1fr_3rem_2.5rem_2.5rem_2.5rem_2.5rem_2.5rem] gap-1 text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 px-2">
+                      <span>POS</span>
+                      <span>GOLFER</span>
+                      <span className="text-right">TOT</span>
+                      <span className="text-center">THR</span>
+                      <span className="text-center">R1</span>
+                      <span className="text-center">R2</span>
+                      <span className="text-center">R3</span>
+                      <span className="text-center">R4</span>
+                    </div>
+
                     {/* Counted Golfers (Best 4) */}
-                    <div className="mb-3">
-                      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-                        Counted (Best 4)
-                      </div>
-                      <div className="space-y-1">
-                        {entry.golferScores
-                          .filter(g => g.counted)
-                          .map(golfer => (
-                            <GolferScoreRow key={golfer.golferId} golfer={golfer} parPerRound={parPerRound} />
-                          ))}
-                      </div>
+                    <div className="space-y-1 mb-3">
+                      {entry.golferScores
+                        .filter(g => g.counted)
+                        .map(golfer => (
+                          <GolferScoreRow key={golfer.golferId} golfer={golfer} />
+                        ))}
                     </div>
 
                     {/* Dropped Golfers (Worst 2) */}
                     {entry.golferScores.filter(g => !g.counted).length > 0 && (
-                      <div>
-                        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-                          Dropped (Worst 2)
-                        </div>
-                        <div className="space-y-1 opacity-60">
-                          {entry.golferScores
-                            .filter(g => !g.counted)
-                            .map(golfer => (
-                              <GolferScoreRow key={golfer.golferId} golfer={golfer} parPerRound={parPerRound} />
-                            ))}
-                        </div>
+                      <div className="space-y-1 opacity-50">
+                        <div className="text-xs text-muted-foreground px-2 pt-1 border-t">Dropped</div>
+                        {entry.golferScores
+                          .filter(g => !g.counted)
+                          .map(golfer => (
+                            <GolferScoreRow key={golfer.golferId} golfer={golfer} />
+                          ))}
                       </div>
                     )}
                   </div>
@@ -208,61 +210,85 @@ export function GolfStandings({ standings, currentUserId, tournamentStatus, parP
   )
 }
 
-// Count how many rounds a golfer has actually played
-function countRoundsPlayed(golfer: GolferScore): number {
-  let count = 0
-  if (golfer.round1 !== null) count++
-  if (golfer.round2 !== null) count++
-  // For missed cut, they've "played" 4 rounds (with penalty scores)
-  if (!golfer.madeCut) return 4
-  if (golfer.round3 !== null) count++
-  if (golfer.round4 !== null) count++
-  return count
-}
+function GolferScoreRow({ golfer }: { golfer: GolferScore }) {
+  // golfer.totalScore is already to-par
+  const toPar = golfer.totalScore
 
-function GolferScoreRow({ golfer, parPerRound }: { golfer: GolferScore; parPerRound: number }) {
-  const roundsPlayed = countRoundsPlayed(golfer)
-  const effectivePar = parPerRound * roundsPlayed
-  const scoreToPar = roundsPlayed > 0 ? formatScoreToPar(golfer.totalScore, effectivePar) : '-'
+  // Format thru display - show CUT if missed cut, F if finished round, hole number otherwise
+  const getThruDisplay = () => {
+    if (!golfer.madeCut) return 'CUT'
+    if (golfer.thru === 18) return 'F'
+    // If thru is null but we have a completed round score, infer they finished
+    // Check the most recent round that has a score
+    if (golfer.thru === null || golfer.thru === undefined) {
+      // If any round score exists, they've finished at least that round
+      if (golfer.round1 !== null || golfer.round2 !== null || golfer.round3 !== null || golfer.round4 !== null) {
+        return 'F'
+      }
+      return '-'
+    }
+    return golfer.thru.toString()
+  }
+
+  // Format round score - show 80 for cut players in R3/R4
+  const formatRound = (score: number | null, roundNum: number): string => {
+    if (!golfer.madeCut && (roundNum === 3 || roundNum === 4)) {
+      return '80'
+    }
+    if (score === null || score === undefined) return '-'
+    return score.toString()
+  }
 
   return (
-    <div className="flex items-center justify-between py-1 px-2 rounded bg-muted/30">
-      <div className="flex items-center gap-2">
+    <div className="grid grid-cols-[2.5rem_1fr_3rem_2.5rem_2.5rem_2.5rem_2.5rem_2.5rem] gap-1 py-1.5 px-2 rounded bg-muted/30 text-sm font-mono items-center">
+      {/* Position */}
+      <span className="text-muted-foreground text-xs">{golfer.position ?? '-'}</span>
+
+      {/* Golfer name with tier badge */}
+      <div className="flex items-center gap-1.5 font-sans min-w-0">
         <span className={cn(
-          'w-5 h-5 flex items-center justify-center rounded text-xs text-white font-medium',
+          'w-5 h-5 flex-shrink-0 flex items-center justify-center rounded text-xs text-white font-medium',
           getTierColor(golfer.tier)
         )}>
           {golfer.tier}
         </span>
-        <span className="text-sm">{golfer.golferName}</span>
-        {!golfer.madeCut && (
-          <Badge variant="destructive" className="text-xs">CUT</Badge>
-        )}
+        <span className={cn('truncate', !golfer.madeCut && 'line-through text-muted-foreground')}>
+          {golfer.golferName}
+        </span>
       </div>
 
-      <div className="flex items-center gap-2 font-mono text-sm">
-        <span className="text-muted-foreground">{formatRoundScore(golfer.round1)}</span>
-        <span className="text-muted-foreground">{formatRoundScore(golfer.round2)}</span>
-        {golfer.madeCut ? (
-          <>
-            <span className="text-muted-foreground">{formatRoundScore(golfer.round3)}</span>
-            <span className="text-muted-foreground">{formatRoundScore(golfer.round4)}</span>
-          </>
-        ) : (
-          <>
-            <span className="text-destructive">+80</span>
-            <span className="text-destructive">+80</span>
-          </>
-        )}
-        <span className={cn(
-          'font-bold ml-2 min-w-[40px] text-right',
-          roundsPlayed > 0 && golfer.totalScore < effectivePar && 'text-green-600',
-          roundsPlayed > 0 && golfer.totalScore > effectivePar && 'text-red-600'
-        )}>
-          {scoreToPar}
-        </span>
-        <span className="text-xs text-muted-foreground w-8 text-right">{golfer.totalScore}</span>
-      </div>
+      {/* Total to-par */}
+      <span className={cn(
+        'text-right font-bold',
+        toPar < 0 && 'text-green-600',
+        toPar > 0 && 'text-red-600'
+      )}>
+        {formatToPar(toPar)}
+      </span>
+
+      {/* Thru */}
+      <span className={cn(
+        'text-center text-xs',
+        !golfer.madeCut ? 'text-red-600 font-medium' : 'text-muted-foreground'
+      )}>
+        {getThruDisplay()}
+      </span>
+
+      {/* R1-R4 */}
+      <span className="text-center text-muted-foreground">{formatRound(golfer.round1, 1)}</span>
+      <span className="text-center text-muted-foreground">{formatRound(golfer.round2, 2)}</span>
+      <span className={cn(
+        'text-center',
+        !golfer.madeCut ? 'text-red-600' : 'text-muted-foreground'
+      )}>
+        {formatRound(golfer.round3, 3)}
+      </span>
+      <span className={cn(
+        'text-center',
+        !golfer.madeCut ? 'text-red-600' : 'text-muted-foreground'
+      )}>
+        {formatRound(golfer.round4, 4)}
+      </span>
     </div>
   )
 }

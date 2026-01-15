@@ -97,32 +97,40 @@ export interface SlashGolfTournamentPlayer {
 
 // Leaderboard response
 export interface SlashGolfLeaderboardResponse {
+  orgId: string
+  year: string
   tournId: string
-  name: string
-  status: 'scheduled' | 'in_progress' | 'completed'
-  currentRound: number
-  cutLine: number | null
-  leaderboard: SlashGolfLeaderboardEntry[]
+  status: string // "Official", "In Progress", etc.
+  roundId: MongoNumber
+  roundStatus: string
+  cutLines?: Array<{ cutCount: MongoNumber; cutScore: string }>
+  leaderboardRows: SlashGolfLeaderboardEntry[]
 }
 
 export interface SlashGolfLeaderboardEntry {
   playerId: string
   firstName: string
   lastName: string
-  country: string
-  position: number
-  status: 'active' | 'cut' | 'wd' | 'dq'
-  total: number
-  toPar: number
-  thru: string | number
-  today: number
+  isAmateur?: boolean
+  courseId?: string
+  status: string // "complete", "active", "cut", "wd", "dq"
+  position: string // "1", "T2", etc.
+  total: string // To par, e.g., "-16", "E", "+5"
+  totalStrokesFromCompletedRounds?: string
+  currentRoundScore?: string
+  currentHole?: MongoNumber
+  roundComplete?: boolean
+  thru: string | number // "F" for finished, or hole number
+  currentRound?: MongoNumber
   rounds: SlashGolfRound[]
 }
 
 export interface SlashGolfRound {
-  roundId: number
-  score: number
-  toPar: number
+  roundId: MongoNumber
+  strokes: MongoNumber
+  scoreToPar: string
+  courseId?: string
+  courseName?: string
 }
 
 // World Rankings response

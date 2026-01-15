@@ -6,14 +6,20 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Trophy, MapPin, Search, ChevronDown, ChevronUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { getTierColor } from '@/lib/golf/types'
 
 interface Pick {
   golferId: string
   golferName: string
+  tier: number
   score: number
   position: string
   madeCut: boolean
   thru: number | null
+  round1: number | null
+  round2: number | null
+  round3: number | null
+  round4: number | null
 }
 
 interface Entry {
@@ -48,32 +54,42 @@ export function GolfPublicLeaderboard({
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null)
 
-  // Filter entries by search query (entry name only for privacy)
-  const filteredEntries = useMemo(() => {
-    if (!searchQuery.trim()) return entries
-    const query = searchQuery.toLowerCase()
-    return entries.filter((e) =>
-      e.entryName.toLowerCase().includes(query)
-    )
-  }, [entries, searchQuery])
-
-  // Calculate rankings (handle ties)
+  // Calculate rankings on FULL list first (handle ties)
   const rankedEntries = useMemo(() => {
+    // Count entries at each score to detect ties
+    const scoreCounts = new Map<number, number>()
+    entries.forEach(entry => {
+      scoreCounts.set(entry.totalScore, (scoreCounts.get(entry.totalScore) || 0) + 1)
+    })
+
     let currentRank = 1
     let previousScore: number | null = null
 
-    return filteredEntries.map((entry, index) => {
+    return entries.map((entry, index) => {
       if (previousScore !== null && entry.totalScore > previousScore) {
         currentRank = index + 1
       }
       previousScore = entry.totalScore
 
+      // Entry is tied if more than one entry has the same score
+      const isTied = (scoreCounts.get(entry.totalScore) || 0) > 1
+
       return {
         ...entry,
         rank: currentRank,
+        tied: isTied,
       }
     })
-  }, [filteredEntries])
+  }, [entries])
+
+  // Filter ranked entries by search query (preserves original rankings)
+  const filteredEntries = useMemo(() => {
+    if (!searchQuery.trim()) return rankedEntries
+    const query = searchQuery.toLowerCase()
+    return rankedEntries.filter((e) =>
+      e.entryName.toLowerCase().includes(query)
+    )
+  }, [rankedEntries, searchQuery])
 
   const toggleExpanded = (entryId: string) => {
     setExpandedEntryId((prev) => (prev === entryId ? null : entryId))
@@ -130,13 +146,13 @@ export function GolfPublicLeaderboard({
             <CardTitle className="text-lg">Standings</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            {rankedEntries.length === 0 ? (
+            {filteredEntries.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground">
                 {searchQuery ? 'No entries match your search' : 'No entries yet'}
               </div>
             ) : (
               <div className="divide-y">
-                {rankedEntries.map((entry) => {
+                {filteredEntries.map((entry) => {
                   const isExpanded = expandedEntryId === entry.id
                   const isLeader = entry.rank === 1
 
@@ -151,7 +167,7 @@ export function GolfPublicLeaderboard({
                           isLeader && 'bg-amber-50/50'
                         )}
                       >
-                        {/* Rank */}
+                        {/* Rank - show T prefix for ties */}
                         <div className={cn(
                           'w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0',
                           isLeader
@@ -160,7 +176,7 @@ export function GolfPublicLeaderboard({
                             ? 'bg-gray-100 text-gray-700'
                             : 'bg-gray-50 text-gray-500'
                         )}>
-                          {entry.rank}
+                          {entry.tied ? 'T' : ''}{entry.rank}
                         </div>
 
                         {/* Entry Info */}
@@ -195,42 +211,107 @@ export function GolfPublicLeaderboard({
                       {/* Expanded Picks */}
                       {isExpanded && (
                         <div className="px-4 pb-4 bg-muted/30">
-                          <div className="pt-2 grid gap-2">
-                            {entry.picks.map((pick, i) => (
-                              <div
-                                key={pick.golferId}
-                                className={cn(
-                                  'flex items-center justify-between text-sm py-1.5 px-3 rounded bg-white border',
-                                  !pick.madeCut && 'opacity-60'
-                                )}
-                              >
-                                <div className="flex items-center gap-2">
-                                  <span className="text-muted-foreground w-5">
-                                    {i + 1}.
-                                  </span>
-                                  <span className={cn(!pick.madeCut && 'line-through')}>
-                                    {pick.golferName}
-                                  </span>
-                                  {!pick.madeCut && (
-                                    <Badge variant="outline" className="text-xs">
-                                      MC
-                                    </Badge>
+                          {/* Column Headers */}
+                          <div className="grid grid-cols-[2.5rem_1fr_3rem_2.5rem_2.5rem_2.5rem_2.5rem_2.5rem] gap-1 text-xs font-medium text-muted-foreground uppercase tracking-wide pt-2 pb-1 px-3">
+                            <span>POS</span>
+                            <span>GOLFER</span>
+                            <span className="text-right">TOT</span>
+                            <span className="text-center">THR</span>
+                            <span className="text-center">R1</span>
+                            <span className="text-center">R2</span>
+                            <span className="text-center">R3</span>
+                            <span className="text-center">R4</span>
+                          </div>
+                          <div className="grid gap-1">
+                            {/* Sort picks by score (best first), then mark last 2 as dropped */}
+                            {[...entry.picks].sort((a, b) => a.score - b.score).map((pick, pickIndex) => {
+                              const isDropped = pickIndex >= 4 // Last 2 golfers (indices 4, 5) are dropped
+                              // Format thru display - show CUT if missed cut, F if finished, hole number otherwise
+                              const getThruDisplay = () => {
+                                if (!pick.madeCut) return 'CUT'
+                                if (pick.thru === 18) return 'F'
+                                // If thru is null but we have a completed round score, infer they finished
+                                if (pick.thru === null || pick.thru === undefined) {
+                                  if (pick.round1 !== null || pick.round2 !== null || pick.round3 !== null || pick.round4 !== null) {
+                                    return 'F'
+                                  }
+                                  return '-'
+                                }
+                                return pick.thru.toString()
+                              }
+                              const thruDisplay = getThruDisplay()
+
+                              // Format round score - show 80 for cut players in R3/R4
+                              const formatRound = (score: number | null, roundNum: number): string => {
+                                if (!pick.madeCut && (roundNum === 3 || roundNum === 4)) {
+                                  return '80'
+                                }
+                                if (score === null || score === undefined) return '-'
+                                return score.toString()
+                              }
+
+                              return (
+                                <div
+                                  key={pick.golferId}
+                                  className={cn(
+                                    'grid grid-cols-[2.5rem_1fr_3rem_2.5rem_2.5rem_2.5rem_2.5rem_2.5rem] gap-1 text-sm py-1.5 px-3 rounded border items-center font-mono',
+                                    isDropped ? 'bg-red-50 border-red-200' : 'bg-white',
+                                    !pick.madeCut && 'opacity-60'
                                   )}
-                                </div>
-                                <div className="flex items-center gap-3">
-                                  <span className="text-xs text-muted-foreground">
+                                >
+                                  {/* Position */}
+                                  <span className="text-muted-foreground text-xs">
                                     {pick.position}
                                   </span>
+
+                                  {/* Golfer name with tier badge */}
+                                  <div className="flex items-center gap-1.5 font-sans min-w-0">
+                                    <span className={cn(
+                                      'w-5 h-5 flex-shrink-0 flex items-center justify-center rounded text-xs text-white font-medium',
+                                      getTierColor(pick.tier)
+                                    )}>
+                                      {pick.tier}
+                                    </span>
+                                    <span className={cn('truncate', !pick.madeCut && 'line-through text-muted-foreground')}>
+                                      {pick.golferName}
+                                    </span>
+                                  </div>
+
+                                  {/* Total to-par */}
                                   <span className={cn(
-                                    'font-mono font-medium',
+                                    'font-bold text-right',
                                     pick.score < 0 && 'text-green-600',
                                     pick.score > 0 && 'text-red-600'
                                   )}>
                                     {formatScore(pick.score)}
                                   </span>
+
+                                  {/* Thru */}
+                                  <span className={cn(
+                                    'text-center text-xs',
+                                    !pick.madeCut ? 'text-red-600 font-medium' : 'text-muted-foreground'
+                                  )}>
+                                    {thruDisplay}
+                                  </span>
+
+                                  {/* R1-R4 */}
+                                  <span className="text-center text-muted-foreground">{formatRound(pick.round1, 1)}</span>
+                                  <span className="text-center text-muted-foreground">{formatRound(pick.round2, 2)}</span>
+                                  <span className={cn(
+                                    'text-center',
+                                    !pick.madeCut ? 'text-red-600' : 'text-muted-foreground'
+                                  )}>
+                                    {formatRound(pick.round3, 3)}
+                                  </span>
+                                  <span className={cn(
+                                    'text-center',
+                                    !pick.madeCut ? 'text-red-600' : 'text-muted-foreground'
+                                  )}>
+                                    {formatRound(pick.round4, 4)}
+                                  </span>
                                 </div>
-                              </div>
-                            ))}
+                              )
+                            })}
                           </div>
                         </div>
                       )}

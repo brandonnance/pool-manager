@@ -60,6 +60,9 @@ export interface GolferEntryScore {
   round3?: number | null
   round4?: number | null
   totalScore: number
+  toPar?: number // Live score relative to par
+  thru?: number | null // Holes completed in current round
+  position?: string | null // Tournament position (e.g., "1", "T2")
   madeCut: boolean
   counted: boolean // Whether this golfer counts towards best 4
 }

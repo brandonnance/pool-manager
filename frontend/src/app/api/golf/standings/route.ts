@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
   // Get golfer results
   const { data: results } = await supabase
     .from('gp_golfer_results')
-    .select('golfer_id, round_1, round_2, round_3, round_4, made_cut, total_score')
+    .select('golfer_id, round_1, round_2, round_3, round_4, made_cut, total_score, to_par, thru, position')
     .eq('tournament_id', gpPool.tournament_id)
 
   const resultMap = new Map(results?.map(r => [r.golfer_id, r]) || [])
@@ -98,13 +98,10 @@ export async function GET(request: NextRequest) {
     const golferScores = entryPicks.map(pick => {
       const result = resultMap.get(pick.golfer_id)
       const madeCut = result?.made_cut ?? true
-      const totalScore = calculateGolferScore(
-        result?.round_1,
-        result?.round_2,
-        result?.round_3,
-        result?.round_4,
-        madeCut
-      )
+
+      // Always use to_par for scoring - it's relative to par (e.g., -5 means 5 under)
+      // This is consistent whether golfer is mid-round or finished
+      const toPar = result?.to_par ?? 0
 
       return {
         golferId: pick.golfer_id,
@@ -114,7 +111,10 @@ export async function GET(request: NextRequest) {
         round2: result?.round_2 ?? null,
         round3: result?.round_3 ?? null,
         round4: result?.round_4 ?? null,
-        totalScore,
+        totalScore: toPar, // Always use to_par for scoring
+        toPar,
+        thru: result?.thru ?? null,
+        position: result?.position ?? null,
         madeCut,
         counted: false, // Will be set by calculateEntryScore
       }

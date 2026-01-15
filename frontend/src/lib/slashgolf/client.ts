@@ -154,29 +154,36 @@ export class SlashGolfClient {
     const leaderboard = await this.getLeaderboard(tournId, year)
 
     // Handle case where leaderboard data is not available yet
-    if (!leaderboard || !leaderboard.leaderboard || !Array.isArray(leaderboard.leaderboard)) {
+    if (!leaderboard || !leaderboard.leaderboardRows || !Array.isArray(leaderboard.leaderboardRows)) {
       console.log('[SlashGolf] No leaderboard data available for tournament', tournId)
       return []
     }
 
-    return leaderboard.leaderboard.map(p => {
+    return leaderboard.leaderboardRows.map(p => {
       const rounds = p.rounds || []
-      const r1 = rounds.find(r => r.roundId === 1)
-      const r2 = rounds.find(r => r.roundId === 2)
-      const r3 = rounds.find(r => r.roundId === 3)
-      const r4 = rounds.find(r => r.roundId === 4)
+      // roundId is MongoDB number format: { "$numberInt": "1" }
+      const r1 = rounds.find(r => parseMongoNumber(r.roundId) === 1)
+      const r2 = rounds.find(r => parseMongoNumber(r.roundId) === 2)
+      const r3 = rounds.find(r => parseMongoNumber(r.roundId) === 3)
+      const r4 = rounds.find(r => parseMongoNumber(r.roundId) === 4)
+
+      // Parse to-par string (e.g., "-16", "E", "+5") to number
+      const parseToPar = (val: string): number => {
+        if (val === 'E') return 0
+        return parseInt(val) || 0
+      }
 
       return {
         playerId: p.playerId,
         playerName: `${p.firstName} ${p.lastName}`,
-        position: p.position ? String(p.position) : '-',
-        tied: false, // Slash Golf doesn't provide tied flag directly
-        round1: r1?.score,
-        round2: r2?.score,
-        round3: r3?.score,
-        round4: r4?.score,
-        totalStrokes: p.total,
-        toPar: p.toPar,
+        position: p.position || '-',
+        tied: p.position?.startsWith('T') || false,
+        round1: parseMongoNumber(r1?.strokes),
+        round2: parseMongoNumber(r2?.strokes),
+        round3: parseMongoNumber(r3?.strokes),
+        round4: parseMongoNumber(r4?.strokes),
+        totalStrokes: p.totalStrokesFromCompletedRounds ? parseInt(p.totalStrokesFromCompletedRounds) : undefined,
+        toPar: parseToPar(p.total),
         thru: p.thru,
         status: this.mapPlayerStatus(p.status),
       }

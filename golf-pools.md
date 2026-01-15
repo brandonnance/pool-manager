@@ -31,6 +31,12 @@ A tiered golf major pool system for PGA majors (Masters, PGA Championship, US Op
 | Smart Rate Limiting | COMPLETE | 5-minute cooldown, tournament hours indicator |
 | Tie Ranking Fix | COMPLETE | All tied entries show "T1" (not just 1 for first) |
 | Entry Name Validation | COMPLETE | Prevented duplicates via email+entry_name check |
+| **To-Par Scoring Fix** | COMPLETE | Uses `to_par` consistently (not stroke totals) |
+| **Detailed Golfer Display** | COMPLETE | POS, GOLFER, TOT, THR, R1-R4 columns |
+| **Round Status Display** | COMPLETE | "F" for finished, "CUT" for missed cuts, hole # for in-progress |
+| **Search Preserves Rankings** | COMPLETE | Filtering doesn't change entry positions |
+| **Dropped Golfer Shading** | COMPLETE | Red background for bottom 2 golfers in public view |
+| **Tier Badges in Public View** | COMPLETE | Color-coded tier numbers next to golfer names |
 
 ---
 
@@ -135,11 +141,19 @@ if (madeCut) {
 ### Score to Par Display
 
 ```typescript
-// Calculates based on rounds actually played
-const roundsPlayed = countRoundsPlayed(golfer)  // 1-4
-const effectivePar = parPerRound * roundsPlayed // e.g., 72 * 2 = 144
-const scoreToPar = totalScore - effectivePar    // e.g., 140 - 144 = -4
+// Uses `to_par` directly from Slash Golf API
+// This is consistent whether golfer is mid-round or finished
+const toPar = result?.to_par ?? 0  // e.g., -6, 0, +3
+
+// Format for display
+function formatToPar(toPar: number): string {
+  if (toPar === 0) return 'E'
+  if (toPar > 0) return `+${toPar}`
+  return toPar.toString()  // e.g., "-6"
+}
 ```
+
+**Important:** We store both `total_score` (stroke total) and `to_par` (relative to par) in `gp_golfer_results`. The UI always uses `to_par` for display, as it's the standard golf scoring format.
 
 ---
 
@@ -211,11 +225,12 @@ gp_golfer_results
 ├── id (uuid, PK)
 ├── tournament_id (uuid, FK)
 ├── golfer_id (uuid, FK)
-├── round_1, round_2, round_3, round_4 (integer, nullable)
+├── round_1, round_2, round_3, round_4 (integer, nullable)  # Stroke totals
 ├── made_cut (boolean)
-├── position (text)
-├── total_score (integer)
-├── thru (integer, nullable)  # Holes completed in current round
+├── position (text)  # "1", "T2", "-" etc.
+├── total_score (integer)  # Total strokes
+├── to_par (integer)  # Score relative to par (-6, 0, +3)
+├── thru (integer, nullable)  # Holes completed: 1-18, or null
 ├── UNIQUE(tournament_id, golfer_id)
 ```
 
@@ -333,11 +348,14 @@ frontend/src/lib/slashgolf/
 ### Golf Standings (`golf-standings.tsx`)
 
 - Expandable rows showing all 6 golfers
-- "Counted (Best 4)" and "Dropped (Worst 2)" sections
-- Color-coded tier badges
-- Score-to-par with green/red coloring
-- CUT badge for missed cut golfers
+- "Counted (Best 4)" and "Dropped (Worst 2)" sections with opacity difference
+- Table-style layout with columns: POS, GOLFER, TOT, THR, R1, R2, R3, R4
+- Color-coded tier badges (1-6) with OWGR-based coloring
+- Score-to-par with green (under) / red (over) coloring
+- THR column: "F" for finished, "CUT" for missed cut, hole # for in-progress
+- Missed cut penalty: Shows "80" in red for R3/R4 columns
 - "You" badge for current user's entries
+- Tied entries show "T" prefix (T1, T3, etc.)
 
 ### Pick Sheet (`picks/page.tsx`)
 
@@ -370,9 +388,15 @@ frontend/src/lib/slashgolf/
 
 ### Public Leaderboard (`golf-public-leaderboard.tsx`)
 
-- Expandable entry rows showing all picks
-- Entry name only (privacy)
-- Refresh button for score updates
+- Expandable entry rows showing all 6 picks
+- Entry name only (privacy - no real names shown)
+- Golfers sorted by score (best first) within each entry
+- Bottom 2 golfers (dropped) shown with red background shading
+- Table-style layout: POS, GOLFER (with tier badge), TOT, THR, R1-R4
+- THR column: "F" for finished, "CUT" for missed cut, hole # for in-progress
+- Color-coded tier badges matching commissioner view
+- Tied entries show "T" prefix (T1, T3, etc.)
+- Search filter preserves original rankings
 - Mobile-responsive design
 
 ---

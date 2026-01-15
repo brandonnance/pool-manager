@@ -182,13 +182,26 @@ export default async function GolfPublicPage({ params }: PageProps) {
     const { data: golferResults } = golferIds.length > 0
       ? await supabase
           .from('gp_golfer_results')
-          .select('golfer_id, total_score, position, made_cut, round_1, round_2, round_3, round_4, thru')
+          .select('golfer_id, total_score, to_par, position, made_cut, round_1, round_2, round_3, round_4, thru')
           .eq('tournament_id', tournament.id)
           .in('golfer_id', golferIds)
       : { data: [] }
 
     const resultsMap = new Map(
       (golferResults ?? []).map(r => [r.golfer_id, r])
+    )
+
+    // Get tier assignments for golfers
+    const { data: tierAssignmentsData } = golferIds.length > 0
+      ? await supabase
+          .from('gp_tier_assignments')
+          .select('golfer_id, tier_value')
+          .eq('pool_id', gpPool.id)
+          .in('golfer_id', golferIds)
+      : { data: [] }
+
+    const tierMap = new Map(
+      (tierAssignmentsData ?? []).map(t => [t.golfer_id, t.tier_value])
     )
 
     // Calculate scores for each entry
@@ -200,16 +213,24 @@ export default async function GolfPublicPage({ params }: PageProps) {
           name: string
         }
         const result = resultsMap.get(golfer.id)
-        const golferScore = result?.total_score ?? 0
+
+        // Always use to_par for scoring - it's the score relative to par (e.g., -6 means 6 under)
+        // This is consistent whether golfer is mid-round or finished
+        const golferScore = result?.to_par ?? 0
         totalScore += golferScore
 
         return {
           golferId: golfer.id,
           golferName: golfer.name,
+          tier: tierMap.get(golfer.id) ?? 5,
           score: golferScore,
           position: result?.position ?? '-',
           madeCut: result?.made_cut ?? true,
           thru: result?.thru ?? null,
+          round1: result?.round_1 ?? null,
+          round2: result?.round_2 ?? null,
+          round3: result?.round_3 ?? null,
+          round4: result?.round_4 ?? null,
         }
       })
 

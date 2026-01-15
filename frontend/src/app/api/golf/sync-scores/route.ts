@@ -112,6 +112,7 @@ export async function POST(request: NextRequest) {
       made_cut: boolean
       position: string
       thru: number | null
+      to_par: number
     }> = []
 
     for (const score of scores) {
@@ -124,32 +125,46 @@ export async function POST(request: NextRequest) {
       const madeCut = score.status !== 'cut'
       const par = tournament.par || 72
 
-      // Calculate total strokes (actual strokes, not relative to par)
-      // round scores from API are actual stroke counts
+      // Use totalStrokes from API if available (for completed rounds)
+      // Otherwise calculate from individual round scores
       let totalStrokes = 0
       let roundsPlayed = 0
 
-      if (score.round1 !== undefined && score.round1 !== null) {
-        totalStrokes += score.round1
-        roundsPlayed++
-      }
-      if (score.round2 !== undefined && score.round2 !== null) {
-        totalStrokes += score.round2
-        roundsPlayed++
-      }
-      if (score.round3 !== undefined && score.round3 !== null) {
-        totalStrokes += score.round3
-        roundsPlayed++
-      }
-      if (score.round4 !== undefined && score.round4 !== null) {
-        totalStrokes += score.round4
-        roundsPlayed++
+      // First try to use the API's totalStrokes (from totalStrokesFromCompletedRounds)
+      if (score.totalStrokes !== undefined && !isNaN(score.totalStrokes)) {
+        totalStrokes = score.totalStrokes
+        // Count completed rounds
+        if (score.round1 !== undefined && score.round1 !== null) roundsPlayed++
+        if (score.round2 !== undefined && score.round2 !== null) roundsPlayed++
+        if (score.round3 !== undefined && score.round3 !== null) roundsPlayed++
+        if (score.round4 !== undefined && score.round4 !== null) roundsPlayed++
+      } else {
+        // Fall back to calculating from round scores
+        if (score.round1 !== undefined && score.round1 !== null) {
+          totalStrokes += score.round1
+          roundsPlayed++
+        }
+        if (score.round2 !== undefined && score.round2 !== null) {
+          totalStrokes += score.round2
+          roundsPlayed++
+        }
+        if (score.round3 !== undefined && score.round3 !== null) {
+          totalStrokes += score.round3
+          roundsPlayed++
+        }
+        if (score.round4 !== undefined && score.round4 !== null) {
+          totalStrokes += score.round4
+          roundsPlayed++
+        }
       }
 
       // If player missed cut, add penalty rounds (80 each for R3 and R4)
       if (!madeCut && roundsPlayed === 2) {
         totalStrokes += 80 + 80 // Penalty for missed cut
       }
+
+      // Store the to-par score for live display
+      const toPar = score.toPar ?? 0
 
       // Convert thru to number - "F" means finished (18 holes)
       let thruHoles: number | null = null
@@ -177,6 +192,7 @@ export async function POST(request: NextRequest) {
         made_cut: madeCut,
         position: score.position || '-',
         thru: thruHoles,
+        to_par: toPar,
       })
 
       results.push({
