@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { ArrowLeft, Loader2, Search, Save, Users } from 'lucide-react'
+import { ArrowLeft, Loader2, Search, Save, Users, Wand2 } from 'lucide-react'
 import Link from 'next/link'
 import { getTierColor, getTierLabel, TIER_INFO } from '@/lib/golf/types'
 import { cn } from '@/lib/utils'
@@ -31,6 +31,7 @@ export default function TierEditorPage() {
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [autoAssigning, setAutoAssigning] = useState(false)
   const [pool, setPool] = useState<{ name: string } | null>(null)
   const [golfers, setGolfers] = useState<Golfer[]>([])
   const [tierAssignments, setTierAssignments] = useState<Map<string, number>>(new Map())
@@ -199,6 +200,32 @@ export default function TierEditorPage() {
     setSaving(false)
   }
 
+  async function handleAutoAssign() {
+    setAutoAssigning(true)
+    setError(null)
+
+    try {
+      const response = await fetch('/api/golf/auto-tier', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ poolId }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error || 'Failed to auto-assign tiers')
+      } else {
+        // Reload data to get updated assignments and OWGR ranks
+        await loadData()
+      }
+    } catch (err) {
+      setError('Failed to auto-assign tiers')
+    }
+
+    setAutoAssigning(false)
+  }
+
   // Filter golfers by search query
   const filteredGolfers = useMemo(() => {
     if (!searchQuery.trim()) return golfers
@@ -212,8 +239,8 @@ export default function TierEditorPage() {
   // Group golfers by tier for stats
   const tierStats = useMemo(() => {
     const stats = new Map<number, number>()
-    for (let i = 0; i <= 6; i++) stats.set(i, 0)
-    
+    for (let i = 1; i <= 6; i++) stats.set(i, 0)
+
     tierAssignments.forEach((tier) => {
       stats.set(tier, (stats.get(tier) || 0) + 1)
     })
@@ -221,7 +248,7 @@ export default function TierEditorPage() {
     // Count unassigned
     const assignedCount = tierAssignments.size
     const unassignedCount = golfers.length - assignedCount
-    
+
     return { stats, unassignedCount }
   }, [tierAssignments, golfers])
 
@@ -259,13 +286,20 @@ export default function TierEditorPage() {
             Back to Setup
           </Link>
           <h1 className="text-2xl font-bold">Tier Assignments</h1>
-          <p className="text-muted-foreground">Assign golfers to tiers 0-6 (lower tier = better player)</p>
+          <p className="text-muted-foreground">Assign golfers to tiers 1-6 (lower tier = better player = fewer points)</p>
         </div>
-        <Button onClick={handleSave} disabled={saving || !hasChanges}>
-          {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          <Save className="mr-2 h-4 w-4" />
-          Save Changes
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleAutoAssign} disabled={autoAssigning || saving}>
+            {autoAssigning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Wand2 className="mr-2 h-4 w-4" />
+            Auto-Assign (OWGR)
+          </Button>
+          <Button onClick={handleSave} disabled={saving || !hasChanges}>
+            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Save className="mr-2 h-4 w-4" />
+            Save Changes
+          </Button>
+        </div>
       </div>
 
       {error && (
@@ -284,15 +318,15 @@ export default function TierEditorPage() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-3">
-            {Array.from({ length: 7 }, (_, i) => (
+            {Array.from({ length: 6 }, (_, i) => i + 1).map((tier) => (
               <div
-                key={i}
+                key={tier}
                 className={cn(
                   'px-3 py-2 rounded-md text-white text-sm font-medium',
-                  getTierColor(i)
+                  getTierColor(tier)
                 )}
               >
-                {getTierLabel(i)}: {tierStats.stats.get(i) || 0}
+                {getTierLabel(tier)}: {tierStats.stats.get(tier) || 0}
               </div>
             ))}
             {tierStats.unassignedCount > 0 && (
@@ -346,7 +380,7 @@ export default function TierEditorPage() {
                   </div>
                   
                   <div className="flex gap-1">
-                    {Array.from({ length: 7 }, (_, tier) => (
+                    {Array.from({ length: 6 }, (_, i) => i + 1).map((tier) => (
                       <button
                         key={tier}
                         onClick={() => updateTier(golfer.id, tier)}

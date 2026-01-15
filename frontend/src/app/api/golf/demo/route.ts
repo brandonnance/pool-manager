@@ -113,13 +113,13 @@ export async function POST(request: NextRequest) {
           name: g.name,
           country: g.country,
           owgr_rank: g.owgrRank,
-          sportradar_player_id: `demo-${g.name.toLowerCase().replace(/\s+/g, '-')}`,
+          external_player_id: `demo-${g.name.toLowerCase().replace(/\s+/g, '-')}`,
         }))
 
         const { error: golferError } = await supabase
           .from('gp_golfers')
           .upsert(golferInserts, {
-            onConflict: 'sportradar_player_id',
+            onConflict: 'external_player_id',
           })
 
         if (golferError) {
@@ -130,8 +130,8 @@ export async function POST(request: NextRequest) {
         // Get golfer IDs
         const { data: golfers } = await supabase
           .from('gp_golfers')
-          .select('id, sportradar_player_id')
-          .in('sportradar_player_id', golferInserts.map(g => g.sportradar_player_id))
+          .select('id, external_player_id')
+          .in('external_player_id', golferInserts.map(g => g.external_player_id))
 
         if (!golfers) {
           return NextResponse.json({ error: 'Failed to retrieve golfers' }, { status: 500 })
@@ -156,13 +156,13 @@ export async function POST(request: NextRequest) {
         }
 
         // Create default tier assignments
-        const golferMap = new Map(golferInserts.map((g, i) => [g.sportradar_player_id, DEMO_GOLFERS[i].suggestedTier]))
+        const golferMap = new Map(golferInserts.map((g, i) => [g.external_player_id, DEMO_GOLFERS[i].suggestedTier]))
         const tierInserts = golfers
-          .filter(g => g.sportradar_player_id !== null)
+          .filter(g => g.external_player_id !== null)
           .map(g => ({
             pool_id: gpPool.id,
             golfer_id: g.id,
-            tier_value: golferMap.get(g.sportradar_player_id!) ?? 5,
+            tier_value: golferMap.get(g.external_player_id!) ?? 5,
           }))
 
         const { error: tierError } = await supabase

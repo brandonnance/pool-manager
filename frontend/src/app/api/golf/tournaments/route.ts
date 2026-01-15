@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
     const { data: existingTournament } = await supabase
       .from('gp_tournaments')
       .select('id')
-      .eq('sportradar_tournament_id', tournamentData.tournId) // Reusing this column for Slash Golf ID
+      .eq('external_tournament_id', tournamentData.tournId)
       .single()
 
     if (existingTournament) {
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
         .from('gp_tournaments')
         .insert({
           name: tournamentData.name,
-          sportradar_tournament_id: tournamentData.tournId, // Reusing for Slash Golf ID
+          external_tournament_id: tournamentData.tournId,
           start_date: tournamentData.startDate,
           end_date: tournamentData.endDate,
           venue: tournamentData.venue || null,
@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
       const { data: existingGolfer } = await supabase
         .from('gp_golfers')
         .select('id')
-        .eq('sportradar_player_id', player.id) // Reusing for Slash Golf player ID
+        .eq('external_player_id', player.id)
         .single()
 
       let golferId: string
@@ -191,7 +191,7 @@ export async function POST(request: NextRequest) {
           .from('gp_golfers')
           .insert({
             name: player.fullName,
-            sportradar_player_id: player.id, // Reusing for Slash Golf player ID
+            external_player_id: player.id,
             country: player.country,
           })
           .select('id')

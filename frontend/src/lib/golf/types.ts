@@ -83,15 +83,15 @@ export interface GolfPoolConfig {
   demoMode: boolean
 }
 
-// Tier display info
-export const TIER_INFO: Record<number, { label: string; points: number; color: string }> = {
-  0: { label: 'Elite', points: 0, color: 'bg-purple-500' },
-  1: { label: 'Tier 1', points: 1, color: 'bg-blue-500' },
-  2: { label: 'Tier 2', points: 2, color: 'bg-green-500' },
-  3: { label: 'Tier 3', points: 3, color: 'bg-yellow-500' },
-  4: { label: 'Tier 4', points: 4, color: 'bg-orange-500' },
-  5: { label: 'Tier 5', points: 5, color: 'bg-red-400' },
-  6: { label: 'Tier 6', points: 6, color: 'bg-red-600' },
+// Tier display info (Tier = Points, lower tier = better player = fewer points)
+// OWGR ranges: T1=1-15, T2=16-40, T3=41-75, T4=76-125, T5=126-200, T6=200+
+export const TIER_INFO: Record<number, { label: string; points: number; color: string; owgrRange: string }> = {
+  1: { label: 'Tier 1', points: 1, color: 'bg-purple-600', owgrRange: '1-15' },
+  2: { label: 'Tier 2', points: 2, color: 'bg-blue-600', owgrRange: '16-40' },
+  3: { label: 'Tier 3', points: 3, color: 'bg-green-600', owgrRange: '41-75' },
+  4: { label: 'Tier 4', points: 4, color: 'bg-yellow-600', owgrRange: '76-125' },
+  5: { label: 'Tier 5', points: 5, color: 'bg-orange-600', owgrRange: '126-200' },
+  6: { label: 'Tier 6', points: 6, color: 'bg-red-600', owgrRange: '200+' },
 }
 
 export function getTierColor(tier: number): string {

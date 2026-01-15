@@ -700,7 +700,7 @@ export type Database = {
           id: string
           name: string
           owgr_rank: number | null
-          sportradar_player_id: string | null
+          external_player_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -710,7 +710,7 @@ export type Database = {
           id?: string
           name: string
           owgr_rank?: number | null
-          sportradar_player_id?: string | null
+          external_player_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -720,7 +720,7 @@ export type Database = {
           id?: string
           name?: string
           owgr_rank?: number | null
-          sportradar_player_id?: string | null
+          external_player_id?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -860,7 +860,7 @@ export type Database = {
           id: string
           name: string
           par: number | null
-          sportradar_tournament_id: string | null
+          external_tournament_id: string | null
           start_date: string
           status: string | null
           updated_at: string | null
@@ -874,7 +874,7 @@ export type Database = {
           id?: string
           name: string
           par?: number | null
-          sportradar_tournament_id?: string | null
+          external_tournament_id?: string | null
           start_date: string
           status?: string | null
           updated_at?: string | null
@@ -888,7 +888,7 @@ export type Database = {
           id?: string
           name?: string
           par?: number | null
-          sportradar_tournament_id?: string | null
+          external_tournament_id?: string | null
           start_date?: string
           status?: string | null
           updated_at?: string | null
