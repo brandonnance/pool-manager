@@ -989,29 +989,6 @@ export default async function PoolDetailPage({ params }: PageProps) {
                 </CardContent>
               </Card>
             )}
-
-            {/* Members */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle>Members</CardTitle>
-                {isCommissioner && (
-                  <Link
-                    href={`/pools/${id}/members`}
-                    className="text-sm text-primary hover:text-primary/80 flex items-center gap-2"
-                  >
-                    Manage
-                    {(pendingMemberCount ?? 0) > 0 && (
-                      <Badge variant="outline" className="border-amber-500 text-amber-600 text-xs">
-                        {pendingMemberCount} pending
-                      </Badge>
-                    )}
-                  </Link>
-                )}
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">{memberCount} approved member{memberCount !== 1 ? 's' : ''}</p>
-              </CardContent>
-            </Card>
           </div>
         </div>
       ) : (

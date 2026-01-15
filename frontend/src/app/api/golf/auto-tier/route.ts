@@ -2,6 +2,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getSlashGolfClient } from '@/lib/slashgolf/client'
 
+// Helper to parse rank which may be a plain number or MongoDB Extended JSON
+function parseRank(val: unknown): number | undefined {
+  if (val === undefined || val === null) return undefined
+  if (typeof val === 'number') return val
+  if (typeof val === 'object' && val !== null) {
+    const mongoVal = val as { $numberInt?: string; $numberLong?: string }
+    if (mongoVal.$numberInt) return parseInt(mongoVal.$numberInt)
+    if (mongoVal.$numberLong) return parseInt(mongoVal.$numberLong)
+  }
+  return undefined
+}
+
 // OWGR rank ranges for each tier
 // Tier = Points (lower tier = better player = fewer points)
 const TIER_RANGES = [
@@ -84,8 +96,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Get golfers in the tournament field
-    console.log('Querying tournament field for tournament_id:', gpPool.tournament_id)
-
     const { data: fieldData, error: fieldError } = await supabase
       .from('gp_tournament_field')
       .select(`
@@ -94,51 +104,57 @@ export async function POST(request: NextRequest) {
       `)
       .eq('tournament_id', gpPool.tournament_id)
 
-    console.log('Field query result:', { fieldData: fieldData?.length, fieldError })
-
     if (fieldError) {
-      console.error('Field query error:', fieldError)
       return NextResponse.json({ error: `Database error: ${fieldError.message}` }, { status: 400 })
     }
 
     if (!fieldData || fieldData.length === 0) {
-      // Try a simpler query to debug
-      const { data: simpleField, error: simpleError } = await supabase
-        .from('gp_tournament_field')
-        .select('*')
-        .eq('tournament_id', gpPool.tournament_id)
-
-      console.log('Simple field query:', { count: simpleField?.length, error: simpleError })
-
-      return NextResponse.json({
-        error: 'No golfers in tournament field',
-        debug: {
-          tournamentId: gpPool.tournament_id,
-          simpleQueryCount: simpleField?.length || 0,
-          simpleError: simpleError?.message
-        }
-      }, { status: 400 })
+      return NextResponse.json({ error: 'No golfers in tournament field' }, { status: 400 })
     }
 
     // Fetch OWGR rankings from Slash Golf API
     const client = getSlashGolfClient()
     const rankingsResponse = await client.getWorldRankings()
 
+    if (!rankingsResponse.rankings) {
+      return NextResponse.json({ error: 'Invalid rankings response from API' }, { status: 500 })
+    }
+
     // Build a map of playerId -> rank
+    // Note: API may return MongoDB Extended JSON format for some fields
     const rankingsMap = new Map<string, number>()
-    rankingsResponse.rankings.forEach(r => {
-      rankingsMap.set(r.playerId, r.rank)
+    rankingsResponse.rankings.forEach((r) => {
+      const playerId = r.playerId
+      // Handle both plain number and MongoDB Extended JSON format
+      const rankValue = parseRank(r.rank)
+      if (playerId && rankValue !== undefined) {
+        rankingsMap.set(playerId, rankValue)
+      }
     })
+
+    console.log(`Loaded ${rankingsMap.size} rankings from API`)
+
+    // Log a few sample rankings for debugging
+    const sampleRankings = Array.from(rankingsMap.entries()).slice(0, 5)
+    console.log('Sample rankings from API:', sampleRankings)
 
     // Assign tiers based on OWGR rank
     const tierAssignments: { pool_id: string; golfer_id: string; tier_value: number }[] = []
     const results: { name: string; rank: number | null; tier: number }[] = []
+    let matchedCount = 0
 
     for (const field of fieldData) {
       const golfer = field.gp_golfers
       const externalId = golfer.external_player_id
       const rank = externalId ? rankingsMap.get(externalId) ?? null : null
       const tier = getTierForRank(rank)
+
+      if (rank !== null) {
+        matchedCount++
+      } else if (externalId) {
+        // Log unmatched golfers with external IDs for debugging
+        console.log(`No rank found for ${golfer.name} (external_id: ${externalId})`)
+      }
 
       tierAssignments.push({
         pool_id: gpPool.id,
@@ -165,16 +181,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to save tier assignments' }, { status: 500 })
     }
 
-    // Also update the owgr_rank in gp_golfers for reference
+    // Also update the owgr_rank and headshot_url in gp_golfers
     for (const field of fieldData) {
       const golfer = field.gp_golfers
       const externalId = golfer.external_player_id
       const rank = externalId ? rankingsMap.get(externalId) ?? null : null
 
+      // Build update object
+      const updateData: { owgr_rank?: number; headshot_url?: string } = {}
+
       if (rank) {
+        updateData.owgr_rank = rank
+      }
+
+      // Generate headshot URL from PGA Tour Cloudinary CDN
+      if (externalId) {
+        updateData.headshot_url = `https://res.cloudinary.com/pga-tour/image/upload/q_auto,w_200/headshots_${externalId}`
+      }
+
+      if (Object.keys(updateData).length > 0) {
         await supabase
           .from('gp_golfers')
-          .update({ owgr_rank: rank })
+          .update(updateData)
           .eq('id', golfer.id)
       }
     }
@@ -185,12 +213,15 @@ export async function POST(request: NextRequest) {
       tierCounts.set(r.tier, (tierCounts.get(r.tier) || 0) + 1)
     })
 
+    console.log(`Matched ${matchedCount} of ${fieldData.length} golfers to rankings`)
+
     return NextResponse.json({
       success: true,
       message: `Auto-assigned ${tierAssignments.length} golfers to tiers`,
       tierCounts: Object.fromEntries(tierCounts),
       totalRanked: results.filter(r => r.rank !== null).length,
       totalUnranked: results.filter(r => r.rank === null).length,
+      rankingsLoaded: rankingsMap.size,
     })
 
   } catch (error) {

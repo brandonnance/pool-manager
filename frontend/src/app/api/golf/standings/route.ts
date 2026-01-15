@@ -40,19 +40,21 @@ export async function GET(request: NextRequest) {
   // Get all entries for this pool
   const { data: entries } = await supabase
     .from('gp_entries')
-    .select('id, entry_name, entry_number, user_id')
+    .select('id, entry_name, entry_number, user_id, participant_name')
     .eq('pool_id', poolId)
 
   if (!entries || entries.length === 0) {
     return NextResponse.json({ standings: [] })
   }
 
-  // Get user profiles
-  const userIds = [...new Set(entries.map(e => e.user_id))]
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select('id, display_name')
-    .in('id', userIds)
+  // Get user profiles (filter out null user_ids for public entries)
+  const userIds = [...new Set(entries.map(e => e.user_id).filter((id): id is string => id !== null))]
+  const { data: profiles } = userIds.length > 0
+    ? await supabase
+        .from('profiles')
+        .select('id, display_name')
+        .in('id', userIds)
+    : { data: [] }
 
   const profileMap = new Map(profiles?.map(p => [p.id, p.display_name]) || [])
 
@@ -127,10 +129,15 @@ export async function GET(request: NextRequest) {
       ...droppedGolfers,
     ]
 
+    // For public entries (no user_id), use participant_name; otherwise use profile display name
+    const userName = entry.user_id
+      ? profileMap.get(entry.user_id) ?? null
+      : entry.participant_name ?? null
+
     return {
       entryId: entry.id,
       entryName: entry.entry_name,
-      userName: profileMap.get(entry.user_id) ?? null,
+      userName,
       userId: entry.user_id,
       score: golferScores.length === 6 ? totalScore : null,
       golferScores: allGolferScores,
@@ -145,15 +152,24 @@ export async function GET(request: NextRequest) {
     return a.score - b.score
   })
 
+  // Count how many entries have each score to determine ties
+  const scoreCounts = new Map<number, number>()
+  standings.forEach(entry => {
+    if (entry.score !== null) {
+      scoreCounts.set(entry.score, (scoreCounts.get(entry.score) || 0) + 1)
+    }
+  })
+
   let currentRank = 1
-  let previousScore: number | null = null
 
   const rankedStandings = standings.map((entry, index) => {
-    const tied = previousScore !== null && entry.score === previousScore
-    if (!tied && entry.score !== null) {
+    // Check if this score appears more than once (tied)
+    const tied = entry.score !== null && (scoreCounts.get(entry.score) || 0) > 1
+
+    // Update rank: if this is a new score, update to current position
+    if (index > 0 && entry.score !== standings[index - 1].score && entry.score !== null) {
       currentRank = index + 1
     }
-    previousScore = entry.score
 
     return {
       ...entry,

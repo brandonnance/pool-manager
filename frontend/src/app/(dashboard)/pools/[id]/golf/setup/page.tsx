@@ -11,6 +11,7 @@ import { Switch } from '@/components/ui/switch'
 import { ArrowLeft, Loader2, Calendar, Flag, RefreshCw, Play, RotateCcw, Search, Download } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import { GpPublicEntriesCard } from '@/components/golf/gp-public-entries-card'
 
 interface SlashGolfTournament {
   id: string
@@ -32,6 +33,8 @@ interface GpPool {
   min_tier_points: number | null
   picks_lock_at: string | null
   demo_mode: boolean | null
+  public_slug: string | null
+  public_entries_enabled: boolean | null
 }
 
 interface Tournament {
@@ -55,6 +58,11 @@ export default function GolfSetupPage() {
   const [seeding, setSeeding] = useState(false)
   const [simulating, setSimulating] = useState(false)
   const [resetting, setResetting] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+  const [syncResult, setSyncResult] = useState<string | null>(null)
+  const [syncHadData, setSyncHadData] = useState(true) // Whether last sync found actual data
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null)
+  const [syncCooldownRemaining, setSyncCooldownRemaining] = useState(0)
   const [gpPool, setGpPool] = useState<GpPool | null>(null)
   const [tournament, setTournament] = useState<Tournament | null>(null)
   const [pool, setPool] = useState<{ name: string } | null>(null)
@@ -77,6 +85,45 @@ export default function GolfSetupPage() {
   useEffect(() => {
     loadData()
   }, [poolId])
+
+  // Cooldown timer for sync button (5 minutes = 300 seconds)
+  const SYNC_COOLDOWN_SECONDS = 300
+
+  useEffect(() => {
+    // Load last sync time from localStorage
+    const stored = localStorage.getItem(`golf-sync-${poolId}`)
+    if (stored) {
+      const storedTime = new Date(stored)
+      setLastSyncTime(storedTime)
+      const elapsed = Math.floor((Date.now() - storedTime.getTime()) / 1000)
+      const remaining = Math.max(0, SYNC_COOLDOWN_SECONDS - elapsed)
+      setSyncCooldownRemaining(remaining)
+    }
+  }, [poolId])
+
+  useEffect(() => {
+    // Countdown timer for cooldown
+    if (syncCooldownRemaining > 0) {
+      const timer = setInterval(() => {
+        setSyncCooldownRemaining(prev => Math.max(0, prev - 1))
+      }, 1000)
+      return () => clearInterval(timer)
+    }
+  }, [syncCooldownRemaining])
+
+  // Check if we're in typical tournament play hours (7am - 9pm local time)
+  function isTournamentHours(): boolean {
+    const now = new Date()
+    const hour = now.getHours()
+    return hour >= 7 && hour <= 21
+  }
+
+  // Format cooldown remaining
+  function formatCooldown(seconds: number): string {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
 
   async function loadData() {
     setLoading(true)
@@ -145,9 +192,10 @@ export default function GolfSetupPage() {
     setDemoMode(gpPoolData.demo_mode ?? false)
 
     if (gpPoolData.picks_lock_at) {
-      // Convert to local datetime-local format
+      // Convert to local datetime-local format (not UTC)
       const date = new Date(gpPoolData.picks_lock_at)
-      setPicksLockAt(date.toISOString().slice(0, 16))
+      const localDatetime = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}T${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+      setPicksLockAt(localDatetime)
     }
 
     // Get tournament if linked
@@ -266,6 +314,45 @@ export default function GolfSetupPage() {
     }
 
     setResetting(false)
+  }
+
+  async function handleSyncScores() {
+    setSyncing(true)
+    setError(null)
+    setSyncResult(null)
+
+    try {
+      const response = await fetch('/api/golf/sync-scores', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ poolId }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to sync scores')
+      }
+
+      // Save sync time and start cooldown
+      const now = new Date()
+      setLastSyncTime(now)
+      setSyncCooldownRemaining(SYNC_COOLDOWN_SECONDS)
+      localStorage.setItem(`golf-sync-${poolId}`, now.toISOString())
+
+      // Track whether we actually got data
+      const hadData = data.matchedGolfers > 0
+      setSyncHadData(hadData)
+
+      // Use message from API if provided (e.g., "No leaderboard data available yet")
+      const resultMessage = data.message || `Synced ${data.matchedGolfers} golfer scores from live API`
+      setSyncResult(resultMessage)
+      // Reload data to show updated status
+      await loadData()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to sync scores')
+    }
+
+    setSyncing(false)
   }
 
   async function fetchTournaments() {
@@ -533,6 +620,88 @@ export default function GolfSetupPage() {
         </Card>
       )}
 
+      {/* Live Scoring - Show when tournament exists and not in demo mode */}
+      {tournament && !demoMode && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <RefreshCw className="h-5 w-5" />
+              Live Scoring
+            </CardTitle>
+            <CardDescription>
+              Sync live scores from the PGA Tour leaderboard
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {syncResult && (
+              <div className={cn(
+                'px-4 py-3 rounded-md text-sm',
+                syncHadData
+                  ? 'bg-green-50 text-green-700'
+                  : 'bg-amber-50 text-amber-700'
+              )}>
+                {syncResult}
+              </div>
+            )}
+
+            {/* Status indicators */}
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              {/* Tournament hours indicator */}
+              <div className={cn(
+                'flex items-center gap-1.5 px-2.5 py-1 rounded-full',
+                isTournamentHours()
+                  ? 'bg-green-100 text-green-700'
+                  : 'bg-amber-100 text-amber-700'
+              )}>
+                <span className={cn(
+                  'w-2 h-2 rounded-full',
+                  isTournamentHours() ? 'bg-green-500' : 'bg-amber-500'
+                )} />
+                {isTournamentHours() ? 'Tournament hours (7am-9pm)' : 'Outside tournament hours'}
+              </div>
+
+              {/* Last sync time */}
+              {lastSyncTime && (
+                <div className="text-muted-foreground">
+                  Last synced: {lastSyncTime.toLocaleTimeString()}
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                onClick={handleSyncScores}
+                disabled={syncing || syncCooldownRemaining > 0}
+              >
+                {syncing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <RefreshCw className="mr-2 h-4 w-4" />
+                {syncCooldownRemaining > 0
+                  ? `Wait ${formatCooldown(syncCooldownRemaining)}`
+                  : 'Sync Live Scores'}
+              </Button>
+
+              {syncCooldownRemaining > 0 && (
+                <span className="text-sm text-muted-foreground">
+                  Cooldown prevents excessive API calls
+                </span>
+              )}
+            </div>
+
+            <div className="text-sm text-muted-foreground space-y-1">
+              <p>
+                <strong>Tip:</strong> Sync every 5-10 minutes during active play.
+                Scores typically update after each group finishes a hole.
+              </p>
+              {!isTournamentHours() && (
+                <p className="text-amber-600">
+                  Tournament play usually occurs between 7am-9pm. Syncing now may return stale data.
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Pool Settings */}
       <Card>
         <CardHeader>
@@ -637,6 +806,18 @@ export default function GolfSetupPage() {
             </p>
           </CardContent>
         </Card>
+      )}
+
+      {/* Public Entry URL */}
+      {tournament && gpPool && (
+        <GpPublicEntriesCard
+          gpPoolId={gpPool.id}
+          poolId={poolId}
+          tournamentId={gpPool.tournament_id}
+          publicSlug={gpPool.public_slug}
+          publicEntriesEnabled={gpPool.public_entries_enabled ?? false}
+          picksLockAt={gpPool.picks_lock_at}
+        />
       )}
 
       {/* Quick Links */}

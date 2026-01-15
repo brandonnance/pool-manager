@@ -1,104 +1,427 @@
-# Golf Pools Feature
+# Golf Major Pools - Technical Specification
 
 ## Overview
 
-Golf pools allow users to pick 6 golfers for a PGA Tour tournament. Each golfer is assigned to a tier (1-6) where the tier value equals the point cost. Users must meet a minimum tier point requirement (default: 21 points) which forces strategic diversity in player selection.
+A tiered golf major pool system for PGA majors (Masters, PGA Championship, US Open, The Open). Participants select 6 golfers across commissioner-defined tiers, and scoring uses "best 4 of 6" with missed cut penalties.
 
-**Tier System:**
-- Tier 0 = Elite (manual assignment only, never auto-assigned)
-- Tier 1 = 1 point (Top 15 OWGR)
-- Tier 2 = 2 points (OWGR 16-40)
-- Tier 3 = 3 points (OWGR 41-75)
-- Tier 4 = 4 points (OWGR 76-125)
-- Tier 5 = 5 points (OWGR 126-200)
-- Tier 6 = 6 points (OWGR 201+ or unranked)
+---
 
-With 6 picks and 21 minimum points, users can't just pick all favorites.
+## Implementation Status
+
+### COMPLETE - Core MVP + Public Entries
+
+| Phase | Status | Notes |
+|-------|--------|-------|
+| Phase 1: Database | COMPLETE | 8 gp_* tables, RLS policies, helper functions |
+| Phase 2: Infrastructure | COMPLETE | Site settings, pool creation, routing |
+| Phase 3: Demo Mode | COMPLETE | 50 mock golfers, simulate rounds, seed data |
+| Phase 4: Commissioner Tools | COMPLETE | Tournament setup, tier editor |
+| Phase 5: Pick Sheet | COMPLETE | 6-golfer selection with tier validation |
+| Phase 6: Standings | COMPLETE | Best 4 of 6, score-to-par display |
+| Phase 7: Public Entries | COMPLETE | Public URL, entry form, leaderboard |
+| Phase 8: Live Scoring | COMPLETE | Slash Golf API sync with rate limiting |
+
+### Recently Completed
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Public Entry System | COMPLETE | `/pools/golf/[slug]` - No account required |
+| Public Leaderboard | COMPLETE | Same URL shows leaderboard after lock |
+| Live Score Sync | COMPLETE | `/api/golf/sync-scores` - Manual sync from Slash Golf API |
+| Smart Rate Limiting | COMPLETE | 5-minute cooldown, tournament hours indicator |
+| Tie Ranking Fix | COMPLETE | All tied entries show "T1" (not just 1 for first) |
+| Entry Name Validation | COMPLETE | Prevented duplicates via email+entry_name check |
+
+---
 
 ## Data Source: Slash Golf API
 
-**NOT using Sportradar** - too expensive ($1k/month). Using Slash Golf API via RapidAPI ($20/month).
+**NOT using Sportradar** - too expensive ($1k/month). Using Slash Golf API via RapidAPI.
 
-API capabilities:
-- Tournament schedules and field data
-- Live leaderboard/scoring
-- OWGR (Official World Golf Rankings) for auto-tiering
-- Player profiles
+### Pricing Tiers
 
-Client: `/frontend/src/lib/slashgolf/client.ts`
+| Plan | Calls/month | Price |
+|------|-------------|-------|
+| Free | 250 | $0 |
+| Pro | 2,000 | $20 |
+| Ultra | 20,000 | $50 |
+| Mega | Unlimited | $100 |
 
-## Database Schema (gp_* tables)
+### Endpoints Used
 
-| Table | Purpose |
-|-------|---------|
-| `gp_golfers` | Master golfer table with `external_player_id` (Slash Golf player ID) |
-| `gp_tournaments` | Tournament definitions with `external_tournament_id` |
-| `gp_pools` | Golf-specific pool config (links to base `pools` table) |
-| `gp_tournament_field` | Which golfers are in which tournament |
-| `gp_tier_assignments` | Commissioner-assigned tiers per pool (tier_value 0-6) |
-| `gp_entries` | User entries (can have multiple per user) |
-| `gp_entry_picks` | 6 golfer picks per entry |
-| `gp_golfer_results` | Round-by-round scores (round_1 through round_4) |
+| Endpoint | Purpose |
+|----------|---------|
+| GET /schedule | Tournament list for a year |
+| GET /tournament | Player field (entry list) |
+| GET /leaderboard | Live scores |
+| GET /stats | World rankings (OWGR) |
+| GET /players | Player search |
 
-## Current Status
+### API Response Format
 
-### Completed
-- [x] Database schema for golf pools
-- [x] Slash Golf API integration (replaced Sportradar)
-- [x] Tournament import from API
-- [x] Tournament field loading
-- [x] Tier assignments page UI
-- [x] Auto-tier API endpoint using OWGR rankings
-- [x] Renamed legacy `sportradar_player_id` → `external_player_id`
-- [x] Renamed legacy `sportradar_tournament_id` → `external_tournament_id`
-- [x] TypeScript types regenerated
+The Slash Golf API returns data in **MongoDB Extended JSON format**. Key differences:
+- Dates: `{ "$date": { "$numberLong": "1736467200000" } }`
+- Numbers: `{ "$numberInt": "100000" }` or `{ "$numberLong": "..." }`
 
-### In Progress
-- [ ] **Testing auto-tier with Sony Open** - Need to verify the Auto-Assign (OWGR) button works correctly
+Our client includes helper functions to parse these:
+- `parseMongoDate()` - Converts to ISO date string
+- `parseMongoNumber()` - Converts to JavaScript number
 
-### Not Started
-- [ ] Entry submission UI
-- [ ] Picks validation (tier point minimum)
-- [ ] Live scoring integration
-- [ ] Standings/leaderboard
+### Environment Variables
 
-## Key Files
+```
+# Slash Golf API (via RapidAPI)
+RAPIDAPI_KEY=your_api_key_here
+```
 
-| File | Purpose |
-|------|---------|
-| `/frontend/src/app/api/golf/auto-tier/route.ts` | Auto-assign tiers based on OWGR |
-| `/frontend/src/app/api/golf/tournaments/route.ts` | Import tournaments and load field |
-| `/frontend/src/app/api/golf/demo/route.ts` | Demo mode data seeding |
-| `/frontend/src/app/(dashboard)/pools/[id]/golf/tiers/page.tsx` | Tier assignment UI |
-| `/frontend/src/lib/slashgolf/client.ts` | Slash Golf API client |
-| `/frontend/src/lib/golf/types.ts` | Golf-specific TypeScript types |
-| `/frontend/src/lib/golf/scoring.ts` | Scoring calculation logic |
+---
 
-## Auto-Tier Flow
+## Tier System
+
+### Point Values
+- **Tier 0**: 0 points (rare, elite golfers - manual assignment only)
+- **Tier 1**: 1 point (Top 15 OWGR)
+- **Tier 2**: 2 points (OWGR 16-40)
+- **Tier 3**: 3 points (OWGR 41-75)
+- **Tier 4**: 4 points (OWGR 76-125)
+- **Tier 5**: 5 points (OWGR 126-200)
+- **Tier 6**: 6 points (OWGR 201+ or unranked)
+
+### Tier Point Rules
+- Minimum tier points: **Configurable per pool** (default: 21)
+- No maximum tier points
+- With 6 picks and 21 minimum points, users can't just pick all favorites
+- Example valid roster: T1 + T1 + T4 + T5 + T5 + T6 = 22 points
+- Example invalid roster: T1 + T1 + T2 + T3 + T3 + T4 = 14 points
+
+### Auto-Tier Flow (OWGR)
 
 1. Commissioner clicks "Auto-Assign (OWGR)" button on tiers page
 2. API fetches tournament field from `gp_tournament_field` joined with `gp_golfers`
-3. API calls Slash Golf to get current OWGR rankings
-4. Matches golfers by `external_player_id` to get their rank
-5. Assigns tier based on TIER_RANGES (see route.ts)
-6. Upserts to `gp_tier_assignments` table
-7. Also updates `owgr_rank` in `gp_golfers` for reference
+3. API calls Slash Golf `/stats` endpoint with `statId: '186'` (OWGR)
+4. Parses MongoDB Extended JSON format
+5. Matches golfers by `external_player_id` to get their rank
+6. Assigns tier based on TIER_RANGES (see route.ts)
+7. Upserts to `gp_tier_assignments` table
+8. Also updates `owgr_rank` in `gp_golfers` for reference
 
 **Important:** Tier 0 is NEVER auto-assigned - it's reserved for manual "Elite" designation.
 
-## Testing (Sony Open - January 2025)
+---
 
-Target tournament for testing the golf pools feature. Steps:
-1. Create a golf pool
-2. Import Sony Open tournament from Slash Golf API
-3. Load tournament field
-4. Test Auto-Assign (OWGR) button
-5. Verify tier assignments look correct
+## Scoring System
 
-## Recent Changes (January 2025)
+### Per-Golfer Score Calculation
 
-- Renamed all `sportradar_*` columns to `external_*` to be API-agnostic
-- Migrations applied:
-  - `rename_sportradar_to_external_player_id`
-  - `rename_sportradar_tournament_id`
-- Updated all code references in API routes and types
+```typescript
+// From lib/golf/scoring.ts
+if (madeCut) {
+  score = R1 + R2 + R3 + R4
+} else {
+  score = R1 + R2 + 80 + 80  // Missed cut penalty
+}
+```
+
+### Entry Score Calculation (Best 4 of 6)
+
+```typescript
+// From lib/golf/scoring.ts
+1. Calculate all 6 golfer scores
+2. Sort ascending (lowest first)
+3. Sum the best 4 (lowest) scores
+4. Discard the worst 2 scores
+```
+
+### Score to Par Display
+
+```typescript
+// Calculates based on rounds actually played
+const roundsPlayed = countRoundsPlayed(golfer)  // 1-4
+const effectivePar = parPerRound * roundsPlayed // e.g., 72 * 2 = 144
+const scoreToPar = totalScore - effectivePar    // e.g., 140 - 144 = -4
+```
+
+---
+
+## Data Model
+
+### Tables (gp_* prefix)
+
+```
+gp_golfers
+├── id (uuid, PK)
+├── name (text)
+├── external_player_id (text, unique, nullable)  # Slash Golf player ID
+├── country (text)
+├── headshot_url (text)
+├── owgr_rank (integer)
+
+gp_tournaments
+├── id (uuid, PK)
+├── name (text)
+├── external_tournament_id (text, unique, nullable)  # Slash Golf tournament ID
+├── start_date, end_date (date)
+├── par (integer, default 72)
+├── cut_round (integer, default 2)
+├── status (upcoming/in_progress/completed)
+├── venue, course_name (text)
+
+gp_pools
+├── id (uuid, PK)
+├── pool_id (uuid, FK → pools, unique)
+├── tournament_id (uuid, FK → gp_tournaments, nullable)
+├── min_tier_points (integer, default 21)
+├── picks_lock_at (timestamptz)
+├── demo_mode (boolean, default false)
+├── public_slug (text, unique)
+├── public_entries_enabled (boolean, default false)
+
+gp_tournament_field
+├── id (uuid, PK)
+├── tournament_id (uuid, FK)
+├── golfer_id (uuid, FK)
+├── status (active/withdrawn/cut/dq)
+├── UNIQUE(tournament_id, golfer_id)
+
+gp_tier_assignments
+├── id (uuid, PK)
+├── pool_id (uuid, FK → gp_pools)
+├── golfer_id (uuid, FK)
+├── tier_value (integer, 0-6)
+├── UNIQUE(pool_id, golfer_id)
+
+gp_entries
+├── id (uuid, PK)
+├── pool_id (uuid, FK → pools)
+├── user_id (uuid, FK, nullable)  # NULL for public entries
+├── entry_name (text)
+├── entry_number (integer)
+├── participant_name (text, nullable)  # For public entries
+├── participant_email (text, nullable)  # For public entries
+├── verified (boolean, default false)
+├── submitted_at (timestamptz)
+
+gp_entry_picks
+├── id (uuid, PK)
+├── entry_id (uuid, FK)
+├── golfer_id (uuid, FK)
+├── UNIQUE(entry_id, golfer_id)
+
+gp_golfer_results
+├── id (uuid, PK)
+├── tournament_id (uuid, FK)
+├── golfer_id (uuid, FK)
+├── round_1, round_2, round_3, round_4 (integer, nullable)
+├── made_cut (boolean)
+├── position (text)
+├── total_score (integer)
+├── thru (integer, nullable)  # Holes completed in current round
+├── UNIQUE(tournament_id, golfer_id)
+```
+
+---
+
+## Key Files Reference
+
+### API Routes
+
+```
+frontend/src/app/api/golf/
+├── auto-tier/route.ts         # POST: Auto-assign tiers based on OWGR
+├── demo/route.ts              # POST: seed, simulate, reset demo data
+├── standings/route.ts         # GET: calculate standings with best 4 of 6
+├── sync-scores/route.ts       # POST: Sync live scores from Slash Golf API
+└── tournaments/route.ts       # GET: fetch tournaments, POST: import tournament
+```
+
+### Pages
+
+```
+frontend/src/app/(dashboard)/pools/[id]/golf/
+├── setup/page.tsx             # Tournament setup, live scoring, demo controls
+├── tiers/page.tsx             # Tier editor (0-6 assignment)
+├── picks/page.tsx             # Pick sheet UI (authenticated)
+└── entries/page.tsx           # Commissioner entry management
+
+frontend/src/app/pools/golf/
+└── [slug]/page.tsx            # Public entry form OR leaderboard (based on lock time)
+```
+
+### Components
+
+```
+frontend/src/components/golf/
+├── golf-standings.tsx             # Expandable standings with golfer details
+├── golf-standings-wrapper.tsx     # Client wrapper with auto-refresh
+├── golf-public-entry-form.tsx     # Public pick sheet form
+├── golf-public-leaderboard.tsx    # Public leaderboard after lock
+└── gp-public-entries-card.tsx     # Commissioner URL management card
+```
+
+### Libraries
+
+```
+frontend/src/lib/golf/
+├── demo-data.ts               # 50 demo golfers with suggested tiers
+├── scoring.ts                 # calculateGolferScore, calculateEntryScore, formatScoreToPar
+├── types.ts                   # GolferWithTier, EntryStanding, etc.
+└── validation.ts              # validateRoster (6 golfers, min tier points)
+
+frontend/src/lib/slashgolf/
+├── client.ts                  # Slash Golf API client (singleton)
+└── types.ts                   # Slash Golf response types & helpers
+```
+
+---
+
+## Core Features
+
+| Feature | Description |
+|---------|-------------|
+| **Tiered Picks** | Golfers assigned to tiers 0-6 by commissioner |
+| **6-Golfer Roster** | Each entry selects exactly 6 golfers |
+| **Tier Point Minimum** | Configurable minimum (default 21), no maximum |
+| **Best 4 of 6 Scoring** | Lowest 4 golfer scores count, worst 2 dropped |
+| **Missed Cut Penalty** | R1 + R2 + 80 + 80 for golfers who miss cut |
+| **Multiple Entries** | Members can create multiple entries per pool |
+| **Score to Par** | Shows -5, +3, E based on rounds played |
+| **Demo Mode** | Test mode with mock tournament data |
+| **Public Entries** | No account required for public pool entries |
+| **Live Scoring** | Manual sync from Slash Golf API with rate limiting |
+
+---
+
+## Public Entry System
+
+### URL Behavior
+- **Before lock**: `/pools/golf/[slug]` shows pick sheet form
+- **After lock**: Same URL shows public leaderboard
+
+### Features
+- Name, email, entry name fields (no account required)
+- One-time submission (no edits after save)
+- Multiple entries per person allowed
+- Countdown timer to lock time
+- Blocking modal when lock time passes
+- Commissioner can edit/delete entries
+- Verified toggle per entry for payment tracking
+
+### Privacy
+- Public leaderboard shows Entry Name only (not real name)
+- Commissioner sees all details
+
+---
+
+## Live Scoring
+
+### Sync Button Features
+- 5-minute cooldown between syncs (prevents API abuse)
+- Tournament hours indicator (7am-9pm local time)
+- Last sync time display
+- Graceful handling when no leaderboard data available
+
+### Score Calculation
+- Rounds 1-4 stored as actual strokes
+- "thru" field shows holes completed (or 18 for finished)
+- Missed cut penalty: R1 + R2 + 80 + 80
+- Position tracking from API
+
+---
+
+## UI Components
+
+### Golf Standings (`golf-standings.tsx`)
+
+- Expandable rows showing all 6 golfers
+- "Counted (Best 4)" and "Dropped (Worst 2)" sections
+- Color-coded tier badges
+- Score-to-par with green/red coloring
+- CUT badge for missed cut golfers
+- "You" badge for current user's entries
+
+### Pick Sheet (`picks/page.tsx`)
+
+- Golfers grouped by tier (0-6), empty tiers hidden
+- Click to add/remove from roster
+- Running tier point total
+- Validation: exactly 6 golfers, minimum points
+- Golfer Info: Hover card (desktop) or tap icon (mobile) shows:
+  - Photo (placeholder if none)
+  - Country with flag icon
+  - OWGR ranking
+  - Tier badge with points
+  - Field status (WITHDRAWN/MISSED CUT/DQ if applicable)
+
+### Tier Editor (`tiers/page.tsx`)
+
+- All golfers in tournament field
+- Select tier 0-6 from dropdown
+- Auto-Assign (OWGR) button for bulk assignment
+- Bulk save assignments
+- Filter by name
+
+### Public Entry Form (`golf-public-entry-form.tsx`)
+
+- Horizontal tier rows with color-coded sections
+- Countdown timer to lock time
+- Name, email, entry name fields
+- Real-time tier point validation
+- Blocking modal when lock passes
+
+### Public Leaderboard (`golf-public-leaderboard.tsx`)
+
+- Expandable entry rows showing all picks
+- Entry name only (privacy)
+- Refresh button for score updates
+- Mobile-responsive design
+
+---
+
+## Testing Checklist
+
+- [x] Create golf pool from org page
+- [x] Seed demo tournament
+- [x] Configure tiers (all golfers assigned)
+- [x] Make picks (6 golfers, meet minimum points)
+- [x] Simulate round 1, verify standings update
+- [x] Simulate through round 4
+- [x] Verify cut penalty (+80/+80)
+- [x] Verify best 4 of 6 scoring
+- [x] Verify score-to-par display
+- [x] Multiple entries per user
+- [x] Proxy entry management (commissioner can edit)
+- [x] Import tournament from Slash Golf API
+- [x] Auto-tier using OWGR rankings
+- [x] Public entry URL
+- [x] Public leaderboard after lock
+- [x] Live score sync from Slash Golf API
+- [x] Rate limiting for API calls
+
+---
+
+## File Paths for Quick Reference
+
+| Purpose | Path |
+|---------|------|
+| Pool detail (golf section) | `frontend/src/app/(dashboard)/pools/[id]/page.tsx` |
+| Tournament setup | `frontend/src/app/(dashboard)/pools/[id]/golf/setup/page.tsx` |
+| Tier editor | `frontend/src/app/(dashboard)/pools/[id]/golf/tiers/page.tsx` |
+| Pick sheet | `frontend/src/app/(dashboard)/pools/[id]/golf/picks/page.tsx` |
+| Manage entries | `frontend/src/app/(dashboard)/pools/[id]/golf/entries/page.tsx` |
+| Public entry/leaderboard | `frontend/src/app/pools/golf/[slug]/page.tsx` |
+| Standings component | `frontend/src/components/golf/golf-standings.tsx` |
+| Standings wrapper | `frontend/src/components/golf/golf-standings-wrapper.tsx` |
+| Public entry form | `frontend/src/components/golf/golf-public-entry-form.tsx` |
+| Public leaderboard | `frontend/src/components/golf/golf-public-leaderboard.tsx` |
+| Standings API | `frontend/src/app/api/golf/standings/route.ts` |
+| Sync scores API | `frontend/src/app/api/golf/sync-scores/route.ts` |
+| Auto-tier API | `frontend/src/app/api/golf/auto-tier/route.ts` |
+| Demo API | `frontend/src/app/api/golf/demo/route.ts` |
+| Tournaments API | `frontend/src/app/api/golf/tournaments/route.ts` |
+| Slash Golf client | `frontend/src/lib/slashgolf/client.ts` |
+| Slash Golf types | `frontend/src/lib/slashgolf/types.ts` |
+| Scoring utilities | `frontend/src/lib/golf/scoring.ts` |
+| Validation | `frontend/src/lib/golf/validation.ts` |
+| Types | `frontend/src/lib/golf/types.ts` |
+| Demo data | `frontend/src/lib/golf/demo-data.ts` |
+| Database types | `frontend/src/types/database.ts` |

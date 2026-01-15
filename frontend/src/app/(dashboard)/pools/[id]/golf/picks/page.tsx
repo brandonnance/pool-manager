@@ -504,7 +504,7 @@ export default function GolfPicksPage() {
                   const canSelect = !isLocked && (isSelected || picks.length < 6)
 
                   return (
-                    <HoverCard key={golfer.id} openDelay={300} closeDelay={100}>
+                    <HoverCard key={golfer.id} openDelay={500} closeDelay={150}>
                       <HoverCardTrigger asChild>
                         <button
                           onClick={() => !isLocked && toggleGolfer(golfer)}
@@ -522,7 +522,7 @@ export default function GolfPicksPage() {
                         >
                           <span className="block truncate">
                             {golfer.name.split(' ').map((part, i, arr) =>
-                              i === arr.length - 1 ? part.toUpperCase() : `${part.charAt(0)}. `
+                              i === arr.length - 1 ? part.toUpperCase() : `${part} `
                             ).join('')}
                           </span>
                           {isSelected && (

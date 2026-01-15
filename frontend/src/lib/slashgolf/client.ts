@@ -153,6 +153,12 @@ export class SlashGolfClient {
   async getScores(tournId: string, year: number): Promise<GolfPlayerScore[]> {
     const leaderboard = await this.getLeaderboard(tournId, year)
 
+    // Handle case where leaderboard data is not available yet
+    if (!leaderboard || !leaderboard.leaderboard || !Array.isArray(leaderboard.leaderboard)) {
+      console.log('[SlashGolf] No leaderboard data available for tournament', tournId)
+      return []
+    }
+
     return leaderboard.leaderboard.map(p => {
       const rounds = p.rounds || []
       const r1 = rounds.find(r => r.roundId === 1)
@@ -177,15 +183,13 @@ export class SlashGolfClient {
     })
   }
 
-  // Get world rankings
+  // Get world rankings (OWGR)
+  // statId: "186" = OWGR, "02671" = FedExCup
   async getWorldRankings(year?: number): Promise<SlashGolfRankingsResponse> {
-    const params: Record<string, string> = {}
-    if (year) {
-      params.year = String(year)
-    }
+    const rankingsYear = year || 2025 // OWGR data lags - use previous year early in season
     return this.fetch<SlashGolfRankingsResponse>('/stats', {
-      ...params,
-      statId: 'owgr', // World rankings
+      year: String(rankingsYear),
+      statId: '186', // OWGR
     })
   }
 
