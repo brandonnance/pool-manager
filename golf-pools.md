@@ -37,6 +37,7 @@ A tiered golf major pool system for PGA majors (Masters, PGA Championship, US Op
 | **Search Preserves Rankings** | COMPLETE | Filtering doesn't change entry positions |
 | **Dropped Golfer Shading** | COMPLETE | Red background for bottom 2 golfers in public view |
 | **Tier Badges in Public View** | COMPLETE | Color-coded tier numbers next to golfer names |
+| **Score Management Page** | COMPLETE | Sync + manual score override for commissioners |
 
 ---
 
@@ -256,7 +257,8 @@ frontend/src/app/(dashboard)/pools/[id]/golf/
 ├── setup/page.tsx             # Tournament setup, live scoring, demo controls
 ├── tiers/page.tsx             # Tier editor (0-6 assignment)
 ├── picks/page.tsx             # Pick sheet UI (authenticated)
-└── entries/page.tsx           # Commissioner entry management
+├── entries/page.tsx           # Commissioner entry management
+└── scores/page.tsx            # Score management (sync + manual override)
 
 frontend/src/app/pools/golf/
 └── [slug]/page.tsx            # Public entry form OR leaderboard (based on lock time)
@@ -303,6 +305,7 @@ frontend/src/lib/slashgolf/
 | **Demo Mode** | Test mode with mock tournament data |
 | **Public Entries** | No account required for public pool entries |
 | **Live Scoring** | Manual sync from Slash Golf API with rate limiting |
+| **Manual Score Override** | Commissioner can edit individual golfer scores |
 
 ---
 
@@ -420,6 +423,8 @@ frontend/src/lib/slashgolf/
 - [x] Public leaderboard after lock
 - [x] Live score sync from Slash Golf API
 - [x] Rate limiting for API calls
+- [x] Manual score override (edit individual golfer scores)
+- [x] Score management page (sync + override combined)
 
 ---
 
@@ -432,6 +437,7 @@ frontend/src/lib/slashgolf/
 | Tier editor | `frontend/src/app/(dashboard)/pools/[id]/golf/tiers/page.tsx` |
 | Pick sheet | `frontend/src/app/(dashboard)/pools/[id]/golf/picks/page.tsx` |
 | Manage entries | `frontend/src/app/(dashboard)/pools/[id]/golf/entries/page.tsx` |
+| Score management | `frontend/src/app/(dashboard)/pools/[id]/golf/scores/page.tsx` |
 | Public entry/leaderboard | `frontend/src/app/pools/golf/[slug]/page.tsx` |
 | Standings component | `frontend/src/components/golf/golf-standings.tsx` |
 | Standings wrapper | `frontend/src/components/golf/golf-standings-wrapper.tsx` |
