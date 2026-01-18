@@ -656,24 +656,70 @@ export function PlayoffContent({
     }
   }
 
-  // Calculate wins by participant name
-  // Track forward vs reverse wins separately
-  const winsByName = new Map<string, { total: number; forward: number; reverse: number }>()
+  // Calculate wins by participant name with round breakdown
+  // Track wins by round for NFL playoff pools
+  interface RoundWins {
+    total: number
+    wc: number // wild card
+    d: number // divisional
+    c: number // conference
+    sbh: number // super bowl halftime
+    sb: number // super bowl final
+  }
+  const winsByName = new Map<string, RoundWins>()
+
   for (const winner of winners) {
     if (winner.winner_name) {
-      const current = winsByName.get(winner.winner_name) ?? { total: 0, forward: 0, reverse: 0 }
-      const isReverse = winner.win_type.includes('reverse')
-      winsByName.set(winner.winner_name, {
-        total: current.total + 1,
-        forward: current.forward + (isReverse ? 0 : 1),
-        reverse: current.reverse + (isReverse ? 1 : 0),
-      })
+      const current = winsByName.get(winner.winner_name) ?? {
+        total: 0,
+        wc: 0,
+        d: 0,
+        c: 0,
+        sbh: 0,
+        sb: 0,
+      }
+
+      current.total++
+
+      // Get the round from the game
+      const game = gameById.get(winner.sq_game_id)
+      if (game) {
+        const isHalftime = winner.win_type === 'halftime' || winner.win_type === 'halftime_reverse'
+        switch (game.round) {
+          case 'wild_card':
+            current.wc++
+            break
+          case 'divisional':
+            current.d++
+            break
+          case 'conference':
+            current.c++
+            break
+          case 'super_bowl':
+            if (isHalftime) current.sbh++
+            else current.sb++
+            break
+        }
+      }
+
+      winsByName.set(winner.winner_name, current)
     }
   }
 
   const leaderboardEntries = Array.from(winsByName.entries())
     .map(([name, stats]) => ({ name, ...stats }))
     .sort((a, b) => b.total - a.total)
+
+  // Helper to format round wins as compact string (e.g., "1WC, 2D, 1C")
+  const formatRoundWins = (entry: RoundWins): string => {
+    const parts: string[] = []
+    if (entry.wc > 0) parts.push(`${entry.wc}WC`)
+    if (entry.d > 0) parts.push(`${entry.d}D`)
+    if (entry.c > 0) parts.push(`${entry.c}C`)
+    if (entry.sbh > 0) parts.push(`${entry.sbh}SBH`)
+    if (entry.sb > 0) parts.push(`${entry.sb}SB`)
+    return parts.join(', ')
+  }
 
   // Group games by round
   const gamesByRound = games.reduce(
@@ -804,34 +850,24 @@ export function PlayoffContent({
             />
           )}
 
-          {/* Wins Leaderboard */}
+          {/* Winners List */}
           {numbersLocked && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Wins</CardTitle>
+                <CardTitle className="text-base">Winners</CardTitle>
               </CardHeader>
               <CardContent>
                 {leaderboardEntries.length > 0 ? (
                   <div className="space-y-1">
-                    {leaderboardEntries.map((entry, index) => (
+                    {leaderboardEntries.map((entry) => (
                       <div
                         key={entry.name}
                         className="flex items-center justify-between text-sm px-2 py-1.5 rounded hover:bg-muted/50"
                       >
-                        <div className="flex items-center gap-2">
-                          <span className="w-6 font-medium">
-                            {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`}
-                          </span>
-                          <span className="truncate">{entry.name}</span>
-                        </div>
-                        <div className="text-right">
-                          <span className="font-bold tabular-nums">{entry.total}</span>
-                          {reverseScoring && (
-                            <span className="text-xs text-muted-foreground ml-1">
-                              ({entry.forward}F, {entry.reverse}R)
-                            </span>
-                          )}
-                        </div>
+                        <span className="truncate">{entry.name}</span>
+                        <span className="text-xs text-muted-foreground ml-2 whitespace-nowrap">
+                          {formatRoundWins(entry)}
+                        </span>
                       </div>
                     ))}
                   </div>

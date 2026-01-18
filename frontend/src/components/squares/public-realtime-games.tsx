@@ -267,24 +267,75 @@ export function PublicRealtimeGames({
     }
   }
 
-  // Calculate wins by participant name for leaderboard
-  // Track forward vs reverse wins separately
-  const winsByName = new Map<string, { total: number; forward: number; reverse: number }>()
+  // Calculate wins by participant name for leaderboard with round breakdown
+  interface RoundWins {
+    total: number
+    wc: number // wild card
+    d: number // divisional
+    c: number // conference
+    sbh: number // super bowl halftime
+    sb: number // super bowl final
+  }
+  const winsByName = new Map<string, RoundWins>()
+
+  // Create game lookup for round info
+  const gamesById = new Map(games.map((g) => [g.id, g]))
+
   for (const winner of winners) {
     if (winner.winner_name) {
-      const current = winsByName.get(winner.winner_name) ?? { total: 0, forward: 0, reverse: 0 }
-      const isReverse = winner.win_type.includes('reverse')
-      winsByName.set(winner.winner_name, {
-        total: current.total + 1,
-        forward: current.forward + (isReverse ? 0 : 1),
-        reverse: current.reverse + (isReverse ? 1 : 0),
-      })
+      const current = winsByName.get(winner.winner_name) ?? {
+        total: 0,
+        wc: 0,
+        d: 0,
+        c: 0,
+        sbh: 0,
+        sb: 0,
+      }
+
+      current.total++
+
+      // Get the round from the game
+      const game = gamesById.get(winner.sq_game_id)
+      if (game) {
+        const isHalftime = winner.win_type === 'halftime' || winner.win_type === 'halftime_reverse'
+        switch (game.round) {
+          case 'wild_card':
+            current.wc++
+            break
+          case 'divisional':
+            current.d++
+            break
+          case 'conference':
+            current.c++
+            break
+          case 'super_bowl':
+            if (isHalftime) current.sbh++
+            else current.sb++
+            break
+        }
+      }
+
+      winsByName.set(winner.winner_name, current)
     }
   }
 
   const leaderboardEntries = Array.from(winsByName.entries())
     .map(([name, stats]) => ({ name, ...stats }))
     .sort((a, b) => b.total - a.total)
+
+  // Helper to format round wins as compact string (e.g., "1WC, 2D, 1C")
+  const formatRoundWins = (entry: RoundWins): string => {
+    const parts: string[] = []
+    if (entry.wc > 0) parts.push(`${entry.wc}WC`)
+    if (entry.d > 0) parts.push(`${entry.d}D`)
+    if (entry.c > 0) parts.push(`${entry.c}C`)
+    if (entry.sbh > 0) parts.push(`${entry.sbh}SBH`)
+    if (entry.sb > 0) parts.push(`${entry.sb}SB`)
+    return parts.join(', ')
+  }
+
+  // Check if this is a playoff pool (has rounds other than single_game)
+  const isPlayoffPool = games.some((g) => g.round !== 'single_game')
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">
@@ -576,32 +627,22 @@ export function PublicRealtimeGames({
         )}
       </div>
 
-      {/* Leaderboard Column */}
+      {/* Winners Column */}
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold">Wins</h2>
+        <h2 className="text-lg font-semibold">Winners</h2>
         {leaderboardEntries.length > 0 ? (
           <Card>
             <CardContent className="pt-4">
               <div className="space-y-1">
-                {leaderboardEntries.map((entry, index) => (
+                {leaderboardEntries.map((entry) => (
                   <div
                     key={entry.name}
                     className="flex items-center justify-between text-sm px-2 py-1.5 rounded hover:bg-muted/50"
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="w-6 font-medium">
-                        {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`}
-                      </span>
-                      <span className="truncate">{entry.name}</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="font-bold tabular-nums">{entry.total}</span>
-                      {reverseScoring && (
-                        <span className="text-xs text-muted-foreground ml-1">
-                          ({entry.forward}F, {entry.reverse}R)
-                        </span>
-                      )}
-                    </div>
+                    <span className="truncate">{entry.name}</span>
+                    <span className="text-xs text-muted-foreground ml-2 whitespace-nowrap">
+                      {isPlayoffPool ? formatRoundWins(entry) : `${entry.total} win${entry.total !== 1 ? 's' : ''}`}
+                    </span>
                   </div>
                 ))}
               </div>

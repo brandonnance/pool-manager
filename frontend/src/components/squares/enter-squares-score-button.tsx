@@ -353,16 +353,12 @@ async function calculateAndRecordWinners(
 
     if (normalSquare) {
       const winnerName = await getWinnerName(supabase, normalSquare.user_id)
-      // Use upsert to handle race conditions (unique constraint on sq_game_id, win_type)
-      await supabase.from('sq_winners').upsert(
-        {
-          sq_game_id: gameId,
-          square_id: normalSquare.id,
-          win_type: 'normal',
-          winner_name: winnerName,
-        },
-        { onConflict: 'sq_game_id,win_type' }
-      )
+      await supabase.from('sq_winners').insert({
+        sq_game_id: gameId,
+        square_id: normalSquare.id,
+        win_type: 'normal',
+        winner_name: winnerName,
+      })
     }
 
     // Reverse winner (if different square)
@@ -381,15 +377,12 @@ async function calculateAndRecordWinners(
 
         if (reverseSquare) {
           const winnerName = await getWinnerName(supabase, reverseSquare.user_id)
-          await supabase.from('sq_winners').upsert(
-            {
-              sq_game_id: gameId,
-              square_id: reverseSquare.id,
-              win_type: 'reverse',
-              winner_name: winnerName,
-            },
-            { onConflict: 'sq_game_id,win_type' }
-          )
+          await supabase.from('sq_winners').insert({
+            sq_game_id: gameId,
+            square_id: reverseSquare.id,
+            win_type: 'reverse',
+            winner_name: winnerName,
+          })
         }
       }
     }
@@ -413,15 +406,12 @@ async function calculateAndRecordWinners(
 
     if (halftimeSquare) {
       const winnerName = await getWinnerName(supabase, halftimeSquare.user_id)
-      await supabase.from('sq_winners').upsert(
-        {
-          sq_game_id: gameId,
-          square_id: halftimeSquare.id,
-          win_type: 'halftime',
-          winner_name: winnerName,
-        },
-        { onConflict: 'sq_game_id,win_type' }
-      )
+      await supabase.from('sq_winners').insert({
+        sq_game_id: gameId,
+        square_id: halftimeSquare.id,
+        win_type: 'halftime',
+        winner_name: winnerName,
+      })
     }
 
     // Halftime reverse
@@ -440,15 +430,12 @@ async function calculateAndRecordWinners(
 
         if (htReverseSquare) {
           const winnerName = await getWinnerName(supabase, htReverseSquare.user_id)
-          await supabase.from('sq_winners').upsert(
-            {
-              sq_game_id: gameId,
-              square_id: htReverseSquare.id,
-              win_type: 'halftime_reverse',
-              winner_name: winnerName,
-            },
-            { onConflict: 'sq_game_id,win_type' }
-          )
+          await supabase.from('sq_winners').insert({
+            sq_game_id: gameId,
+            square_id: htReverseSquare.id,
+            win_type: 'halftime_reverse',
+            winner_name: winnerName,
+          })
         }
       }
     }
