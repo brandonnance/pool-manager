@@ -47,6 +47,8 @@ import { PoolStandings } from '@/components/standings/pool-standings'
 import { SingleGameContent } from '@/components/squares/single-game-content'
 import { PlayoffContent } from '@/components/squares/playoff-content'
 import { MmPublicUrlCard } from '@/components/march-madness/mm-public-url-card'
+import { GolfStandingsWrapper } from '@/components/golf/golf-standings-wrapper'
+import { GpPublicUrlDisplay } from '@/components/golf/gp-public-url-display'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -380,6 +382,84 @@ export default async function PoolDetailPage({ params }: PageProps) {
     }
   }
 
+  // ============================================
+  // GOLF POOL DATA FETCHING
+  // ============================================
+  let gpPoolData: {
+    id: string
+    pool_id: string
+    tournament_id: string | null
+    min_tier_points: number | null
+    picks_lock_at: string | null
+    demo_mode: boolean | null
+    public_entries_enabled: boolean | null
+    public_slug: string | null
+    created_at: string | null
+  } | null = null
+  let gpTournamentData: {
+    id: string
+    name: string
+    start_date: string
+    end_date: string
+    status: string | null
+  } | null = null
+
+  if (pool.type === 'golf') {
+    // Get gp_pool config
+    const { data: gpPool } = await supabase
+      .from('gp_pools')
+      .select('*')
+      .eq('pool_id', id)
+      .single()
+    gpPoolData = gpPool
+
+    // Get tournament if linked
+    if (gpPool?.tournament_id) {
+      const { data: tournament } = await supabase
+        .from('gp_tournaments')
+        .select('id, name, start_date, end_date, status')
+        .eq('id', gpPool.tournament_id)
+        .single()
+      gpTournamentData = tournament
+    }
+
+    // Lazy status sync: Check if golf pool status should be updated
+    if (gpPool) {
+      const computedStatus = computeGolfPoolStatus(
+        gpPool.public_entries_enabled ?? false,
+        gpPool.picks_lock_at,
+        gpTournamentData?.status as 'upcoming' | 'in_progress' | 'completed' | null,
+        gpPool.tournament_id
+      )
+
+      // Update pools.status if it's different
+      if (computedStatus !== pool.status) {
+        await supabase
+          .from('pools')
+          .update({ status: computedStatus })
+          .eq('id', id)
+        // Update local pool object so display is correct
+        pool.status = computedStatus
+      }
+    }
+  }
+
+  // Helper function to compute golf pool status
+  function computeGolfPoolStatus(
+    publicEntriesEnabled: boolean,
+    picksLockAt: string | null,
+    tournamentStatus: string | null,
+    tournamentId: string | null
+  ): 'draft' | 'open' | 'locked' | 'completed' {
+    if (!tournamentId) return 'draft'
+    if (tournamentStatus === 'completed') return 'completed'
+    const now = new Date()
+    const lockTime = picksLockAt ? new Date(picksLockAt) : null
+    if (lockTime && now >= lockTime) return 'locked'
+    if (publicEntriesEnabled) return 'open'
+    return 'draft'
+  }
+
   // Transform squares data for component
   const squaresForGrid = sqSquaresData.map((sq) => {
     const displayName = sq.user_id ? sqOwnerProfiles.get(sq.user_id) : null
@@ -546,16 +626,22 @@ export default async function PoolDetailPage({ params }: PageProps) {
                   <Badge
                     variant={
                       pool.status === 'open' ? 'default' :
+                      pool.status === 'locked' ? 'default' :
                       pool.status === 'completed' ? 'secondary' :
                       'outline'
                     }
                     className={
-                      pool.status === 'open' ? 'bg-primary' :
+                      pool.status === 'open' ? 'bg-green-600' :
+                      pool.status === 'locked' ? 'bg-blue-600' :
                       pool.status === 'draft' ? 'border-amber-500 text-amber-600' :
                       ''
                     }
                   >
-                    {pool.status === 'completed' ? 'Completed' : pool.status}
+                    {pool.status === 'locked' ? 'In Progress' :
+                     pool.status === 'completed' ? 'Completed' :
+                     pool.status === 'open' ? 'Accepting Entries' :
+                     pool.status === 'draft' ? 'Draft' :
+                     pool.status}
                   </Badge>
                   {isCommissioner && (
                     <Badge variant="secondary" className="bg-primary/10 text-primary shrink-0">
@@ -808,6 +894,153 @@ export default async function PoolDetailPage({ params }: PageProps) {
             </p>
           </CardContent>
         </Card>
+      ) : pool.type === 'golf' ? (
+        /* Golf Pool */
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-2 space-y-6">
+            {/* Tournament Info / Setup */}
+            {gpPoolData && !gpPoolData.tournament_id && isCommissioner ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Tournament Setup</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground mb-4">
+                    Select a tournament and configure tiers to get started.
+                  </p>
+                  <div className="space-y-2">
+                    <Button variant="outline" className="w-full" asChild>
+                      <Link href={`/pools/${id}/golf/setup`}>
+                        Tournament Setup
+                      </Link>
+                    </Button>
+                    <Button variant="outline" className="w-full" asChild>
+                      <Link href={`/pools/${id}/golf/tiers`}>
+                        Configure Tiers
+                      </Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : gpPoolData && !gpPoolData.tournament_id ? (
+              <Card>
+                <CardContent className="py-8 text-center">
+                  <h2 className="text-lg font-semibold text-foreground mb-2">Pool Not Active</h2>
+                  <p className="text-muted-foreground">
+                    This pool is still being set up. Check back soon!
+                  </p>
+                </CardContent>
+              </Card>
+            ) : gpPoolData && gpTournamentData ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>{gpTournamentData.name}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-2 mb-4">
+                    <Badge variant={
+                      gpTournamentData.status === 'in_progress' ? 'default' :
+                      gpTournamentData.status === 'completed' ? 'secondary' :
+                      'outline'
+                    }>
+                      {gpTournamentData.status === 'in_progress' ? 'In Progress' :
+                       gpTournamentData.status === 'completed' ? 'Completed' : 'Upcoming'}
+                    </Badge>
+                    {gpPoolData.demo_mode && (
+                      <Badge variant="outline" className="border-amber-500 text-amber-600">
+                        Demo Mode
+                      </Badge>
+                    )}
+                  </div>
+                  {gpTournamentData.start_date && (
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {new Date(gpTournamentData.start_date).toLocaleDateString('en-US', {
+                        month: 'long',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}
+                      {gpTournamentData.end_date && ` - ${new Date(gpTournamentData.end_date).toLocaleDateString('en-US', {
+                        month: 'long',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}`}
+                    </p>
+                  )}
+                  <p className="text-muted-foreground mb-4">
+                    Pick 6 golfers with at least {gpPoolData.min_tier_points} tier points. Best 4 of 6 scores count.
+                  </p>
+                  {(isMember || isCommissioner) && (
+                    <Button asChild>
+                      <Link href={`/pools/${id}/golf/picks`}>
+                        Make Picks
+                      </Link>
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent className="py-8 text-center">
+                  <h2 className="text-lg font-semibold text-foreground mb-2">Pool Not Configured</h2>
+                  <p className="text-muted-foreground">
+                    This Golf pool hasn&apos;t been set up yet.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Golf Standings */}
+            {gpPoolData && gpTournamentData && (isMember || isCommissioner) && (
+              <GolfStandingsWrapper
+                poolId={id}
+                currentUserId={user.id}
+                tournamentStatus={
+                  gpTournamentData.status === 'in_progress' ? 'in_progress' :
+                  gpTournamentData.status === 'completed' ? 'completed' : 'upcoming'
+                }
+              />
+            )}
+          </div>
+
+          {/* Right Column - Pool Info */}
+          <div className="space-y-6">
+            {/* Commissioner Tools */}
+            {isCommissioner && gpPoolData && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Commissioner Tools</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <Button variant="outline" className="w-full" asChild>
+                    <Link href={`/pools/${id}/golf/setup`}>
+                      Tournament Setup
+                    </Link>
+                  </Button>
+                  <Button variant="outline" className="w-full" asChild>
+                    <Link href={`/pools/${id}/golf/tiers`}>
+                      Configure Tiers
+                    </Link>
+                  </Button>
+                  <Button variant="outline" className="w-full" asChild>
+                    <Link href={`/pools/${id}/golf/entries`}>
+                      Manage Entries
+                    </Link>
+                  </Button>
+                  <Button variant="outline" className="w-full" asChild>
+                    <Link href={`/pools/${id}/golf/scores`}>
+                      Enter Scores
+                    </Link>
+                  </Button>
+
+                  {/* Public URL - shown when public entries are live */}
+                  {gpPoolData.public_entries_enabled && gpPoolData.public_slug && (
+                    <GpPublicUrlDisplay publicSlug={gpPoolData.public_slug} />
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
       ) : (
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Left Column - Games/Picks */}

@@ -562,9 +562,12 @@ export type Database = {
           entry_name: string | null
           entry_number: number | null
           id: string
+          participant_email: string | null
+          participant_name: string | null
           pool_id: string
           submitted_at: string | null
-          user_id: string
+          user_id: string | null
+          verified: boolean | null
         }
         Insert: {
           created_at?: string | null
@@ -572,9 +575,12 @@ export type Database = {
           entry_name?: string | null
           entry_number?: number | null
           id?: string
+          participant_email?: string | null
+          participant_name?: string | null
           pool_id: string
           submitted_at?: string | null
-          user_id: string
+          user_id?: string | null
+          verified?: boolean | null
         }
         Update: {
           created_at?: string | null
@@ -582,9 +588,12 @@ export type Database = {
           entry_name?: string | null
           entry_number?: number | null
           id?: string
+          participant_email?: string | null
+          participant_name?: string | null
           pool_id?: string
           submitted_at?: string | null
-          user_id?: string
+          user_id?: string | null
+          verified?: boolean | null
         }
         Relationships: [
           {
@@ -643,6 +652,7 @@ export type Database = {
           round_3: number | null
           round_4: number | null
           thru: number | null
+          to_par: number | null
           total_score: number | null
           tournament_id: string
           updated_at: string | null
@@ -657,6 +667,7 @@ export type Database = {
           round_3?: number | null
           round_4?: number | null
           thru?: number | null
+          to_par?: number | null
           total_score?: number | null
           tournament_id: string
           updated_at?: string | null
@@ -671,6 +682,7 @@ export type Database = {
           round_3?: number | null
           round_4?: number | null
           thru?: number | null
+          to_par?: number | null
           total_score?: number | null
           tournament_id?: string
           updated_at?: string | null
@@ -696,31 +708,31 @@ export type Database = {
         Row: {
           country: string | null
           created_at: string | null
+          external_player_id: string | null
           headshot_url: string | null
           id: string
           name: string
           owgr_rank: number | null
-          sportradar_player_id: string | null
           updated_at: string | null
         }
         Insert: {
           country?: string | null
           created_at?: string | null
+          external_player_id?: string | null
           headshot_url?: string | null
           id?: string
           name: string
           owgr_rank?: number | null
-          sportradar_player_id?: string | null
           updated_at?: string | null
         }
         Update: {
           country?: string | null
           created_at?: string | null
+          external_player_id?: string | null
           headshot_url?: string | null
           id?: string
           name?: string
           owgr_rank?: number | null
-          sportradar_player_id?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -733,6 +745,8 @@ export type Database = {
           min_tier_points: number | null
           picks_lock_at: string | null
           pool_id: string
+          public_entries_enabled: boolean | null
+          public_slug: string | null
           tournament_id: string | null
         }
         Insert: {
@@ -742,6 +756,8 @@ export type Database = {
           min_tier_points?: number | null
           picks_lock_at?: string | null
           pool_id: string
+          public_entries_enabled?: boolean | null
+          public_slug?: string | null
           tournament_id?: string | null
         }
         Update: {
@@ -751,6 +767,8 @@ export type Database = {
           min_tier_points?: number | null
           picks_lock_at?: string | null
           pool_id?: string
+          public_entries_enabled?: boolean | null
+          public_slug?: string | null
           tournament_id?: string | null
         }
         Relationships: [
@@ -857,10 +875,10 @@ export type Database = {
           created_at: string | null
           cut_round: number | null
           end_date: string
+          external_tournament_id: string | null
           id: string
           name: string
           par: number | null
-          sportradar_tournament_id: string | null
           start_date: string
           status: string | null
           updated_at: string | null
@@ -871,10 +889,10 @@ export type Database = {
           created_at?: string | null
           cut_round?: number | null
           end_date: string
+          external_tournament_id?: string | null
           id?: string
           name: string
           par?: number | null
-          sportradar_tournament_id?: string | null
           start_date: string
           status?: string | null
           updated_at?: string | null
@@ -885,10 +903,10 @@ export type Database = {
           created_at?: string | null
           cut_round?: number | null
           end_date?: string
+          external_tournament_id?: string | null
           id?: string
           name?: string
           par?: number | null
-          sportradar_tournament_id?: string | null
           start_date?: string
           status?: string | null
           updated_at?: string | null

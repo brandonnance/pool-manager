@@ -166,6 +166,49 @@ export function DeletePoolButton({ poolId, poolName, poolType, orgId }: DeletePo
           .from('bb_pool_games')
           .delete()
           .eq('pool_id', poolId)
+      } else if (poolType === 'golf') {
+        // Get gp_pool id first
+        const { data: gpPool } = await supabase
+          .from('gp_pools')
+          .select('id')
+          .eq('pool_id', poolId)
+          .single()
+
+        if (gpPool) {
+          // Get all entry ids for this pool
+          const { data: entries } = await supabase
+            .from('gp_entries')
+            .select('id')
+            .eq('pool_id', poolId)
+
+          const entryIds = entries?.map(e => e.id) ?? []
+
+          if (entryIds.length > 0) {
+            // Delete entry picks
+            await supabase
+              .from('gp_entry_picks')
+              .delete()
+              .in('entry_id', entryIds)
+          }
+
+          // Delete entries
+          await supabase
+            .from('gp_entries')
+            .delete()
+            .eq('pool_id', poolId)
+
+          // Delete tier assignments
+          await supabase
+            .from('gp_tier_assignments')
+            .delete()
+            .eq('pool_id', gpPool.id)
+
+          // Delete gp_pool
+          await supabase
+            .from('gp_pools')
+            .delete()
+            .eq('id', gpPool.id)
+        }
       }
 
       // Common deletions for all pool types
@@ -270,6 +313,12 @@ export function DeletePoolButton({ poolId, poolName, poolType, orgId }: DeletePo
                     <li>All bowl picks</li>
                     <li>All CFP bracket picks</li>
                     <li>All game configurations</li>
+                  </>
+                )}
+                {poolType === 'golf' && (
+                  <>
+                    <li>All golf entries and picks</li>
+                    <li>All tier assignments</li>
                   </>
                 )}
                 <li>All join links</li>

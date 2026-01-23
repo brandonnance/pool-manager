@@ -443,7 +443,7 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
             {/* Show single pool type header if only one is enabled */}
             {enabledCount === 1 && enabledPoolTypes && (
               <div className="text-sm text-muted-foreground">
-                Creating a {enabledPoolTypes.bowl_buster ? 'Bowl Buster' : 'Squares'} pool
+                Creating a {enabledPoolTypes.bowl_buster ? 'Bowl Buster' : enabledPoolTypes.playoff_squares ? 'Squares' : enabledPoolTypes.golf ? 'Golf Pool' : 'March Madness'} pool
               </div>
             )}
 
@@ -453,7 +453,12 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder={poolType === 'bowl_buster' ? 'My Bowl Pool' : 'Super Bowl Squares 2025'}
+                placeholder={
+                  poolType === 'bowl_buster' ? 'My Bowl Pool' :
+                  poolType === 'playoff_squares' ? 'Super Bowl Squares 2025' :
+                  poolType === 'golf' ? 'Masters 2025 Pool' :
+                  'March Madness 2025'
+                }
                 required
               />
             </div>

@@ -1,0 +1,259 @@
+import {
+  SlashGolfScheduleResponse,
+  SlashGolfTournamentResponse,
+  SlashGolfLeaderboardResponse,
+  SlashGolfRankingsResponse,
+  SlashGolfPlayerResponse,
+  GolfTournament,
+  GolfPlayer,
+  GolfPlayerScore,
+  parseMongoDate,
+  parseMongoNumber,
+} from './types'
+
+const RAPIDAPI_HOST = 'live-golf-data.p.rapidapi.com'
+const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY
+
+export class SlashGolfClient {
+  private apiKey: string
+  private host: string
+
+  constructor(apiKey?: string) {
+    this.apiKey = apiKey || RAPIDAPI_KEY || ''
+    this.host = RAPIDAPI_HOST
+
+    if (!this.apiKey) {
+      console.warn('RapidAPI key not configured for Slash Golf API')
+    }
+  }
+
+  private async fetch<T>(endpoint: string, params?: Record<string, string>): Promise<T> {
+    if (!this.apiKey) {
+      throw new Error('RapidAPI key not configured. Add RAPIDAPI_KEY to your .env.local file.')
+    }
+
+    const url = new URL(`https://${this.host}${endpoint}`)
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        url.searchParams.append(key, value)
+      })
+    }
+
+    const response = await fetch(url.toString(), {
+      headers: {
+        'X-RapidAPI-Key': this.apiKey,
+        'X-RapidAPI-Host': this.host,
+      },
+      next: { revalidate: 300 }, // Cache for 5 minutes
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+
+      if (response.status === 429) {
+        throw new Error('Rate limit exceeded. Please wait and try again.')
+      }
+
+      if (response.status === 403) {
+        throw new Error('API key invalid or subscription required.')
+      }
+
+      if (response.status === 404) {
+        throw new Error('Resource not found.')
+      }
+
+      throw new Error(`Slash Golf API error: ${response.status} - ${errorText}`)
+    }
+
+    return response.json()
+  }
+
+  // Get schedule for a year (orgId: 1 = PGA Tour, 2 = LIV)
+  async getSchedule(year: number, orgId: string = '1'): Promise<SlashGolfScheduleResponse> {
+    return this.fetch<SlashGolfScheduleResponse>('/schedule', {
+      orgId,
+      year: String(year),
+    })
+  }
+
+  // Get tournaments normalized for our app
+  async getTournaments(year: number): Promise<GolfTournament[]> {
+    const schedule = await this.getSchedule(year)
+
+    return schedule.schedule.map(t => {
+      const course = t.courses?.[0]
+      const startDateStr = parseMongoDate(t.date.start)
+      const endDateStr = parseMongoDate(t.date.end)
+      const startDate = startDateStr ? new Date(startDateStr) : new Date()
+      const endDate = endDateStr ? new Date(endDateStr) : new Date()
+      const now = new Date()
+
+      let status: 'upcoming' | 'in_progress' | 'completed' = 'upcoming'
+      if (endDate < now) {
+        status = 'completed'
+      } else if (startDate <= now && endDate >= now) {
+        status = 'in_progress'
+      }
+
+      return {
+        id: t.tournId,
+        name: t.name,
+        startDate: startDateStr || '',
+        endDate: endDateStr || '',
+        venue: course?.courseName,
+        courseName: course?.courseName,
+        city: course?.location?.city,
+        state: course?.location?.state,
+        country: course?.location?.country,
+        par: course?.par,
+        purse: parseMongoNumber(t.purse),
+        status,
+      }
+    })
+  }
+
+  // Get tournament field (entry list)
+  async getTournamentField(tournId: string, year: number): Promise<SlashGolfTournamentResponse> {
+    return this.fetch<SlashGolfTournamentResponse>('/tournament', {
+      tournId,
+      year: String(year),
+    })
+  }
+
+  // Get players in a tournament normalized for our app
+  async getPlayers(tournId: string, year: number): Promise<GolfPlayer[]> {
+    const tournament = await this.getTournamentField(tournId, year)
+
+    if (!tournament.players || tournament.players.length === 0) {
+      return []
+    }
+
+    return tournament.players.map(p => ({
+      id: p.playerId,
+      firstName: p.firstName,
+      lastName: p.lastName,
+      fullName: `${p.firstName} ${p.lastName}`,
+      country: '', // Country not available in tournament field response
+    }))
+  }
+
+  // Get leaderboard for a tournament
+  async getLeaderboard(tournId: string, year: number, roundId?: number): Promise<SlashGolfLeaderboardResponse> {
+    const params: Record<string, string> = {
+      tournId,
+      year: String(year),
+    }
+    if (roundId) {
+      params.roundId = String(roundId)
+    }
+    return this.fetch<SlashGolfLeaderboardResponse>('/leaderboard', params)
+  }
+
+  // Get scores normalized for our app
+  async getScores(tournId: string, year: number): Promise<GolfPlayerScore[]> {
+    const leaderboard = await this.getLeaderboard(tournId, year)
+
+    // Handle case where leaderboard data is not available yet
+    if (!leaderboard || !leaderboard.leaderboardRows || !Array.isArray(leaderboard.leaderboardRows)) {
+      console.log('[SlashGolf] No leaderboard data available for tournament', tournId)
+      return []
+    }
+
+    return leaderboard.leaderboardRows.map(p => {
+      const rounds = p.rounds || []
+      // roundId is MongoDB number format: { "$numberInt": "1" }
+      const r1 = rounds.find(r => parseMongoNumber(r.roundId) === 1)
+      const r2 = rounds.find(r => parseMongoNumber(r.roundId) === 2)
+      const r3 = rounds.find(r => parseMongoNumber(r.roundId) === 3)
+      const r4 = rounds.find(r => parseMongoNumber(r.roundId) === 4)
+
+      // Parse to-par string (e.g., "-16", "E", "+5") to number
+      const parseToPar = (val: string): number => {
+        if (val === 'E') return 0
+        return parseInt(val) || 0
+      }
+
+      return {
+        playerId: p.playerId,
+        playerName: `${p.firstName} ${p.lastName}`,
+        position: p.position || '-',
+        tied: p.position?.startsWith('T') || false,
+        round1: parseMongoNumber(r1?.strokes),
+        round2: parseMongoNumber(r2?.strokes),
+        round3: parseMongoNumber(r3?.strokes),
+        round4: parseMongoNumber(r4?.strokes),
+        totalStrokes: p.totalStrokesFromCompletedRounds ? parseInt(p.totalStrokesFromCompletedRounds) : undefined,
+        toPar: parseToPar(p.total),
+        thru: p.thru,
+        status: this.mapPlayerStatus(p.status),
+      }
+    })
+  }
+
+  // Get world rankings (OWGR)
+  // statId: "186" = OWGR, "02671" = FedExCup
+  // Returns rankings with metadata about which year was used
+  async getWorldRankings(year?: number): Promise<SlashGolfRankingsResponse & { yearUsed: number; usedFallback: boolean }> {
+    const currentYear = year || new Date().getFullYear()
+
+    // Try current year first
+    const currentYearResponse = await this.fetch<SlashGolfRankingsResponse>('/stats', {
+      year: String(currentYear),
+      statId: '186', // OWGR
+    })
+
+    // Check if we got valid results
+    if (currentYearResponse.rankings && currentYearResponse.rankings.length > 0) {
+      return { ...currentYearResponse, yearUsed: currentYear, usedFallback: false }
+    }
+
+    // Fall back to prior year if current year has no data
+    const priorYear = currentYear - 1
+    console.log(`[SlashGolf] No OWGR data for ${currentYear}, falling back to ${priorYear}`)
+
+    const priorYearResponse = await this.fetch<SlashGolfRankingsResponse>('/stats', {
+      year: String(priorYear),
+      statId: '186', // OWGR
+    })
+
+    return { ...priorYearResponse, yearUsed: priorYear, usedFallback: true }
+  }
+
+  // Get world rankings as a map of playerId -> rank
+  async getWorldRankingsMap(): Promise<Map<string, number>> {
+    const rankings = await this.getWorldRankings()
+    return new Map(rankings.rankings.map(r => [r.playerId, r.rank]))
+  }
+
+  // Search for a player
+  async searchPlayer(lastName?: string, firstName?: string, playerId?: string): Promise<SlashGolfPlayerResponse> {
+    const params: Record<string, string> = {}
+    if (lastName) params.lastName = lastName
+    if (firstName) params.firstName = firstName
+    if (playerId) params.playerId = playerId
+    return this.fetch<SlashGolfPlayerResponse>('/players', params)
+  }
+
+  private mapPlayerStatus(status?: string): 'active' | 'cut' | 'withdrawn' | 'disqualified' {
+    switch (status) {
+      case 'cut':
+        return 'cut'
+      case 'wd':
+        return 'withdrawn'
+      case 'dq':
+        return 'disqualified'
+      default:
+        return 'active'
+    }
+  }
+}
+
+// Singleton instance for server-side use
+let clientInstance: SlashGolfClient | null = null
+
+export function getSlashGolfClient(): SlashGolfClient {
+  if (!clientInstance) {
+    clientInstance = new SlashGolfClient()
+  }
+  return clientInstance
+}
