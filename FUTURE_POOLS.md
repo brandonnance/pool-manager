@@ -1,109 +1,34 @@
-# BN Pools - Future Pool Types Roadmap
+# BN Pools - Pool Types Roadmap
 
 ## Current State
+
+### Live Pool Types
+
 - **Bowl Buster** - Complete and live at pools.brandon-nance.com
   - Bowl game picks with margin-of-victory scoring
   - CFP bracket picker
   - Demo mode for testing
 
----
+- **NFL Playoff Squares** - Complete and live
+  - 10x10 grid with visual ownership display
+  - Random number generation
+  - 13 NFL playoff games pre-structured
+  - Color-coded winners by round
 
-## Pool Type #1: NFL Playoff Squares
+- **Single Game Squares** - Complete and live
+  - Score change mode with forward/reverse winners
+  - Quarter scoring mode (needs testing)
 
-### Status: IMPLEMENTED
-
-### Overview
-Classic 10x10 squares grid for NFL playoff games. Players claim squares, numbers are randomly assigned after grid is full, and winners are determined by the last digit of each team's score.
-
-### Implemented Features
-- [x] 10x10 grid with visual ownership display
-- [x] Click-to-claim squares (members can claim/unclaim before numbers locked)
-- [x] Commissioner can assign/reassign squares to any member
-- [x] Random number generation for row/column axes
-- [x] Configurable max squares per player
-- [x] Reverse scoring option (both forward and reverse winners)
-- [x] Halftime scoring for Super Bowl
-- [x] 13 NFL playoff games pre-structured (Wild Card, Divisional, Conference, Super Bowl)
-- [x] Color-coded winners by round:
-  - Wild Card: Amber
-  - Divisional: Emerald
-  - Conference: Red
-  - Super Bowl Halftime: Violet
-  - Super Bowl Final: Purple
-- [x] Commissioner score entry for each game
-- [x] Automatic winner calculation based on score digits
-- [x] Payout leaderboard showing total winnings per player
-- [x] Team labels on grid axes
-- [x] Grid legend showing all colors
-- [x] Your squares highlighted in sky blue
-
-### Database Schema (Implemented)
-- `sq_pools` - Pool configuration (reverse_scoring, max_squares_per_player, numbers_locked, row_numbers, col_numbers, mode)
-- `sq_squares` - Individual square ownership
-- `sq_games` - Games with scores, round, status
-- `sq_winners` - Winner records with win_type and payout
-
-### Future Enhancements
-- [ ] Animated number reveal when commissioner locks grid
-- [ ] Live score API integration
-- [ ] "Current winning square" highlight during live games
-- [ ] Push notifications when your square wins
+- **Golf Major Pools** - Complete and live (can be disabled via admin settings)
+  - Tiered golfer picks (6 golfers, best 4 of 6 scoring)
+  - Public entry system (no account required)
+  - Live scoring via Slash Golf API
+  - Elite tier for commissioner-designated players
+  - See [golf-pools.md](golf-pools.md) for full documentation
 
 ---
 
-## Pool Type #2: Single Game Squares (Super Bowl Squares)
-
-### Status: MOSTLY IMPLEMENTED
-
-### Overview
-Same 10x10 grid mechanics as NFL Playoff Squares, but for a single game with more granular scoring options.
-
-### Scoring Mode A: Every Score Change - IMPLEMENTED
-- [x] Game starts 0-0 with automatic first winner
-- [x] Every score change during game creates winners
-- [x] Forward winner (green) and reverse winner (red) for each score
-- [x] Both forward + reverse shown with diagonal gradient split
-- [x] Score change log with newest first
-- [x] Commissioner can add score changes via dialog
-- [x] Validation: scores cannot decrease
-- [x] Validation: only one team can score at a time
-- [x] Validation: score must change from previous entry
-- [x] Delete score change with cascade warning
-- [x] Final score winners highlighted in purple/fuchsia
-- [x] Final Score Winners card with prominent display
-- [x] Payout leaderboard
-
-### Scoring Mode B: Quarter Scoring (Traditional) - NOT TESTED
-- [x] Database and UI support exists
-- [x] Q1, Halftime, Q3, Final score entry
-- [ ] Needs end-to-end testing
-
-### Color Scheme (Score Change Mode)
-| State | Color |
-|-------|-------|
-| Forward winner | Emerald/Green |
-| Reverse winner | Rose/Red |
-| Both forward + reverse | Green/Rose diagonal gradient |
-| Final forward | Purple |
-| Final reverse | Fuchsia |
-| Final both | Purple/Fuchsia diagonal gradient |
-
-### Database Additions (Implemented)
-- `sq_pools.mode` - 'full_playoff' or 'single_game'
-- `sq_pools.scoring_mode` - 'quarter' or 'score_change'
-- `sq_pools.q1_payout`, `halftime_payout`, `q3_payout`, `final_payout`
-- `sq_pools.per_change_payout`, `final_bonus_payout`
-- `sq_score_changes` - Track all score changes with order
-- Win types: 'score_change', 'score_change_reverse', 'score_change_final', 'score_change_final_reverse', 'q1', 'q1_reverse', 'q3', 'q3_reverse'
-
-### Remaining Work
-- [ ] Test quarter scoring mode end-to-end
-- [ ] Verify payout calculations are correct
-- [ ] Consider live score API integration
-
----
-
-## Pool Type #3: March Madness Blind Draw
+## Pool Type: March Madness Blind Draw
 
 ### Status: PLANNED - See [blind-draw.md](blind-draw.md) for full implementation plan
 
@@ -212,7 +137,7 @@ CREATE TABLE mm_games (
 
 ---
 
-## Pool Type #4: NFL Survivor (Future)
+## Pool Type: NFL Survivor (Future)
 
 ### Status: NOT DESIGNED
 
@@ -220,7 +145,7 @@ CREATE TABLE mm_games (
 
 ---
 
-## Pool Type #5: Weekly Pick'em (Future)
+## Pool Type: Weekly Pick'em (Future)
 
 ### Status: NOT DESIGNED
 
@@ -229,8 +154,10 @@ CREATE TABLE mm_games (
 ---
 
 ## Implementation Priority
-1. **NFL Playoff Squares** - DONE
-2. **Single Game Squares** - DONE (needs quarter mode testing)
-3. **March Madness Blind Draw** - March timing, spread-based advancement
-4. **NFL Survivor** - September timing, simple mechanics
-5. **Weekly Pick'em** - Anytime, most flexible
+1. **Bowl Buster** - DONE
+2. **NFL Playoff Squares** - DONE
+3. **Single Game Squares** - DONE (needs quarter mode testing)
+4. **Golf Major Pools** - DONE (live, toggleable via admin)
+5. **March Madness Blind Draw** - March timing, spread-based advancement
+6. **NFL Survivor** - September timing, simple mechanics
+7. **Weekly Pick'em** - Anytime, most flexible

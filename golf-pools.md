@@ -6,22 +6,23 @@ A tiered golf major pool system for PGA majors (Masters, PGA Championship, US Op
 
 ---
 
-## Implementation Status
+## Implementation Status: LIVE
 
-### COMPLETE - Core MVP + Public Entries
+Golf pools are fully implemented and deployed at pools.brandon-nance.com. The feature can be enabled/disabled via site admin settings.
 
 | Phase | Status | Notes |
 |-------|--------|-------|
 | Phase 1: Database | COMPLETE | 8 gp_* tables, RLS policies, helper functions |
 | Phase 2: Infrastructure | COMPLETE | Site settings, pool creation, routing |
 | Phase 3: Demo Mode | COMPLETE | 50 mock golfers, simulate rounds, seed data |
-| Phase 4: Commissioner Tools | COMPLETE | Tournament setup, tier editor |
+| Phase 4: Commissioner Tools | COMPLETE | Tournament setup, tier editor, elite promotion |
 | Phase 5: Pick Sheet | COMPLETE | 6-golfer selection with tier validation |
 | Phase 6: Standings | COMPLETE | Best 4 of 6, score-to-par display |
 | Phase 7: Public Entries | COMPLETE | Public URL, entry form, leaderboard |
 | Phase 8: Live Scoring | COMPLETE | Slash Golf API sync with rate limiting |
+| Phase 9: Score Management | COMPLETE | Sync + manual override for commissioners |
 
-### Recently Completed
+### Feature Summary
 
 | Feature | Status | Notes |
 |---------|--------|-------|
@@ -29,15 +30,16 @@ A tiered golf major pool system for PGA majors (Masters, PGA Championship, US Op
 | Public Leaderboard | COMPLETE | Same URL shows leaderboard after lock |
 | Live Score Sync | COMPLETE | `/api/golf/sync-scores` - Manual sync from Slash Golf API |
 | Smart Rate Limiting | COMPLETE | 5-minute cooldown, tournament hours indicator |
-| Tie Ranking Fix | COMPLETE | All tied entries show "T1" (not just 1 for first) |
+| Tie Ranking | COMPLETE | All tied entries show "T1" (not just 1 for first) |
 | Entry Name Validation | COMPLETE | Prevented duplicates via email+entry_name check |
-| **To-Par Scoring Fix** | COMPLETE | Uses `to_par` consistently (not stroke totals) |
-| **Detailed Golfer Display** | COMPLETE | POS, GOLFER, TOT, THR, R1-R4 columns |
-| **Round Status Display** | COMPLETE | "F" for finished, "CUT" for missed cuts, hole # for in-progress |
-| **Search Preserves Rankings** | COMPLETE | Filtering doesn't change entry positions |
-| **Dropped Golfer Shading** | COMPLETE | Red background for bottom 2 golfers in public view |
-| **Tier Badges in Public View** | COMPLETE | Color-coded tier numbers next to golfer names |
-| **Score Management Page** | COMPLETE | Sync + manual score override for commissioners |
+| To-Par Scoring | COMPLETE | Uses `to_par` consistently (not stroke totals) |
+| Detailed Golfer Display | COMPLETE | POS, GOLFER, TOT, THR, R1-R4 columns |
+| Round Status Display | COMPLETE | "F" for finished, "CUT" for missed cuts, hole # for in-progress |
+| Search Preserves Rankings | COMPLETE | Filtering doesn't change entry positions |
+| Dropped Golfer Shading | COMPLETE | Red background for bottom 2 golfers in public view |
+| Tier Badges | COMPLETE | Color-coded tier numbers next to golfer names |
+| Elite Tier (Tier 0) | COMPLETE | Commissioner-promoted elite golfers |
+| Pool Status System | COMPLETE | Draft/Open/Active/Completed status badges |
 
 ---
 
@@ -112,7 +114,7 @@ RAPIDAPI_KEY=your_api_key_here
 7. Upserts to `gp_tier_assignments` table
 8. Also updates `owgr_rank` in `gp_golfers` for reference
 
-**Important:** Tier 0 is NEVER auto-assigned - it's reserved for manual "Elite" designation.
+**Important:** Tier 0 is NEVER auto-assigned - it's reserved for manual "Elite" designation via the Elite Promotion modal.
 
 ---
 
@@ -237,7 +239,137 @@ gp_golfer_results
 
 ---
 
-## Key Files Reference
+## Public Entry System
+
+### URL Behavior
+- **Before lock**: `/pools/golf/[slug]` shows pick sheet form
+- **After lock**: Same URL shows public leaderboard
+
+### Entry Form Features
+- Name, email, entry name fields (no account required)
+- One-time submission (no edits after save)
+- Multiple entries per person allowed (different entry names)
+- Live countdown timer to lock time
+- Blocking modal when lock time passes
+- Real-time tier point validation
+- Horizontal tier rows with color-coded sections
+
+### Commissioner Entry Management
+- Table of all entries with participant info
+- Search by name or entry name
+- Verified toggle for payment tracking
+- Edit/delete capabilities with slide-in sheet
+
+### Privacy
+- Public leaderboard shows Entry Name only (not real name)
+- Commissioner sees all details (name, email)
+
+### Database Constraints
+- Identity constraint (entry is user-linked XOR public)
+- Slug format constraint (lowercase, alphanumeric, hyphens)
+- Email + entry_name uniqueness check prevents duplicate entries
+
+---
+
+## Live Scoring
+
+### Sync Button Features
+- 5-minute cooldown between syncs (prevents API abuse)
+- Tournament hours indicator (7am-9pm local time)
+- Last sync time display
+- Graceful handling when no leaderboard data available
+
+### Score Calculation
+- Rounds 1-4 stored as actual strokes
+- "thru" field shows holes completed (or 18 for finished)
+- Missed cut penalty: R1 + R2 + 80 + 80
+- Position tracking from API
+
+### Manual Score Override
+- Commissioner can edit individual golfer scores
+- Useful for corrections or when API data is delayed
+
+---
+
+## Core Features Summary
+
+| Feature | Description |
+|---------|-------------|
+| **Tiered Picks** | Golfers assigned to tiers 0-6 by commissioner |
+| **6-Golfer Roster** | Each entry selects exactly 6 golfers |
+| **Tier Point Minimum** | Configurable minimum (default 21), no maximum |
+| **Best 4 of 6 Scoring** | Lowest 4 golfer scores count, worst 2 dropped |
+| **Missed Cut Penalty** | R1 + R2 + 80 + 80 for golfers who miss cut |
+| **Multiple Entries** | Members can create multiple entries per pool |
+| **Score to Par** | Shows -5, +3, E based on rounds played |
+| **Demo Mode** | Test mode with mock tournament data |
+| **Public Entries** | No account required for public pool entries |
+| **Live Scoring** | Manual sync from Slash Golf API with rate limiting |
+| **Manual Score Override** | Commissioner can edit individual golfer scores |
+| **Elite Tier** | Tier 0 for commissioner-designated elite players |
+
+---
+
+## UI Components
+
+### Golf Standings (`golf-standings.tsx`)
+
+- Expandable rows showing all 6 golfers
+- "Counted (Best 4)" and "Dropped (Worst 2)" sections with opacity difference
+- Table-style layout with columns: POS, GOLFER, TOT, THR, R1, R2, R3, R4
+- Color-coded tier badges (0-6) with OWGR-based coloring
+- Score-to-par with green (under) / red (over) coloring
+- THR column: "F" for finished, "CUT" for missed cut, hole # for in-progress
+- Missed cut penalty: Shows "80" in red for R3/R4 columns
+- "You" badge for current user's entries
+- Tied entries show "T" prefix (T1, T3, etc.)
+
+### Pick Sheet (`picks/page.tsx`)
+
+- Golfers grouped by tier (0-6), empty tiers hidden
+- Click to add/remove from roster
+- Running tier point total
+- Validation: exactly 6 golfers, minimum points
+- Golfer Info: Hover card (desktop) or tap icon (mobile) shows:
+  - Photo (placeholder if none)
+  - Country with flag icon
+  - OWGR ranking
+  - Tier badge with points
+  - Field status (WITHDRAWN/MISSED CUT/DQ if applicable)
+
+### Tier Editor (`tiers/page.tsx`)
+
+- All golfers in tournament field
+- Select tier 0-6 from dropdown
+- Auto-Assign (OWGR) button for bulk assignment
+- Elite (Tier 0) golfers highlighted with crown icon
+- Bulk save assignments
+- Filter by name
+
+### Public Entry Form (`golf-public-entry-form.tsx`)
+
+- Horizontal tier rows with color-coded sections
+- Countdown timer to lock time
+- Name, email, entry name fields
+- Real-time tier point validation
+- Blocking modal when lock passes
+
+### Public Leaderboard (`golf-public-leaderboard.tsx`)
+
+- Expandable entry rows showing all 6 picks
+- Entry name only (privacy - no real names shown)
+- Golfers sorted by score (best first) within each entry
+- Bottom 2 golfers (dropped) shown with red background shading
+- Table-style layout: POS, GOLFER (with tier badge), TOT, THR, R1-R4
+- THR column: "F" for finished, "CUT" for missed cut, hole # for in-progress
+- Color-coded tier badges matching commissioner view
+- Tied entries show "T" prefix (T1, T3, etc.)
+- Search filter preserves original rankings
+- Mobile-responsive design
+
+---
+
+## File Paths Reference
 
 ### API Routes
 
@@ -272,7 +404,9 @@ frontend/src/components/golf/
 ├── golf-standings-wrapper.tsx     # Client wrapper with auto-refresh
 ├── golf-public-entry-form.tsx     # Public pick sheet form
 ├── golf-public-leaderboard.tsx    # Public leaderboard after lock
-└── gp-public-entries-card.tsx     # Commissioner URL management card
+├── gp-public-entries-card.tsx     # Commissioner URL management card
+├── gp-public-url-display.tsx      # Public URL display component
+└── gp-elite-promotion-modal.tsx   # Modal for promoting golfers to Elite tier
 ```
 
 ### Libraries
@@ -281,126 +415,13 @@ frontend/src/components/golf/
 frontend/src/lib/golf/
 ├── demo-data.ts               # 50 demo golfers with suggested tiers
 ├── scoring.ts                 # calculateGolferScore, calculateEntryScore, formatScoreToPar
-├── types.ts                   # GolferWithTier, EntryStanding, etc.
+├── types.ts                   # GolferWithTier, EntryStanding, TIER_INFO, etc.
 └── validation.ts              # validateRoster (6 golfers, min tier points)
 
 frontend/src/lib/slashgolf/
 ├── client.ts                  # Slash Golf API client (singleton)
 └── types.ts                   # Slash Golf response types & helpers
 ```
-
----
-
-## Core Features
-
-| Feature | Description |
-|---------|-------------|
-| **Tiered Picks** | Golfers assigned to tiers 0-6 by commissioner |
-| **6-Golfer Roster** | Each entry selects exactly 6 golfers |
-| **Tier Point Minimum** | Configurable minimum (default 21), no maximum |
-| **Best 4 of 6 Scoring** | Lowest 4 golfer scores count, worst 2 dropped |
-| **Missed Cut Penalty** | R1 + R2 + 80 + 80 for golfers who miss cut |
-| **Multiple Entries** | Members can create multiple entries per pool |
-| **Score to Par** | Shows -5, +3, E based on rounds played |
-| **Demo Mode** | Test mode with mock tournament data |
-| **Public Entries** | No account required for public pool entries |
-| **Live Scoring** | Manual sync from Slash Golf API with rate limiting |
-| **Manual Score Override** | Commissioner can edit individual golfer scores |
-
----
-
-## Public Entry System
-
-### URL Behavior
-- **Before lock**: `/pools/golf/[slug]` shows pick sheet form
-- **After lock**: Same URL shows public leaderboard
-
-### Features
-- Name, email, entry name fields (no account required)
-- One-time submission (no edits after save)
-- Multiple entries per person allowed
-- Countdown timer to lock time
-- Blocking modal when lock time passes
-- Commissioner can edit/delete entries
-- Verified toggle per entry for payment tracking
-
-### Privacy
-- Public leaderboard shows Entry Name only (not real name)
-- Commissioner sees all details
-
----
-
-## Live Scoring
-
-### Sync Button Features
-- 5-minute cooldown between syncs (prevents API abuse)
-- Tournament hours indicator (7am-9pm local time)
-- Last sync time display
-- Graceful handling when no leaderboard data available
-
-### Score Calculation
-- Rounds 1-4 stored as actual strokes
-- "thru" field shows holes completed (or 18 for finished)
-- Missed cut penalty: R1 + R2 + 80 + 80
-- Position tracking from API
-
----
-
-## UI Components
-
-### Golf Standings (`golf-standings.tsx`)
-
-- Expandable rows showing all 6 golfers
-- "Counted (Best 4)" and "Dropped (Worst 2)" sections with opacity difference
-- Table-style layout with columns: POS, GOLFER, TOT, THR, R1, R2, R3, R4
-- Color-coded tier badges (1-6) with OWGR-based coloring
-- Score-to-par with green (under) / red (over) coloring
-- THR column: "F" for finished, "CUT" for missed cut, hole # for in-progress
-- Missed cut penalty: Shows "80" in red for R3/R4 columns
-- "You" badge for current user's entries
-- Tied entries show "T" prefix (T1, T3, etc.)
-
-### Pick Sheet (`picks/page.tsx`)
-
-- Golfers grouped by tier (0-6), empty tiers hidden
-- Click to add/remove from roster
-- Running tier point total
-- Validation: exactly 6 golfers, minimum points
-- Golfer Info: Hover card (desktop) or tap icon (mobile) shows:
-  - Photo (placeholder if none)
-  - Country with flag icon
-  - OWGR ranking
-  - Tier badge with points
-  - Field status (WITHDRAWN/MISSED CUT/DQ if applicable)
-
-### Tier Editor (`tiers/page.tsx`)
-
-- All golfers in tournament field
-- Select tier 0-6 from dropdown
-- Auto-Assign (OWGR) button for bulk assignment
-- Bulk save assignments
-- Filter by name
-
-### Public Entry Form (`golf-public-entry-form.tsx`)
-
-- Horizontal tier rows with color-coded sections
-- Countdown timer to lock time
-- Name, email, entry name fields
-- Real-time tier point validation
-- Blocking modal when lock passes
-
-### Public Leaderboard (`golf-public-leaderboard.tsx`)
-
-- Expandable entry rows showing all 6 picks
-- Entry name only (privacy - no real names shown)
-- Golfers sorted by score (best first) within each entry
-- Bottom 2 golfers (dropped) shown with red background shading
-- Table-style layout: POS, GOLFER (with tier badge), TOT, THR, R1-R4
-- THR column: "F" for finished, "CUT" for missed cut, hole # for in-progress
-- Color-coded tier badges matching commissioner view
-- Tied entries show "T" prefix (T1, T3, etc.)
-- Search filter preserves original rankings
-- Mobile-responsive design
 
 ---
 
@@ -425,33 +446,15 @@ frontend/src/lib/slashgolf/
 - [x] Rate limiting for API calls
 - [x] Manual score override (edit individual golfer scores)
 - [x] Score management page (sync + override combined)
+- [x] Elite tier promotion
+- [x] Pool status badges
 
 ---
 
-## File Paths for Quick Reference
+## Future Enhancements (Optional)
 
-| Purpose | Path |
-|---------|------|
-| Pool detail (golf section) | `frontend/src/app/(dashboard)/pools/[id]/page.tsx` |
-| Tournament setup | `frontend/src/app/(dashboard)/pools/[id]/golf/setup/page.tsx` |
-| Tier editor | `frontend/src/app/(dashboard)/pools/[id]/golf/tiers/page.tsx` |
-| Pick sheet | `frontend/src/app/(dashboard)/pools/[id]/golf/picks/page.tsx` |
-| Manage entries | `frontend/src/app/(dashboard)/pools/[id]/golf/entries/page.tsx` |
-| Score management | `frontend/src/app/(dashboard)/pools/[id]/golf/scores/page.tsx` |
-| Public entry/leaderboard | `frontend/src/app/pools/golf/[slug]/page.tsx` |
-| Standings component | `frontend/src/components/golf/golf-standings.tsx` |
-| Standings wrapper | `frontend/src/components/golf/golf-standings-wrapper.tsx` |
-| Public entry form | `frontend/src/components/golf/golf-public-entry-form.tsx` |
-| Public leaderboard | `frontend/src/components/golf/golf-public-leaderboard.tsx` |
-| Standings API | `frontend/src/app/api/golf/standings/route.ts` |
-| Sync scores API | `frontend/src/app/api/golf/sync-scores/route.ts` |
-| Auto-tier API | `frontend/src/app/api/golf/auto-tier/route.ts` |
-| Demo API | `frontend/src/app/api/golf/demo/route.ts` |
-| Tournaments API | `frontend/src/app/api/golf/tournaments/route.ts` |
-| Slash Golf client | `frontend/src/lib/slashgolf/client.ts` |
-| Slash Golf types | `frontend/src/lib/slashgolf/types.ts` |
-| Scoring utilities | `frontend/src/lib/golf/scoring.ts` |
-| Validation | `frontend/src/lib/golf/validation.ts` |
-| Types | `frontend/src/lib/golf/types.ts` |
-| Demo data | `frontend/src/lib/golf/demo-data.ts` |
-| Database types | `frontend/src/types/database.ts` |
+- [ ] Automatic score refresh during tournament (interval-based)
+- [ ] Email notifications when picks are locked
+- [ ] Export entries to CSV
+- [ ] Bulk verify entries
+- [ ] Push notifications for leaderboard changes
