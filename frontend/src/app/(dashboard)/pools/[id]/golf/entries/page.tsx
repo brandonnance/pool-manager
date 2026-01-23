@@ -701,7 +701,7 @@ export default function GolfEntriesPage() {
                           {entry.picks.length === 0 ? (
                             <span className="text-muted-foreground text-sm">No picks</span>
                           ) : (
-                            entry.picks.slice(0, 3).map((pick) => (
+                            entry.picks.map((pick) => (
                               <span
                                 key={pick.golferId}
                                 className={cn(
@@ -712,11 +712,6 @@ export default function GolfEntriesPage() {
                                 {pick.golferName.split(' ').pop()}
                               </span>
                             ))
-                          )}
-                          {entry.picks.length > 3 && (
-                            <span className="text-xs text-muted-foreground">
-                              +{entry.picks.length - 3} more
-                            </span>
                           )}
                         </div>
                       </TableCell>

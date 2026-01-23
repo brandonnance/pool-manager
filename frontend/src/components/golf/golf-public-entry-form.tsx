@@ -14,12 +14,21 @@ import { Check, Clock, MapPin, Trophy, AlertCircle, Loader2, CheckCircle2, Rotat
 import { cn } from '@/lib/utils'
 
 // Tier color configurations
+// Tier 0 = Elite (commissioner-assigned for players on hot streaks)
+// Tiers 1-6 = OWGR-based automatic assignment
 const TIER_STYLES: Record<number, { bg: string; border: string; badge: string; label: string; desc: string }> = {
+  0: {
+    bg: 'bg-amber-100',
+    border: 'border-amber-400',
+    badge: 'bg-amber-500 text-white border-amber-500',
+    label: '⭐ ELITE',
+    desc: 'Hot Streak',
+  },
   1: {
     bg: 'bg-emerald-50',
     border: 'border-emerald-200',
     badge: 'bg-emerald-600 text-white border-emerald-600',
-    label: 'Elite',
+    label: 'Premier',
     desc: 'OWGR 1-15',
   },
   2: {
@@ -46,7 +55,7 @@ const TIER_STYLES: Record<number, { bg: string; border: string; badge: string; l
   5: {
     bg: 'bg-amber-50',
     border: 'border-amber-200',
-    badge: 'bg-amber-500 text-white border-amber-500',
+    badge: 'bg-amber-600 text-white border-amber-600',
     label: 'Value',
     desc: 'OWGR 126-200',
   },
@@ -503,12 +512,12 @@ export function GolfPublicEntryForm({
                 >
                   <div className="flex items-center gap-3 mb-4">
                     <Badge className={cn('font-bold text-sm px-3 py-1', tierStyle.badge)}>
-                      Tier {tier}
+                      {tier === 0 ? 'Elite' : `Tier ${tier}`}
                     </Badge>
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-sm">{tierStyle.label}</span>
                       <span className="text-xs text-muted-foreground">
-                        • {tierStyle.desc} • {tier} pt{tier !== 1 ? 's' : ''}
+                        • {tierStyle.desc} • {tier} pt{tier !== 1 && tier !== 0 ? 's' : ''}
                       </span>
                     </div>
                     <span className="ml-auto text-xs text-muted-foreground">
@@ -588,7 +597,7 @@ export function GolfPublicEntryForm({
                                     </Badge>
                                   )}
                                   <Badge className={cn('text-xs', tierStyle.badge)}>
-                                    Tier {tier} ({tier} pt{tier !== 1 ? 's' : ''})
+                                    {tier === 0 ? 'Elite (0 pts)' : `Tier ${tier} (${tier} pt${tier !== 1 ? 's' : ''})`}
                                   </Badge>
                                 </div>
                               </div>

@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { ArrowLeft, Loader2, Search, Save, Users, Wand2 } from 'lucide-react'
+import { ArrowLeft, Loader2, Search, Save, Users, Wand2, Crown } from 'lucide-react'
 import Link from 'next/link'
 import { getTierColor, getTierLabel, TIER_INFO } from '@/lib/golf/types'
 import { cn } from '@/lib/utils'
@@ -39,6 +39,7 @@ export default function TierEditorPage() {
   const [gpPoolId, setGpPoolId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [hasChanges, setHasChanges] = useState(false)
 
   useEffect(() => {
@@ -203,6 +204,7 @@ export default function TierEditorPage() {
   async function handleAutoAssign() {
     setAutoAssigning(true)
     setError(null)
+    setSuccessMessage(null)
 
     try {
       const response = await fetch('/api/golf/auto-tier', {
@@ -216,6 +218,8 @@ export default function TierEditorPage() {
       if (!response.ok) {
         setError(data.error || 'Failed to auto-assign tiers')
       } else {
+        // Show success message (includes fallback notice if applicable)
+        setSuccessMessage(data.message)
         // Reload data to get updated assignments and OWGR ranks
         await loadData()
       }
@@ -239,7 +243,7 @@ export default function TierEditorPage() {
   // Group golfers by tier for stats
   const tierStats = useMemo(() => {
     const stats = new Map<number, number>()
-    for (let i = 1; i <= 6; i++) stats.set(i, 0)
+    for (let i = 0; i <= 6; i++) stats.set(i, 0) // Include Tier 0 (Elite)
 
     tierAssignments.forEach((tier) => {
       stats.set(tier, (stats.get(tier) || 0) + 1)
@@ -308,6 +312,12 @@ export default function TierEditorPage() {
         </div>
       )}
 
+      {successMessage && (
+        <div className="bg-green-50 text-green-800 border border-green-200 px-4 py-3 rounded-md">
+          {successMessage}
+        </div>
+      )}
+
       {/* Tier Stats */}
       <Card>
         <CardHeader>
@@ -318,6 +328,17 @@ export default function TierEditorPage() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-3">
+            {/* Show Elite (Tier 0) first if any exist */}
+            {(tierStats.stats.get(0) || 0) > 0 && (
+              <div
+                className={cn(
+                  'px-3 py-2 rounded-md text-white text-sm font-medium',
+                  getTierColor(0)
+                )}
+              >
+                {getTierLabel(0)}: {tierStats.stats.get(0)}
+              </div>
+            )}
             {Array.from({ length: 6 }, (_, i) => i + 1).map((tier) => (
               <div
                 key={tier}
@@ -361,24 +382,42 @@ export default function TierEditorPage() {
           <div className="space-y-2">
             {filteredGolfers.map((golfer) => {
               const currentTier = tierAssignments.get(golfer.id)
-              
+              const isElite = currentTier === 0
+
               return (
                 <div
                   key={golfer.id}
-                  className="flex items-center justify-between py-2 px-3 rounded-md hover:bg-muted/50"
+                  className={cn(
+                    'flex items-center justify-between py-2 px-3 rounded-md hover:bg-muted/50',
+                    isElite && 'bg-amber-50 border border-amber-200'
+                  )}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 text-center text-sm text-muted-foreground">
-                      {golfer.owgr_rank ? `#${golfer.owgr_rank}` : '-'}
-                    </div>
+                    {isElite ? (
+                      <div className="w-8 flex justify-center">
+                        <Crown className="h-4 w-4 text-amber-500" />
+                      </div>
+                    ) : (
+                      <div className="w-8 text-center text-sm text-muted-foreground">
+                        {golfer.owgr_rank ? `#${golfer.owgr_rank}` : '-'}
+                      </div>
+                    )}
                     <div>
-                      <div className="font-medium">{golfer.name}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{golfer.name}</span>
+                        {isElite && (
+                          <span className="text-xs font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">
+                            ELITE
+                          </span>
+                        )}
+                      </div>
                       <div className="text-sm text-muted-foreground">
                         {golfer.country}
+                        {isElite && golfer.owgr_rank && ` • OWGR #${golfer.owgr_rank}`}
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="flex gap-1">
                     {Array.from({ length: 6 }, (_, i) => i + 1).map((tier) => (
                       <button

@@ -20,6 +20,7 @@ interface Pick {
   round2: number | null
   round3: number | null
   round4: number | null
+  counted?: boolean
 }
 
 interface Entry {
@@ -223,9 +224,10 @@ export function GolfPublicLeaderboard({
                             <span className="text-center">R4</span>
                           </div>
                           <div className="grid gap-1">
-                            {/* Sort picks by score (best first), then mark last 2 as dropped */}
-                            {[...entry.picks].sort((a, b) => a.score - b.score).map((pick, pickIndex) => {
-                              const isDropped = pickIndex >= 4 // Last 2 golfers (indices 4, 5) are dropped
+                            {/* Sort picks by score (best first), show counted vs dropped */}
+                            {[...entry.picks].sort((a, b) => a.score - b.score).map((pick) => {
+                              // Use the counted flag if available, otherwise fall back to sorting position
+                              const isDropped = pick.counted === false
                               // Format thru display - show CUT if missed cut, F if finished, hole number otherwise
                               const getThruDisplay = () => {
                                 if (!pick.madeCut) return 'CUT'

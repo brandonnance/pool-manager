@@ -12,6 +12,8 @@ import { ArrowLeft, Loader2, Calendar, Flag, RefreshCw, Play, RotateCcw, Search,
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { GpPublicEntriesCard } from '@/components/golf/gp-public-entries-card'
+import { GpElitePromotionModal } from '@/components/golf/gp-elite-promotion-modal'
+import { Badge } from '@/components/ui/badge'
 
 interface SlashGolfTournament {
   id: string
@@ -65,7 +67,7 @@ export default function GolfSetupPage() {
   const [syncCooldownRemaining, setSyncCooldownRemaining] = useState(0)
   const [gpPool, setGpPool] = useState<GpPool | null>(null)
   const [tournament, setTournament] = useState<Tournament | null>(null)
-  const [pool, setPool] = useState<{ name: string } | null>(null)
+  const [pool, setPool] = useState<{ name: string; status: string } | null>(null)
   const [isCommissioner, setIsCommissioner] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -138,7 +140,7 @@ export default function GolfSetupPage() {
     // Get pool info
     const { data: poolData } = await supabase
       .from('pools')
-      .select('name, org_id')
+      .select('name, status, org_id')
       .eq('id', poolId)
       .single()
 
@@ -148,7 +150,20 @@ export default function GolfSetupPage() {
       return
     }
 
-    setPool({ name: poolData.name })
+    // Sync status on load (lazy update for time-based transitions)
+    try {
+      const syncResponse = await fetch('/api/golf/sync-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ poolId }),
+      })
+      const syncData = await syncResponse.json()
+      // Use synced status if available, otherwise use fetched status
+      setPool({ name: poolData.name, status: syncData.status || poolData.status })
+    } catch {
+      // Fall back to fetched status if sync fails
+      setPool({ name: poolData.name, status: poolData.status })
+    }
 
     // Check if commissioner
     const { data: poolMembership } = await supabase
@@ -236,6 +251,9 @@ export default function GolfSetupPage() {
 
     if (updateError) {
       setError('Failed to save settings')
+    } else {
+      // Reload data to refresh gpPool state (updates public entries card validation)
+      await loadData()
     }
 
     setSaving(false)
@@ -449,14 +467,38 @@ export default function GolfSetupPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header with Pool Status */}
       <div className="flex items-center justify-between">
         <div>
           <Link href={`/pools/${poolId}`} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-2">
             <ArrowLeft className="h-4 w-4" />
             Back to {pool?.name}
           </Link>
-          <h1 className="text-2xl font-bold">Tournament Setup</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold">Tournament Setup</h1>
+            {pool?.status && (
+              <Badge
+                variant={
+                  pool.status === 'open' ? 'default' :
+                  pool.status === 'locked' ? 'default' :
+                  pool.status === 'completed' ? 'secondary' :
+                  'outline'
+                }
+                className={
+                  pool.status === 'open' ? 'bg-green-600' :
+                  pool.status === 'locked' ? 'bg-blue-600' :
+                  pool.status === 'draft' ? 'border-amber-500 text-amber-600' :
+                  ''
+                }
+              >
+                {pool.status === 'locked' ? 'In Progress' :
+                 pool.status === 'completed' ? 'Completed' :
+                 pool.status === 'open' ? 'Accepting Entries' :
+                 pool.status === 'draft' ? 'Draft' :
+                 pool.status}
+              </Badge>
+            )}
+          </div>
         </div>
       </div>
 
@@ -821,7 +863,7 @@ export default function GolfSetupPage() {
       )}
 
       {/* Quick Links */}
-      {tournament && (
+      {tournament && gpPool && (
         <Card>
           <CardHeader>
             <CardTitle>Commissioner Tools</CardTitle>
@@ -831,6 +873,10 @@ export default function GolfSetupPage() {
               <Link href={`/pools/${poolId}/golf/tiers`}>
                 <Button variant="outline">Edit Tier Assignments</Button>
               </Link>
+              <GpElitePromotionModal
+                gpPoolId={gpPool.id}
+                tournamentId={gpPool.tournament_id}
+              />
               <Link href={`/pools/${poolId}/golf/entries`}>
                 <Button variant="outline">Manage Entries</Button>
               </Link>

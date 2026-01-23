@@ -22,6 +22,7 @@ import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { GolfPublicEntryForm } from '@/components/golf/golf-public-entry-form'
 import { GolfPublicLeaderboard } from '@/components/golf/golf-public-leaderboard'
+import { calculateEntryScore } from '@/lib/golf/scoring'
 
 interface PageProps {
   params: Promise<{ slug: string }>
@@ -204,10 +205,9 @@ export default async function GolfPublicPage({ params }: PageProps) {
       (tierAssignmentsData ?? []).map(t => [t.golfer_id, t.tier_value])
     )
 
-    // Calculate scores for each entry
+    // Calculate scores for each entry using "best 4 of 6" scoring
     const entriesWithScores = (entries ?? []).map((entry) => {
-      let totalScore = 0
-      const picks = (entry.gp_entry_picks ?? []).map((pick) => {
+      const golferScores = (entry.gp_entry_picks ?? []).map((pick) => {
         const golfer = pick.gp_golfers as unknown as {
           id: string
           name: string
@@ -217,12 +217,12 @@ export default async function GolfPublicPage({ params }: PageProps) {
         // Always use to_par for scoring - it's the score relative to par (e.g., -6 means 6 under)
         // This is consistent whether golfer is mid-round or finished
         const golferScore = result?.to_par ?? 0
-        totalScore += golferScore
 
         return {
           golferId: golfer.id,
           golferName: golfer.name,
           tier: tierMap.get(golfer.id) ?? 5,
+          totalScore: golferScore, // Used by calculateEntryScore
           score: golferScore,
           position: result?.position ?? '-',
           madeCut: result?.made_cut ?? true,
@@ -231,8 +231,28 @@ export default async function GolfPublicPage({ params }: PageProps) {
           round2: result?.round_2 ?? null,
           round3: result?.round_3 ?? null,
           round4: result?.round_4 ?? null,
+          counted: false, // Will be set by calculateEntryScore
         }
       })
+
+      // Calculate entry score using best 4 of 6
+      const { totalScore, countedGolfers, droppedGolfers } = calculateEntryScore(golferScores)
+
+      // Merge picks with counted flags
+      const picks = [...countedGolfers, ...droppedGolfers].map(g => ({
+        golferId: g.golferId,
+        golferName: g.golferName,
+        tier: g.tier,
+        score: g.score,
+        position: g.position,
+        madeCut: g.madeCut,
+        thru: g.thru,
+        round1: g.round1,
+        round2: g.round2,
+        round3: g.round3,
+        round4: g.round4,
+        counted: g.counted,
+      }))
 
       return {
         id: entry.id,

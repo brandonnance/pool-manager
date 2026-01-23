@@ -48,6 +48,7 @@ import { SingleGameContent } from '@/components/squares/single-game-content'
 import { PlayoffContent } from '@/components/squares/playoff-content'
 import { MmPublicUrlCard } from '@/components/march-madness/mm-public-url-card'
 import { GolfStandingsWrapper } from '@/components/golf/golf-standings-wrapper'
+import { GpPublicUrlDisplay } from '@/components/golf/gp-public-url-display'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -391,6 +392,8 @@ export default async function PoolDetailPage({ params }: PageProps) {
     min_tier_points: number | null
     picks_lock_at: string | null
     demo_mode: boolean | null
+    public_entries_enabled: boolean | null
+    public_slug: string | null
     created_at: string | null
   } | null = null
   let gpTournamentData: {
@@ -419,6 +422,42 @@ export default async function PoolDetailPage({ params }: PageProps) {
         .single()
       gpTournamentData = tournament
     }
+
+    // Lazy status sync: Check if golf pool status should be updated
+    if (gpPool) {
+      const computedStatus = computeGolfPoolStatus(
+        gpPool.public_entries_enabled ?? false,
+        gpPool.picks_lock_at,
+        gpTournamentData?.status as 'upcoming' | 'in_progress' | 'completed' | null,
+        gpPool.tournament_id
+      )
+
+      // Update pools.status if it's different
+      if (computedStatus !== pool.status) {
+        await supabase
+          .from('pools')
+          .update({ status: computedStatus })
+          .eq('id', id)
+        // Update local pool object so display is correct
+        pool.status = computedStatus
+      }
+    }
+  }
+
+  // Helper function to compute golf pool status
+  function computeGolfPoolStatus(
+    publicEntriesEnabled: boolean,
+    picksLockAt: string | null,
+    tournamentStatus: string | null,
+    tournamentId: string | null
+  ): 'draft' | 'open' | 'locked' | 'completed' {
+    if (!tournamentId) return 'draft'
+    if (tournamentStatus === 'completed') return 'completed'
+    const now = new Date()
+    const lockTime = picksLockAt ? new Date(picksLockAt) : null
+    if (lockTime && now >= lockTime) return 'locked'
+    if (publicEntriesEnabled) return 'open'
+    return 'draft'
   }
 
   // Transform squares data for component
@@ -587,16 +626,22 @@ export default async function PoolDetailPage({ params }: PageProps) {
                   <Badge
                     variant={
                       pool.status === 'open' ? 'default' :
+                      pool.status === 'locked' ? 'default' :
                       pool.status === 'completed' ? 'secondary' :
                       'outline'
                     }
                     className={
-                      pool.status === 'open' ? 'bg-primary' :
+                      pool.status === 'open' ? 'bg-green-600' :
+                      pool.status === 'locked' ? 'bg-blue-600' :
                       pool.status === 'draft' ? 'border-amber-500 text-amber-600' :
                       ''
                     }
                   >
-                    {pool.status === 'completed' ? 'Completed' : pool.status}
+                    {pool.status === 'locked' ? 'In Progress' :
+                     pool.status === 'completed' ? 'Completed' :
+                     pool.status === 'open' ? 'Accepting Entries' :
+                     pool.status === 'draft' ? 'Draft' :
+                     pool.status}
                   </Badge>
                   {isCommissioner && (
                     <Badge variant="secondary" className="bg-primary/10 text-primary shrink-0">
@@ -986,6 +1031,11 @@ export default async function PoolDetailPage({ params }: PageProps) {
                       Enter Scores
                     </Link>
                   </Button>
+
+                  {/* Public URL - shown when public entries are live */}
+                  {gpPoolData.public_entries_enabled && gpPoolData.public_slug && (
+                    <GpPublicUrlDisplay publicSlug={gpPoolData.public_slug} />
+                  )}
                 </CardContent>
               </Card>
             )}

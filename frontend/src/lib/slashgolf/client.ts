@@ -192,12 +192,31 @@ export class SlashGolfClient {
 
   // Get world rankings (OWGR)
   // statId: "186" = OWGR, "02671" = FedExCup
-  async getWorldRankings(year?: number): Promise<SlashGolfRankingsResponse> {
-    const rankingsYear = year || 2025 // OWGR data lags - use previous year early in season
-    return this.fetch<SlashGolfRankingsResponse>('/stats', {
-      year: String(rankingsYear),
+  // Returns rankings with metadata about which year was used
+  async getWorldRankings(year?: number): Promise<SlashGolfRankingsResponse & { yearUsed: number; usedFallback: boolean }> {
+    const currentYear = year || new Date().getFullYear()
+
+    // Try current year first
+    const currentYearResponse = await this.fetch<SlashGolfRankingsResponse>('/stats', {
+      year: String(currentYear),
       statId: '186', // OWGR
     })
+
+    // Check if we got valid results
+    if (currentYearResponse.rankings && currentYearResponse.rankings.length > 0) {
+      return { ...currentYearResponse, yearUsed: currentYear, usedFallback: false }
+    }
+
+    // Fall back to prior year if current year has no data
+    const priorYear = currentYear - 1
+    console.log(`[SlashGolf] No OWGR data for ${currentYear}, falling back to ${priorYear}`)
+
+    const priorYearResponse = await this.fetch<SlashGolfRankingsResponse>('/stats', {
+      year: String(priorYear),
+      statId: '186', // OWGR
+    })
+
+    return { ...priorYearResponse, yearUsed: priorYear, usedFallback: true }
   }
 
   // Get world rankings as a map of playerId -> rank

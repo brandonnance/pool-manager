@@ -205,7 +205,7 @@ export default async function DashboardPage() {
           season_label: pm.pools.season_label,
           membership_status: pm.status as 'approved' | 'pending',
           pending_count: pendingCount,
-          is_commissioner: isCommissioner
+          is_commissioner: isCommissioner,
         })
       }
     }
@@ -223,7 +223,7 @@ export default async function DashboardPage() {
           name: pool.name,
           status: pool.status,
           season_label: pool.season_label,
-          membership_status: 'discoverable'
+          membership_status: 'discoverable',
         })
       }
     }
@@ -338,16 +338,22 @@ export default async function DashboardPage() {
                         <Badge
                           variant={
                             pool.status === 'open' ? 'default' :
+                            pool.status === 'locked' ? 'default' :
                             pool.status === 'completed' ? 'secondary' :
                             'outline'
                           }
                           className={
-                            pool.status === 'open' ? 'bg-primary' :
+                            pool.status === 'open' ? 'bg-green-600' :
+                            pool.status === 'locked' ? 'bg-blue-600' :
                             pool.status === 'draft' ? 'border-yellow-500 text-yellow-600' :
                             ''
                           }
                         >
-                          {pool.status === 'completed' ? 'Completed' : pool.status}
+                          {pool.status === 'locked' ? 'In Progress' :
+                           pool.status === 'completed' ? 'Completed' :
+                           pool.status === 'open' ? 'Accepting Entries' :
+                           pool.status === 'draft' ? 'Draft' :
+                           pool.status}
                         </Badge>
                       </div>
                     </div>

@@ -120,6 +120,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid rankings response from API' }, { status: 500 })
     }
 
+    const { yearUsed, usedFallback } = rankingsResponse
+
     // Build a map of playerId -> rank
     // Note: API may return MongoDB Extended JSON format for some fields
     const rankingsMap = new Map<string, number>()
@@ -215,13 +217,21 @@ export async function POST(request: NextRequest) {
 
     console.log(`Matched ${matchedCount} of ${fieldData.length} golfers to rankings`)
 
+    // Build message with fallback notice if applicable
+    let message = `Auto-assigned ${tierAssignments.length} golfers to tiers`
+    if (usedFallback) {
+      message += ` (Note: ${yearUsed} OWGR rankings used - current year data not yet available)`
+    }
+
     return NextResponse.json({
       success: true,
-      message: `Auto-assigned ${tierAssignments.length} golfers to tiers`,
+      message,
       tierCounts: Object.fromEntries(tierCounts),
       totalRanked: results.filter(r => r.rank !== null).length,
       totalUnranked: results.filter(r => r.rank === null).length,
       rankingsLoaded: rankingsMap.size,
+      yearUsed,
+      usedFallback,
     })
 
   } catch (error) {

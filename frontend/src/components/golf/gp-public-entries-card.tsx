@@ -235,6 +235,17 @@ export function GpPublicEntriesCard({
       return
     }
 
+    // Sync pool status after toggling public entries
+    try {
+      await fetch('/api/golf/sync-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ poolId }),
+      })
+    } catch (e) {
+      console.error('Failed to sync pool status:', e)
+    }
+
     setEnabled(newEnabled)
     setIsUpdating(false)
     router.refresh()
