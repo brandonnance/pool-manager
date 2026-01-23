@@ -40,6 +40,8 @@ Golf pools are fully implemented and deployed at pools.brandon-nance.com. The fe
 | Tier Badges | COMPLETE | Color-coded tier numbers next to golfer names |
 | Elite Tier (Tier 0) | COMPLETE | Commissioner-promoted elite golfers |
 | Pool Status System | COMPLETE | Draft/Open/Active/Completed status badges |
+| Unicorn Team | COMPLETE | Optimal team display on public leaderboard |
+| Mobile-Responsive Leaderboard | COMPLETE | Two-row stacked layout for mobile golfer display |
 
 ---
 
@@ -365,7 +367,27 @@ gp_golfer_results
 - Color-coded tier badges matching commissioner view
 - Tied entries show "T" prefix (T1, T3, etc.)
 - Search filter preserves original rankings
-- Mobile-responsive design
+- Mobile-responsive two-row stacked layout (name row + stats row)
+- Unicorn team card displayed above standings
+
+### Unicorn Team Card (`unicorn-card.tsx`)
+
+Displays the mathematically optimal 6-golfer team that meets tier requirements.
+
+- **Algorithm**: Tier multiset enumeration (~300 combinations vs 13 billion brute force)
+- **Scoring**: Best 4 of 6 using same scoring rules as entries
+- **Display**: Amber/gold gradient card distinguishing it from entries
+- **Header**: Sparkles icon, "Optimal Team" title, total score
+- **Body**: Same golfer table format as leaderboard (POS, TOT, THR, R1-R4)
+- **Dropped rows**: Bottom 2 golfers shown with red background
+- **Footer**: Total tier points + count of alternative teams achieving same score
+- **Mobile**: Two-row stacked layout (name row + stats row) for readability
+
+**How it works:**
+1. Generate all valid tier combinations (6 values from 0-6 summing to ≥ min_tier_points)
+2. For each combination, pick the best-scoring golfers from each required tier
+3. Calculate best-4-of-6 score and track the minimum
+4. Display the optimal team as a benchmark for participants
 
 ---
 
@@ -404,6 +426,7 @@ frontend/src/components/golf/
 ├── golf-standings-wrapper.tsx     # Client wrapper with auto-refresh
 ├── golf-public-entry-form.tsx     # Public pick sheet form
 ├── golf-public-leaderboard.tsx    # Public leaderboard after lock
+├── unicorn-card.tsx               # Optimal team display card
 ├── gp-public-entries-card.tsx     # Commissioner URL management card
 ├── gp-public-url-display.tsx      # Public URL display component
 └── gp-elite-promotion-modal.tsx   # Modal for promoting golfers to Elite tier
@@ -416,6 +439,7 @@ frontend/src/lib/golf/
 ├── demo-data.ts               # 50 demo golfers with suggested tiers
 ├── scoring.ts                 # calculateGolferScore, calculateEntryScore, formatScoreToPar
 ├── types.ts                   # GolferWithTier, EntryStanding, TIER_INFO, etc.
+├── unicorn.ts                 # Unicorn team algorithm (findUnicornTeam, generateValidMultisets)
 └── validation.ts              # validateRoster (6 golfers, min tier points)
 
 frontend/src/lib/slashgolf/
@@ -448,6 +472,8 @@ frontend/src/lib/slashgolf/
 - [x] Score management page (sync + override combined)
 - [x] Elite tier promotion
 - [x] Pool status badges
+- [x] Unicorn team calculation and display
+- [x] Mobile-responsive leaderboard (two-row stacked layout)
 
 ---
 

@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge'
 import { Trophy, MapPin, Search, ChevronDown, ChevronUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getTierColor } from '@/lib/golf/types'
+import { UnicornCard } from './unicorn-card'
+import type { UnicornTeam } from '@/lib/golf/unicorn'
 
 interface Pick {
   golferId: string
@@ -38,6 +40,7 @@ interface GolfPublicLeaderboardProps {
   lockTime: string | null
   entries: Entry[]
   tournamentId: string
+  unicornTeam?: UnicornTeam | null
 }
 
 function formatScore(score: number): string {
@@ -51,6 +54,7 @@ export function GolfPublicLeaderboard({
   tournamentName,
   tournamentVenue,
   entries,
+  unicornTeam,
 }: GolfPublicLeaderboardProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null)
@@ -141,6 +145,9 @@ export function GolfPublicLeaderboard({
           )}
         </div>
 
+        {/* Unicorn Team */}
+        {unicornTeam && <UnicornCard unicornTeam={unicornTeam} />}
+
         {/* Leaderboard */}
         <Card>
           <CardHeader className="pb-2">
@@ -211,11 +218,21 @@ export function GolfPublicLeaderboard({
 
                       {/* Expanded Picks */}
                       {isExpanded && (
-                        <div className="px-4 pb-4 bg-muted/30">
-                          {/* Column Headers */}
-                          <div className="grid grid-cols-[2.5rem_1fr_3rem_2.5rem_2.5rem_2.5rem_2.5rem_2.5rem] gap-1 text-xs font-medium text-muted-foreground uppercase tracking-wide pt-2 pb-1 px-3">
+                        <div className="px-2 sm:px-4 pb-4 bg-muted/30">
+                          {/* Column Headers - Desktop */}
+                          <div className="hidden sm:grid grid-cols-[2.5rem_1fr_3rem_2.5rem_2.5rem_2.5rem_2.5rem_2.5rem] gap-1 text-xs font-medium text-muted-foreground uppercase tracking-wide pt-2 pb-1 px-3">
                             <span>POS</span>
                             <span>GOLFER</span>
+                            <span className="text-right">TOT</span>
+                            <span className="text-center">THR</span>
+                            <span className="text-center">R1</span>
+                            <span className="text-center">R2</span>
+                            <span className="text-center">R3</span>
+                            <span className="text-center">R4</span>
+                          </div>
+                          {/* Column Headers - Mobile */}
+                          <div className="sm:hidden grid grid-cols-[2rem_2.5rem_2rem_2rem_2rem_2rem_2rem] gap-1 text-xs font-medium text-muted-foreground uppercase tracking-wide pt-2 pb-1 px-2">
+                            <span>POS</span>
                             <span className="text-right">TOT</span>
                             <span className="text-center">THR</span>
                             <span className="text-center">R1</span>
@@ -256,61 +273,112 @@ export function GolfPublicLeaderboard({
                                 <div
                                   key={pick.golferId}
                                   className={cn(
-                                    'grid grid-cols-[2.5rem_1fr_3rem_2.5rem_2.5rem_2.5rem_2.5rem_2.5rem] gap-1 text-sm py-1.5 px-3 rounded border items-center font-mono',
+                                    'rounded border',
                                     isDropped ? 'bg-red-50 border-red-200' : 'bg-white',
                                     !pick.madeCut && 'opacity-60'
                                   )}
                                 >
-                                  {/* Position */}
-                                  <span className="text-muted-foreground text-xs">
-                                    {pick.position}
-                                  </span>
-
-                                  {/* Golfer name with tier badge */}
-                                  <div className="flex items-center gap-1.5 font-sans min-w-0">
+                                  {/* Mobile: Name row */}
+                                  <div className="sm:hidden flex items-center gap-1.5 px-2 pt-1.5 pb-0.5">
                                     <span className={cn(
                                       'w-5 h-5 flex-shrink-0 flex items-center justify-center rounded text-xs text-white font-medium',
                                       getTierColor(pick.tier)
                                     )}>
                                       {pick.tier}
                                     </span>
-                                    <span className={cn('truncate', !pick.madeCut && 'line-through text-muted-foreground')}>
+                                    <span className={cn(
+                                      'text-sm font-medium truncate',
+                                      !pick.madeCut && 'line-through text-muted-foreground'
+                                    )}>
                                       {pick.golferName}
                                     </span>
                                   </div>
 
-                                  {/* Total to-par */}
-                                  <span className={cn(
-                                    'font-bold text-right',
-                                    pick.score < 0 && 'text-green-600',
-                                    pick.score > 0 && 'text-red-600'
-                                  )}>
-                                    {formatScore(pick.score)}
-                                  </span>
+                                  {/* Mobile: Stats row */}
+                                  <div className="sm:hidden grid grid-cols-[2rem_2.5rem_2rem_2rem_2rem_2rem_2rem] gap-1 text-sm px-2 pb-1.5 items-center font-mono">
+                                    <span className="text-muted-foreground text-xs">{pick.position}</span>
+                                    <span className={cn(
+                                      'font-bold text-right',
+                                      pick.score < 0 && 'text-green-600',
+                                      pick.score > 0 && 'text-red-600'
+                                    )}>
+                                      {formatScore(pick.score)}
+                                    </span>
+                                    <span className={cn(
+                                      'text-center text-xs',
+                                      !pick.madeCut ? 'text-red-600 font-medium' : 'text-muted-foreground'
+                                    )}>
+                                      {thruDisplay}
+                                    </span>
+                                    <span className="text-center text-muted-foreground text-xs">{formatRound(pick.round1, 1)}</span>
+                                    <span className="text-center text-muted-foreground text-xs">{formatRound(pick.round2, 2)}</span>
+                                    <span className={cn(
+                                      'text-center text-xs',
+                                      !pick.madeCut ? 'text-red-600' : 'text-muted-foreground'
+                                    )}>
+                                      {formatRound(pick.round3, 3)}
+                                    </span>
+                                    <span className={cn(
+                                      'text-center text-xs',
+                                      !pick.madeCut ? 'text-red-600' : 'text-muted-foreground'
+                                    )}>
+                                      {formatRound(pick.round4, 4)}
+                                    </span>
+                                  </div>
 
-                                  {/* Thru */}
-                                  <span className={cn(
-                                    'text-center text-xs',
-                                    !pick.madeCut ? 'text-red-600 font-medium' : 'text-muted-foreground'
-                                  )}>
-                                    {thruDisplay}
-                                  </span>
+                                  {/* Desktop: Single row layout */}
+                                  <div className="hidden sm:grid grid-cols-[2.5rem_1fr_3rem_2.5rem_2.5rem_2.5rem_2.5rem_2.5rem] gap-1 text-sm py-1.5 px-3 items-center font-mono">
+                                    {/* Position */}
+                                    <span className="text-muted-foreground text-xs">
+                                      {pick.position}
+                                    </span>
 
-                                  {/* R1-R4 */}
-                                  <span className="text-center text-muted-foreground">{formatRound(pick.round1, 1)}</span>
-                                  <span className="text-center text-muted-foreground">{formatRound(pick.round2, 2)}</span>
-                                  <span className={cn(
-                                    'text-center',
-                                    !pick.madeCut ? 'text-red-600' : 'text-muted-foreground'
-                                  )}>
-                                    {formatRound(pick.round3, 3)}
-                                  </span>
-                                  <span className={cn(
-                                    'text-center',
-                                    !pick.madeCut ? 'text-red-600' : 'text-muted-foreground'
-                                  )}>
-                                    {formatRound(pick.round4, 4)}
-                                  </span>
+                                    {/* Golfer name with tier badge */}
+                                    <div className="flex items-center gap-1.5 font-sans min-w-0">
+                                      <span className={cn(
+                                        'w-5 h-5 flex-shrink-0 flex items-center justify-center rounded text-xs text-white font-medium',
+                                        getTierColor(pick.tier)
+                                      )}>
+                                        {pick.tier}
+                                      </span>
+                                      <span className={cn('truncate', !pick.madeCut && 'line-through text-muted-foreground')}>
+                                        {pick.golferName}
+                                      </span>
+                                    </div>
+
+                                    {/* Total to-par */}
+                                    <span className={cn(
+                                      'font-bold text-right',
+                                      pick.score < 0 && 'text-green-600',
+                                      pick.score > 0 && 'text-red-600'
+                                    )}>
+                                      {formatScore(pick.score)}
+                                    </span>
+
+                                    {/* Thru */}
+                                    <span className={cn(
+                                      'text-center text-xs',
+                                      !pick.madeCut ? 'text-red-600 font-medium' : 'text-muted-foreground'
+                                    )}>
+                                      {thruDisplay}
+                                    </span>
+
+                                    {/* R1-R4 */}
+                                    <span className="text-center text-muted-foreground">{formatRound(pick.round1, 1)}</span>
+                                    <span className="text-center text-muted-foreground">{formatRound(pick.round2, 2)}</span>
+                                    <span className={cn(
+                                      'text-center',
+                                      !pick.madeCut ? 'text-red-600' : 'text-muted-foreground'
+                                    )}>
+                                      {formatRound(pick.round3, 3)}
+                                    </span>
+                                    <span className={cn(
+                                      'text-center',
+                                      !pick.madeCut ? 'text-red-600' : 'text-muted-foreground'
+                                    )}>
+                                      {formatRound(pick.round4, 4)}
+                                    </span>
+                                  </div>
                                 </div>
                               )
                             })}

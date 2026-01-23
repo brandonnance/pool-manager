@@ -23,6 +23,7 @@ import type { Database } from '@/types/database'
 import { GolfPublicEntryForm } from '@/components/golf/golf-public-entry-form'
 import { GolfPublicLeaderboard } from '@/components/golf/golf-public-leaderboard'
 import { calculateEntryScore } from '@/lib/golf/scoring'
+import { findUnicornTeam, type GolferWithScore } from '@/lib/golf/unicorn'
 
 interface PageProps {
   params: Promise<{ slug: string }>
@@ -263,11 +264,76 @@ export default async function GolfPublicPage({ params }: PageProps) {
       }
     }).sort((a, b) => a.totalScore - b.totalScore) // Lower score is better
 
+    // === UNICORN TEAM CALCULATION ===
+    // Fetch ALL golfers with tier assignments for the unicorn calculation
+    const { data: allTierAssignments } = await supabase
+      .from('gp_tier_assignments')
+      .select(`
+        golfer_id,
+        tier_value,
+        gp_golfers!inner (
+          id,
+          name
+        )
+      `)
+      .eq('pool_id', gpPool.id)
+
+    // Get ALL golfer results for the tournament
+    const allGolferIds = (allTierAssignments ?? []).map(ta => ta.golfer_id)
+    const { data: allGolferResults } = allGolferIds.length > 0
+      ? await supabase
+          .from('gp_golfer_results')
+          .select('golfer_id, total_score, to_par, position, made_cut, round_1, round_2, round_3, round_4, thru')
+          .eq('tournament_id', tournament.id)
+          .in('golfer_id', allGolferIds)
+      : { data: [] }
+
+    const allResultsMap = new Map(
+      (allGolferResults ?? []).map(r => [r.golfer_id, r])
+    )
+
+    // Build golfersByTier map for unicorn calculation
+    const unicornGolfersByTier = new Map<number, GolferWithScore[]>()
+
+    for (const ta of allTierAssignments ?? []) {
+      const golfer = ta.gp_golfers as unknown as { id: string; name: string }
+      const result = allResultsMap.get(golfer.id)
+
+      const golferWithScore: GolferWithScore = {
+        golferId: golfer.id,
+        golferName: golfer.name,
+        tier: ta.tier_value,
+        toPar: result?.to_par ?? 0,
+        position: result?.position ?? '-',
+        madeCut: result?.made_cut ?? true,
+        thru: result?.thru ?? null,
+        round1: result?.round_1 ?? null,
+        round2: result?.round_2 ?? null,
+        round3: result?.round_3 ?? null,
+        round4: result?.round_4 ?? null,
+      }
+
+      const tier = ta.tier_value
+      if (!unicornGolfersByTier.has(tier)) {
+        unicornGolfersByTier.set(tier, [])
+      }
+      unicornGolfersByTier.get(tier)!.push(golferWithScore)
+    }
+
+    // Sort each tier by score (ascending - best first)
+    for (const [tier, golfers] of unicornGolfersByTier) {
+      golfers.sort((a, b) => a.toPar - b.toPar)
+    }
+
+    // Calculate the unicorn team
+    const unicornTeam = findUnicornTeam(unicornGolfersByTier, gpPool.min_tier_points ?? 21)
+
     return (
       <GolfPublicLeaderboard
         {...commonProps}
         entries={entriesWithScores}
         tournamentId={tournament.id}
+        unicornTeam={unicornTeam}
       />
     )
   }
