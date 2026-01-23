@@ -243,7 +243,7 @@ export default async function GolfPublicPage({ params }: PageProps) {
         golferId: g.golferId,
         golferName: g.golferName,
         tier: g.tier,
-        score: g.score,
+        score: g.totalScore,
         position: g.position,
         madeCut: g.madeCut,
         thru: g.thru,
