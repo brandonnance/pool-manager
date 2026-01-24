@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import type { Sport, EventType, Provider, EventStatus } from '@/lib/global-events/types'
+import type { Json } from '@/types/database'
 
 interface ResolveEventRequest {
   sport: Sport
@@ -22,7 +23,7 @@ interface ResolveEventRequest {
   name: string
   start_time?: string
   status?: EventStatus
-  metadata?: Record<string, unknown>
+  metadata?: Json
 }
 
 interface ResolveEventResponse {
@@ -35,7 +36,7 @@ interface ResolveEventResponse {
     name: string
     start_time: string | null
     status: EventStatus
-    metadata: Record<string, unknown>
+    metadata: Json | null
     created_at: string
     updated_at: string
   }

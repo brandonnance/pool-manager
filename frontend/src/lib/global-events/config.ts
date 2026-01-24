@@ -38,7 +38,7 @@ export async function getGlobalEventsConfig(): Promise<GlobalEventsConfig> {
     return DEFAULT_CONFIG
   }
 
-  return data.value as GlobalEventsConfig
+  return data.value as unknown as GlobalEventsConfig
 }
 
 /**
@@ -59,7 +59,7 @@ export async function getGlobalEventsConfigServer(): Promise<GlobalEventsConfig>
     return DEFAULT_CONFIG
   }
 
-  return data.value as GlobalEventsConfig
+  return data.value as unknown as GlobalEventsConfig
 }
 
 /**
