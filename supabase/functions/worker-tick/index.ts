@@ -11,6 +11,7 @@
 
 import { createServiceClient } from '../_shared/supabase-client.ts'
 import { eventNeedsPolling, LEASE_DURATION_SECONDS, type Event } from '../_shared/types.ts'
+import { syncGolfToLegacy } from '../_shared/legacy-sync.ts'
 
 // Generate a unique worker ID for this invocation
 const WORKER_ID = `worker-${crypto.randomUUID().slice(0, 8)}`
@@ -242,6 +243,19 @@ async function pollEvent(event: Event): Promise<{ success: boolean; error?: stri
           .from('events')
           .update({ status, updated_at: new Date().toISOString() })
           .eq('id', event.id)
+      }
+
+      // Shadow mode: Sync to legacy tables for backward compatibility
+      const legacyResult = await syncGolfToLegacy(
+        supabase,
+        event.provider_event_id,
+        payload
+      )
+      if (legacyResult.synced > 0) {
+        console.log(`[poll-event] Synced ${legacyResult.synced} results to legacy tables`)
+      }
+      if (legacyResult.error) {
+        console.error('[poll-event] Legacy sync error:', legacyResult.error)
       }
 
       console.log(`[poll-event] Updated golf event ${event.id}: round ${payload.current_round}, ${payload.leaderboard.length} players`)

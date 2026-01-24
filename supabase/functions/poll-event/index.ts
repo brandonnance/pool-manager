@@ -11,7 +11,8 @@
 import { createServiceClient } from '../_shared/supabase-client.ts'
 import { fetchESPNGame, toTeamGamePayload } from '../_shared/providers/espn.ts'
 import { fetchGolfTournamentState } from '../_shared/providers/slashgolf.ts'
-import type { Event, EventStatus, EventStatePayload } from '../_shared/types.ts'
+import { syncGolfToLegacy } from '../_shared/legacy-sync.ts'
+import type { Event, EventStatus, EventStatePayload, GolfTournamentPayload } from '../_shared/types.ts'
 
 interface PollRequest {
   event_id?: string
@@ -139,6 +140,21 @@ Deno.serve(async (req) => {
         JSON.stringify({ success: false, event_id: event.id, error: stateError.message }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       )
+    }
+
+    // Shadow mode: Sync to legacy tables for backward compatibility
+    if (event.event_type === 'golf_tournament') {
+      const legacyResult = await syncGolfToLegacy(
+        supabase,
+        event.provider_event_id,
+        payload as GolfTournamentPayload
+      )
+      if (legacyResult.synced > 0) {
+        console.log(`[poll-event] Synced ${legacyResult.synced} results to legacy tables`)
+      }
+      if (legacyResult.error) {
+        console.error('[poll-event] Legacy sync error:', legacyResult.error)
+      }
     }
 
     // Update event status if changed
