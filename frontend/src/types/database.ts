@@ -555,6 +555,176 @@ export type Database = {
         }
         Relationships: []
       }
+      event_milestones: {
+        Row: {
+          created_at: string | null
+          event_id: string | null
+          id: string
+          milestone_type: string
+          payload: Json
+        }
+        Insert: {
+          created_at?: string | null
+          event_id?: string | null
+          id?: string
+          milestone_type: string
+          payload: Json
+        }
+        Update: {
+          created_at?: string | null
+          event_id?: string | null
+          id?: string
+          milestone_type?: string
+          payload?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_milestones_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_state: {
+        Row: {
+          event_id: string
+          last_provider_update_at: string | null
+          payload: Json
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          event_id: string
+          last_provider_update_at?: string | null
+          payload: Json
+          status: string
+          updated_at?: string | null
+        }
+        Update: {
+          event_id?: string
+          last_provider_update_at?: string | null
+          payload?: Json
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_state_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          created_at: string | null
+          event_type: string
+          id: string
+          metadata: Json | null
+          name: string
+          provider: string
+          provider_event_id: string
+          sport: string
+          start_time: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          event_type: string
+          id?: string
+          metadata?: Json | null
+          name: string
+          provider: string
+          provider_event_id: string
+          sport: string
+          start_time?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          event_type?: string
+          id?: string
+          metadata?: Json | null
+          name?: string
+          provider?: string
+          provider_event_id?: string
+          sport?: string
+          start_time?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      golf_field: {
+        Row: {
+          created_at: string | null
+          event_id: string | null
+          golfer_id: string
+          id: string
+          metadata: Json | null
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          event_id?: string | null
+          golfer_id: string
+          id?: string
+          metadata?: Json | null
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          event_id?: string | null
+          golfer_id?: string
+          id?: string
+          metadata?: Json | null
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "golf_field_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      golf_tournaments_global: {
+        Row: {
+          event_id: string
+          field_imported_at: string | null
+          field_last_checked_at: string | null
+          field_status: string | null
+        }
+        Insert: {
+          event_id: string
+          field_imported_at?: string | null
+          field_last_checked_at?: string | null
+          field_status?: string | null
+        }
+        Update: {
+          event_id?: string
+          field_imported_at?: string | null
+          field_last_checked_at?: string | null
+          field_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "golf_tournaments_global_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gp_entries: {
         Row: {
           created_at: string | null
@@ -1524,6 +1694,7 @@ export type Database = {
           current_period: number | null
           display_order: number | null
           espn_game_id: string | null
+          event_id: string | null
           game_name: string
           game_time: string | null
           halftime_away_score: number | null
@@ -1551,6 +1722,7 @@ export type Database = {
           current_period?: number | null
           display_order?: number | null
           espn_game_id?: string | null
+          event_id?: string | null
           game_name: string
           game_time?: string | null
           halftime_away_score?: number | null
@@ -1578,6 +1750,7 @@ export type Database = {
           current_period?: number | null
           display_order?: number | null
           espn_game_id?: string | null
+          event_id?: string | null
           game_name?: string
           game_time?: string | null
           halftime_away_score?: number | null
@@ -1598,6 +1771,13 @@ export type Database = {
           status?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "sq_games_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sq_games_sq_pool_id_fkey"
             columns: ["sq_pool_id"]
@@ -1627,6 +1807,7 @@ export type Database = {
           reverse_scoring: boolean | null
           row_numbers: number[] | null
           scoring_mode: string | null
+          scoring_source: string | null
         }
         Insert: {
           col_numbers?: number[] | null
@@ -1647,6 +1828,7 @@ export type Database = {
           reverse_scoring?: boolean | null
           row_numbers?: number[] | null
           scoring_mode?: string | null
+          scoring_source?: string | null
         }
         Update: {
           col_numbers?: number[] | null
@@ -1667,6 +1849,7 @@ export type Database = {
           reverse_scoring?: boolean | null
           row_numbers?: number[] | null
           scoring_mode?: string | null
+          scoring_source?: string | null
         }
         Relationships: [
           {
@@ -1799,6 +1982,38 @@ export type Database = {
           },
         ]
       }
+      worker_leases: {
+        Row: {
+          event_id: string
+          expires_at: string
+          last_poll_at: string | null
+          leased_at: string | null
+          worker_id: string
+        }
+        Insert: {
+          event_id: string
+          expires_at: string
+          last_poll_at?: string | null
+          leased_at?: string | null
+          worker_id: string
+        }
+        Update: {
+          event_id?: string
+          expires_at?: string
+          last_poll_at?: string | null
+          leased_at?: string | null
+          worker_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "worker_leases_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -1851,6 +2066,8 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: never; Returns: boolean }
+      pg_advisory_unlock: { Args: { lock_id: number }; Returns: boolean }
+      pg_try_advisory_lock: { Args: { lock_id: number }; Returns: boolean }
       pool_lock_time_for_bowl: {
         Args: { p_pool_game_id: string }
         Returns: string
