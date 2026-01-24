@@ -1,15 +1,12 @@
 /**
  * @fileoverview Worker Tick Edge Function
  *
- * Scheduled function that runs periodically (e.g., every minute) to:
+ * Scheduled function that runs periodically (every minute) to:
  * 1. Find events that need polling
  * 2. Acquire leases for those events
- * 3. Invoke poll-event for each leased event
+ * 3. Poll each leased event and update event_state
  *
- * Schedule: */1 * * * * (every minute)
- *
- * Deployment:
- *   supabase functions deploy worker-tick --schedule "*/1 * * * *"
+ * Set up cron schedule via pg_cron after deployment.
  */
 
 import { createServiceClient } from '../_shared/supabase-client.ts'
