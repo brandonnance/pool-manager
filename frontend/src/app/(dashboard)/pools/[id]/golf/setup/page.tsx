@@ -37,6 +37,8 @@ interface GpPool {
   demo_mode: boolean | null
   public_slug: string | null
   public_entries_enabled: boolean | null
+  scoring_source: string | null
+  event_id: string | null
 }
 
 interface Tournament {
@@ -671,75 +673,92 @@ export default function GolfSetupPage() {
               Live Scoring
             </CardTitle>
             <CardDescription>
-              Sync live scores from the PGA Tour leaderboard
+              {gpPool?.scoring_source === 'global'
+                ? 'Scores are automatically synced by the global events system'
+                : 'Sync live scores from the PGA Tour leaderboard'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {syncResult && (
-              <div className={cn(
-                'px-4 py-3 rounded-md text-sm',
-                syncHadData
-                  ? 'bg-green-50 text-green-700'
-                  : 'bg-amber-50 text-amber-700'
-              )}>
-                {syncResult}
-              </div>
-            )}
-
-            {/* Status indicators */}
-            <div className="flex flex-wrap items-center gap-3 text-sm">
-              {/* Tournament hours indicator */}
-              <div className={cn(
-                'flex items-center gap-1.5 px-2.5 py-1 rounded-full',
-                isTournamentHours()
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-amber-100 text-amber-700'
-              )}>
-                <span className={cn(
-                  'w-2 h-2 rounded-full',
-                  isTournamentHours() ? 'bg-green-500' : 'bg-amber-500'
-                )} />
-                {isTournamentHours() ? 'Tournament hours (7am-9pm)' : 'Outside tournament hours'}
-              </div>
-
-              {/* Last sync time */}
-              {lastSyncTime && (
-                <div className="text-muted-foreground">
-                  Last synced: {lastSyncTime.toLocaleTimeString()}
+            {/* Global scoring auto-sync indicator */}
+            {gpPool?.scoring_source === 'global' && gpPool?.event_id ? (
+              <div className="bg-green-50 text-green-700 px-4 py-3 rounded-md text-sm flex items-center gap-2">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-600 text-white text-xs font-medium">
+                  <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                  Auto-Sync
                 </div>
-              )}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <Button
-                onClick={handleSyncScores}
-                disabled={syncing || syncCooldownRemaining > 0}
-              >
-                {syncing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                <RefreshCw className="mr-2 h-4 w-4" />
-                {syncCooldownRemaining > 0
-                  ? `Wait ${formatCooldown(syncCooldownRemaining)}`
-                  : 'Sync Live Scores'}
-              </Button>
-
-              {syncCooldownRemaining > 0 && (
-                <span className="text-sm text-muted-foreground">
-                  Cooldown prevents excessive API calls
+                <span>
+                  This pool uses the global events system for automatic score updates. Manual sync is not needed.
                 </span>
-              )}
-            </div>
+              </div>
+            ) : (
+              <>
+                {syncResult && (
+                  <div className={cn(
+                    'px-4 py-3 rounded-md text-sm',
+                    syncHadData
+                      ? 'bg-green-50 text-green-700'
+                      : 'bg-amber-50 text-amber-700'
+                  )}>
+                    {syncResult}
+                  </div>
+                )}
 
-            <div className="text-sm text-muted-foreground space-y-1">
-              <p>
-                <strong>Tip:</strong> Sync every 5-10 minutes during active play.
-                Scores typically update after each group finishes a hole.
-              </p>
-              {!isTournamentHours() && (
-                <p className="text-amber-600">
-                  Tournament play usually occurs between 7am-9pm. Syncing now may return stale data.
-                </p>
-              )}
-            </div>
+                {/* Status indicators */}
+                <div className="flex flex-wrap items-center gap-3 text-sm">
+                  {/* Tournament hours indicator */}
+                  <div className={cn(
+                    'flex items-center gap-1.5 px-2.5 py-1 rounded-full',
+                    isTournamentHours()
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-amber-100 text-amber-700'
+                  )}>
+                    <span className={cn(
+                      'w-2 h-2 rounded-full',
+                      isTournamentHours() ? 'bg-green-500' : 'bg-amber-500'
+                    )} />
+                    {isTournamentHours() ? 'Tournament hours (7am-9pm)' : 'Outside tournament hours'}
+                  </div>
+
+                  {/* Last sync time */}
+                  {lastSyncTime && (
+                    <div className="text-muted-foreground">
+                      Last synced: {lastSyncTime.toLocaleTimeString()}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button
+                    onClick={handleSyncScores}
+                    disabled={syncing || syncCooldownRemaining > 0}
+                  >
+                    {syncing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    {syncCooldownRemaining > 0
+                      ? `Wait ${formatCooldown(syncCooldownRemaining)}`
+                      : 'Sync Live Scores'}
+                  </Button>
+
+                  {syncCooldownRemaining > 0 && (
+                    <span className="text-sm text-muted-foreground">
+                      Cooldown prevents excessive API calls
+                    </span>
+                  )}
+                </div>
+
+                <div className="text-sm text-muted-foreground space-y-1">
+                  <p>
+                    <strong>Tip:</strong> Sync every 5-10 minutes during active play.
+                    Scores typically update after each group finishes a hole.
+                  </p>
+                  {!isTournamentHours() && (
+                    <p className="text-amber-600">
+                      Tournament play usually occurs between 7am-9pm. Syncing now may return stale data.
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       )}
