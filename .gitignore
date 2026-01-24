@@ -27,3 +27,11 @@ dist/
 # OS
 .DS_Store
 Thumbs.db
+
+# Database sync files (regenerated when syncing dev)
+schema_dump.sql
+data_dump.sql
+supabase/migrations/*_schema.sql
+
+# Backup exports
+*.csv
