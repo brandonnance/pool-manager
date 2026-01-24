@@ -70,6 +70,7 @@ interface NoAccountPlayoffContentProps {
   winners: SqWinner[]
   isCommissioner: boolean
   isSuperAdmin?: boolean
+  scoringSource?: string | null
 }
 
 function getRoundLabel(round: string): string {
@@ -403,6 +404,7 @@ function SimplePlayoffGameCard({
   squares,
   rowNumbers,
   colNumbers,
+  scoringSource,
 }: {
   game: SqGame
   isCommissioner: boolean
@@ -411,6 +413,7 @@ function SimplePlayoffGameCard({
   squares: NoAccountSquare[]
   rowNumbers: number[]
   colNumbers: number[]
+  scoringSource?: string | null
 }) {
   const hasScores = game.home_score !== null && game.away_score !== null
   const isFinal = game.status === 'final'
@@ -480,6 +483,7 @@ function SimplePlayoffGameCard({
             reverseScoring={reverseScoring}
             rowNumbers={rowNumbers}
             colNumbers={colNumbers}
+            scoringSource={scoringSource}
           />
         </div>
       )}
@@ -502,6 +506,7 @@ export function PlayoffContent({
   winners,
   isCommissioner,
   isSuperAdmin = false,
+  scoringSource,
 }: NoAccountPlayoffContentProps) {
   // Local state for squares with realtime updates
   const [squares, setSquares] = useState<NoAccountSquare[]>(initialSquares)
@@ -815,6 +820,7 @@ export function PlayoffContent({
                             squares={squares}
                             rowNumbers={rowNumbers ?? []}
                             colNumbers={colNumbers ?? []}
+                            scoringSource={scoringSource}
                           />
                         ))}
                       </div>

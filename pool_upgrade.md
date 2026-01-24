@@ -7,11 +7,22 @@
 | Phase 1: Schema + Feature Flags | ✅ COMPLETE | All migrations applied, types regenerated |
 | Phase 2: Worker Infrastructure | ✅ COMPLETE | Edge Functions deployed, golf polling live |
 | Phase 3: Shadow Mode | ✅ COMPLETE | Legacy sync working, 0 mismatches verified |
-| Phase 4: Shadow Comparison | 🔲 NOT STARTED | Optional logging/alerting |
-| Phase 5: Controlled Cutover | 🔲 NOT STARTED | Switch UI to read from event_state |
+| Phase 4: Shadow Comparison | 🔲 NOT STARTED | Optional logging/alerting (deferred) |
+| Phase 5: Controlled Cutover | ✅ COMPLETE | UI reads from event_state when scoring_source='global' |
 | Pool Creation Wizard | 🔲 NOT STARTED | Can be done in parallel |
 
-**Last Updated:** January 2025 (The American Express tournament successfully polling)
+**Last Updated:** January 2025
+
+### Phase 5 Implementation Details
+
+- Added `scoring_source` and `event_id` columns to `gp_pools`
+- Created mapper functions (`mappers.ts`) to transform event_state to legacy formats
+- Created fetch helpers (`fetch-event-state.ts`) for server-side event_state fetching
+- Modified golf components: standings API, public leaderboard, scores page
+- Modified squares components: live-scoring-control, game-score-card, playoff-content, single-game-content
+- Shows "Auto-Sync" indicator when pool uses global scoring
+- To enable: `UPDATE gp_pools SET scoring_source = 'global' WHERE id = 'pool-uuid'`
+- Rollback: Set `scoring_source = 'legacy'` (shadow mode keeps legacy tables in sync)
 
 ---
 

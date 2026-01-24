@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { calculateGolferScore, calculateEntryScore } from '@/lib/golf/scoring'
+import {
+  getGolfLeaderboardFromEventState,
+  shouldUseGlobalScoring,
+} from '@/lib/global-events/fetch-event-state'
 
 // GET /api/golf/standings?poolId=xxx
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  
+
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -16,16 +20,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Missing poolId' }, { status: 400 })
   }
 
-  // Get golf pool config
+  // Get golf pool config including scoring_source and event_id
   const { data: gpPool } = await supabase
     .from('gp_pools')
-    .select('id, tournament_id')
+    .select('id, tournament_id, scoring_source, event_id')
     .eq('pool_id', poolId)
     .single()
 
   if (!gpPool || !gpPool.tournament_id) {
     return NextResponse.json({ error: 'Golf pool not configured' }, { status: 404 })
   }
+
+  const useGlobalScoring = shouldUseGlobalScoring(gpPool.scoring_source, gpPool.event_id)
 
   // Get tournament info including par
   const { data: tournament } = await supabase
@@ -82,13 +88,59 @@ export async function GET(request: NextRequest) {
 
   const tierMap = new Map(tiers?.map(t => [t.golfer_id, t.tier_value]) || [])
 
-  // Get golfer results
-  const { data: results } = await supabase
-    .from('gp_golfer_results')
-    .select('golfer_id, round_1, round_2, round_3, round_4, made_cut, total_score, to_par, thru, position')
-    .eq('tournament_id', gpPool.tournament_id)
+  // Get golfer results - from event_state if global scoring, otherwise from legacy table
+  let resultMap: Map<string, {
+    golfer_id: string
+    round_1: number | null
+    round_2: number | null
+    round_3: number | null
+    round_4: number | null
+    made_cut: boolean | null
+    total_score: number | null
+    to_par: number | null
+    thru: number | null
+    position: string | null
+  }>
 
-  const resultMap = new Map(results?.map(r => [r.golfer_id, r]) || [])
+  if (useGlobalScoring && gpPool.event_id) {
+    // Fetch from event_state
+    const globalData = await getGolfLeaderboardFromEventState(
+      supabase,
+      gpPool.event_id,
+      gpPool.tournament_id
+    )
+
+    if (globalData) {
+      resultMap = new Map(
+        globalData.results.map(r => [r.golfer_id, {
+          golfer_id: r.golfer_id,
+          round_1: r.round_1,
+          round_2: r.round_2,
+          round_3: r.round_3,
+          round_4: r.round_4,
+          made_cut: r.made_cut,
+          total_score: r.total_score,
+          to_par: r.to_par,
+          thru: r.thru,
+          position: r.position,
+        }])
+      )
+    } else {
+      // Fallback to legacy if event_state fetch failed
+      const { data: results } = await supabase
+        .from('gp_golfer_results')
+        .select('golfer_id, round_1, round_2, round_3, round_4, made_cut, total_score, to_par, thru, position')
+        .eq('tournament_id', gpPool.tournament_id)
+      resultMap = new Map(results?.map(r => [r.golfer_id, r]) || [])
+    }
+  } else {
+    // Fetch from legacy table
+    const { data: results } = await supabase
+      .from('gp_golfer_results')
+      .select('golfer_id, round_1, round_2, round_3, round_4, made_cut, total_score, to_par, thru, position')
+      .eq('tournament_id', gpPool.tournament_id)
+    resultMap = new Map(results?.map(r => [r.golfer_id, r]) || [])
+  }
 
   // Build standings
   const standings = entries.map(entry => {
@@ -182,5 +234,6 @@ export async function GET(request: NextRequest) {
     standings: rankedStandings,
     parPerRound,
     totalPar,
+    scoringSource: useGlobalScoring ? 'global' : 'legacy',
   })
 }

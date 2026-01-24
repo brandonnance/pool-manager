@@ -24,6 +24,10 @@ import { GolfPublicEntryForm } from '@/components/golf/golf-public-entry-form'
 import { GolfPublicLeaderboard } from '@/components/golf/golf-public-leaderboard'
 import { calculateEntryScore } from '@/lib/golf/scoring'
 import { findUnicornTeam, type GolferWithScore } from '@/lib/golf/unicorn'
+import {
+  getGolfLeaderboardFromEventState,
+  shouldUseGlobalScoring,
+} from '@/lib/global-events/fetch-event-state'
 
 interface PageProps {
   params: Promise<{ slug: string }>
@@ -55,7 +59,9 @@ export default async function GolfPublicPage({ params }: PageProps) {
       min_tier_points,
       picks_lock_at,
       public_slug,
-      public_entries_enabled
+      public_entries_enabled,
+      scoring_source,
+      event_id
     `)
     .eq('public_slug', slug)
     .eq('public_entries_enabled', true)
@@ -181,17 +187,67 @@ export default async function GolfPublicPage({ params }: PageProps) {
       (e.gp_entry_picks ?? []).map(p => (p.gp_golfers as { id: string }).id)
     )
 
-    const { data: golferResults } = golferIds.length > 0
-      ? await supabase
-          .from('gp_golfer_results')
-          .select('golfer_id, total_score, to_par, position, made_cut, round_1, round_2, round_3, round_4, thru')
-          .eq('tournament_id', tournament.id)
-          .in('golfer_id', golferIds)
-      : { data: [] }
+    // Check if we should use global scoring
+    const useGlobalScoring = shouldUseGlobalScoring(gpPool.scoring_source, gpPool.event_id)
 
-    const resultsMap = new Map(
-      (golferResults ?? []).map(r => [r.golfer_id, r])
-    )
+    let resultsMap: Map<string, {
+      golfer_id: string
+      total_score: number | null
+      to_par: number | null
+      position: string | null
+      made_cut: boolean | null
+      round_1: number | null
+      round_2: number | null
+      round_3: number | null
+      round_4: number | null
+      thru: number | null
+    }>
+
+    if (useGlobalScoring && gpPool.event_id) {
+      // Fetch from event_state
+      const globalData = await getGolfLeaderboardFromEventState(
+        supabase,
+        gpPool.event_id,
+        tournament.id
+      )
+
+      if (globalData) {
+        resultsMap = new Map(
+          globalData.results.map(r => [r.golfer_id, {
+            golfer_id: r.golfer_id,
+            total_score: r.total_score,
+            to_par: r.to_par,
+            position: r.position,
+            made_cut: r.made_cut,
+            round_1: r.round_1,
+            round_2: r.round_2,
+            round_3: r.round_3,
+            round_4: r.round_4,
+            thru: r.thru,
+          }])
+        )
+      } else {
+        // Fallback to legacy
+        const { data: golferResults } = golferIds.length > 0
+          ? await supabase
+              .from('gp_golfer_results')
+              .select('golfer_id, total_score, to_par, position, made_cut, round_1, round_2, round_3, round_4, thru')
+              .eq('tournament_id', tournament.id)
+              .in('golfer_id', golferIds)
+          : { data: [] }
+        resultsMap = new Map((golferResults ?? []).map(r => [r.golfer_id, r]))
+      }
+    } else {
+      // Use legacy table
+      const { data: golferResults } = golferIds.length > 0
+        ? await supabase
+            .from('gp_golfer_results')
+            .select('golfer_id, total_score, to_par, position, made_cut, round_1, round_2, round_3, round_4, thru')
+            .eq('tournament_id', tournament.id)
+            .in('golfer_id', golferIds)
+        : { data: [] }
+      resultsMap = new Map((golferResults ?? []).map(r => [r.golfer_id, r]))
+    }
 
     // Get tier assignments for golfers
     const { data: tierAssignmentsData } = golferIds.length > 0
@@ -280,17 +336,67 @@ export default async function GolfPublicPage({ params }: PageProps) {
 
     // Get ALL golfer results for the tournament
     const allGolferIds = (allTierAssignments ?? []).map(ta => ta.golfer_id)
-    const { data: allGolferResults } = allGolferIds.length > 0
-      ? await supabase
-          .from('gp_golfer_results')
-          .select('golfer_id, total_score, to_par, position, made_cut, round_1, round_2, round_3, round_4, thru')
-          .eq('tournament_id', tournament.id)
-          .in('golfer_id', allGolferIds)
-      : { data: [] }
 
-    const allResultsMap = new Map(
-      (allGolferResults ?? []).map(r => [r.golfer_id, r])
-    )
+    // Reuse resultsMap from above if it contains all golfers, otherwise fetch
+    let allResultsMap: Map<string, {
+      golfer_id: string
+      total_score: number | null
+      to_par: number | null
+      position: string | null
+      made_cut: boolean | null
+      round_1: number | null
+      round_2: number | null
+      round_3: number | null
+      round_4: number | null
+      thru: number | null
+    }>
+
+    // For unicorn, we need ALL golfer results, not just those in entries
+    // If using global scoring and the global data covers all golfers, use it
+    if (useGlobalScoring && gpPool.event_id) {
+      // Already fetched global data above, use it
+      // Note: getGolfLeaderboardFromEventState returns all golfers in the leaderboard
+      const globalData = await getGolfLeaderboardFromEventState(
+        supabase,
+        gpPool.event_id,
+        tournament.id
+      )
+
+      if (globalData) {
+        allResultsMap = new Map(
+          globalData.results.map(r => [r.golfer_id, {
+            golfer_id: r.golfer_id,
+            total_score: r.total_score,
+            to_par: r.to_par,
+            position: r.position,
+            made_cut: r.made_cut,
+            round_1: r.round_1,
+            round_2: r.round_2,
+            round_3: r.round_3,
+            round_4: r.round_4,
+            thru: r.thru,
+          }])
+        )
+      } else {
+        const { data: allGolferResults } = allGolferIds.length > 0
+          ? await supabase
+              .from('gp_golfer_results')
+              .select('golfer_id, total_score, to_par, position, made_cut, round_1, round_2, round_3, round_4, thru')
+              .eq('tournament_id', tournament.id)
+              .in('golfer_id', allGolferIds)
+          : { data: [] }
+        allResultsMap = new Map((allGolferResults ?? []).map(r => [r.golfer_id, r]))
+      }
+    } else {
+      const { data: allGolferResults } = allGolferIds.length > 0
+        ? await supabase
+            .from('gp_golfer_results')
+            .select('golfer_id, total_score, to_par, position, made_cut, round_1, round_2, round_3, round_4, thru')
+            .eq('tournament_id', tournament.id)
+            .in('golfer_id', allGolferIds)
+        : { data: [] }
+      allResultsMap = new Map((allGolferResults ?? []).map(r => [r.golfer_id, r]))
+    }
 
     // Build golfersByTier map for unicorn calculation
     const unicornGolfersByTier = new Map<number, GolferWithScore[]>()

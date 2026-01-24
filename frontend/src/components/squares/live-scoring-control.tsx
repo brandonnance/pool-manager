@@ -17,6 +17,7 @@ interface LiveScoringControlProps {
   reverseScoring: boolean
   rowNumbers: number[] | null
   colNumbers: number[] | null
+  scoringSource?: string | null
 }
 
 // Helper function to get winner name from square
@@ -67,6 +68,7 @@ export function LiveScoringControl({
   reverseScoring,
   rowNumbers,
   colNumbers,
+  scoringSource,
 }: LiveScoringControlProps) {
   const router = useRouter()
   const [isPolling, setIsPolling] = useState(false)
@@ -200,6 +202,24 @@ export function LiveScoringControl({
   // No ESPN ID configured
   if (!espnGameId) {
     return null
+  }
+
+  // Global scoring - show auto-sync indicator instead of manual controls
+  if (scoringSource === 'global') {
+    return (
+      <div className="flex items-center gap-2 text-xs">
+        <Badge variant="outline" className="text-xs font-mono">
+          ESPN: {espnGameId}
+        </Badge>
+        <Badge className="text-xs bg-green-600 hover:bg-green-600">
+          <Wifi className="h-3 w-3 mr-1" />
+          Auto-Sync
+        </Badge>
+        <span className="text-muted-foreground">
+          Scores synced automatically
+        </span>
+      </div>
+    )
   }
 
   // Game is already final

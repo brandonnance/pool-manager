@@ -911,37 +911,50 @@ export type Database = {
         Row: {
           created_at: string | null
           demo_mode: boolean | null
+          event_id: string | null
           id: string
           min_tier_points: number | null
           picks_lock_at: string | null
           pool_id: string
           public_entries_enabled: boolean | null
           public_slug: string | null
+          scoring_source: string | null
           tournament_id: string | null
         }
         Insert: {
           created_at?: string | null
           demo_mode?: boolean | null
+          event_id?: string | null
           id?: string
           min_tier_points?: number | null
           picks_lock_at?: string | null
           pool_id: string
           public_entries_enabled?: boolean | null
           public_slug?: string | null
+          scoring_source?: string | null
           tournament_id?: string | null
         }
         Update: {
           created_at?: string | null
           demo_mode?: boolean | null
+          event_id?: string | null
           id?: string
           min_tier_points?: number | null
           picks_lock_at?: string | null
           pool_id?: string
           public_entries_enabled?: boolean | null
           public_slug?: string | null
+          scoring_source?: string | null
           tournament_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "gp_pools_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "gp_pools_pool_id_fkey"
             columns: ["pool_id"]

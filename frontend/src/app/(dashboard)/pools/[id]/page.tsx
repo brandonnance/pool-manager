@@ -714,6 +714,7 @@ export default async function PoolDetailPage({ params }: PageProps) {
           scoreChanges={sqScoreChangesData}
           isCommissioner={isCommissioner}
           isSuperAdmin={isSuperAdmin}
+          scoringSource={sqPoolData.scoring_source}
         />
       ) : pool.type === 'playoff_squares' && sqPoolData ? (
         /* Squares - Full Playoffs Mode */
@@ -732,6 +733,7 @@ export default async function PoolDetailPage({ params }: PageProps) {
           winners={sqWinnersData}
           isCommissioner={isCommissioner}
           isSuperAdmin={isSuperAdmin}
+          scoringSource={sqPoolData.scoring_source}
         />
       ) : pool.type === 'playoff_squares' && !sqPoolData ? (
         <Card>

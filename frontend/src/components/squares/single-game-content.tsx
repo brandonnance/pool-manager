@@ -81,6 +81,7 @@ interface NoAccountSingleGameContentProps {
   scoreChanges: ScoreChange[]
   isCommissioner: boolean
   isSuperAdmin?: boolean
+  scoringSource?: string | null
 }
 
 // Simple Game Score Display Component
@@ -928,6 +929,7 @@ export function SingleGameContent({
   scoreChanges,
   isCommissioner,
   isSuperAdmin = false,
+  scoringSource,
 }: NoAccountSingleGameContentProps) {
   // Local state for squares with realtime updates
   const [squares, setSquares] = useState<NoAccountSquare[]>(initialSquares)

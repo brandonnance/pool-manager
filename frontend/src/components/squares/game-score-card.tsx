@@ -45,6 +45,7 @@ interface GameScoreCardProps {
   reverseScoring: boolean
   currentUserId: string | null
   isCommissioner: boolean
+  scoringSource?: string | null
 }
 
 function getWinTypeLabel(winType: string): string {
@@ -84,6 +85,7 @@ export function GameScoreCard({
   reverseScoring,
   currentUserId,
   isCommissioner,
+  scoringSource,
 }: GameScoreCardProps) {
   // Create square lookup by ID
   const squareById = new Map<string, Square>()
@@ -277,6 +279,7 @@ export function GameScoreCard({
             reverseScoring={reverseScoring}
             rowNumbers={rowNumbers}
             colNumbers={colNumbers}
+            scoringSource={scoringSource}
           />
           <div className="flex justify-end">
             <EnterSquaresScoreButton

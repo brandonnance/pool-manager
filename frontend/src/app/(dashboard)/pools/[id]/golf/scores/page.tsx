@@ -44,6 +44,12 @@ interface Tournament {
   par: number | null
 }
 
+interface GpPoolConfig {
+  tournament_id: string
+  scoring_source: string | null
+  event_id: string | null
+}
+
 export default function GolfScoresPage() {
   const params = useParams()
   const router = useRouter()
@@ -59,6 +65,7 @@ export default function GolfScoresPage() {
   const [golferResults, setGolferResults] = useState<GolferResult[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [isCommissioner, setIsCommissioner] = useState(false)
+  const [gpPoolConfig, setGpPoolConfig] = useState<GpPoolConfig | null>(null)
 
   // Sync cooldown state
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null)
@@ -158,10 +165,10 @@ export default function GolfScoresPage() {
       return
     }
 
-    // Get golf pool config
+    // Get golf pool config including scoring_source
     const { data: gpPool } = await supabase
       .from('gp_pools')
-      .select('tournament_id')
+      .select('tournament_id, scoring_source, event_id')
       .eq('pool_id', poolId)
       .single()
 
@@ -170,6 +177,12 @@ export default function GolfScoresPage() {
       setLoading(false)
       return
     }
+
+    setGpPoolConfig({
+      tournament_id: gpPool.tournament_id,
+      scoring_source: gpPool.scoring_source,
+      event_id: gpPool.event_id,
+    })
 
     // Get tournament
     const { data: tournamentData } = await supabase
@@ -366,6 +379,9 @@ export default function GolfScoresPage() {
     await loadData()
   }
 
+  // Check if using global scoring
+  const useGlobalScoring = gpPoolConfig?.scoring_source === 'global' && gpPoolConfig?.event_id !== null
+
   // Filter golfers by search query
   const filteredGolfers = golferResults.filter(g =>
     g.golfer_name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -417,54 +433,80 @@ export default function GolfScoresPage() {
         </div>
       )}
 
-      {/* Sync Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <RefreshCw className="h-5 w-5" />
-            Sync Live Scores
-          </CardTitle>
-          <CardDescription>
-            Pull latest scores from the PGA Tour leaderboard
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {syncResult && (
-            <div className={cn(
-              'px-4 py-3 rounded-md text-sm flex items-center gap-2',
-              syncResult.success
-                ? 'bg-green-50 text-green-700'
-                : 'bg-amber-50 text-amber-700'
-            )}>
-              {syncResult.success ? <Check className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
-              {syncResult.message}
-            </div>
-          )}
-
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              onClick={handleSync}
-              disabled={syncing || syncCooldownRemaining > 0}
-            >
-              {syncing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              <RefreshCw className="mr-2 h-4 w-4" />
-              {syncCooldownRemaining > 0
-                ? `Wait ${formatCooldown(syncCooldownRemaining)}`
-                : 'Sync Scores'}
-            </Button>
-
-            {lastSyncTime && (
-              <span className="text-sm text-muted-foreground">
-                Last synced: {lastSyncTime.toLocaleTimeString()}
+      {/* Scoring Source Info */}
+      {useGlobalScoring ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Check className="h-5 w-5 text-green-600" />
+              Auto-Sync Enabled
+            </CardTitle>
+            <CardDescription>
+              Scores are automatically synced by the global events system
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="bg-green-50 text-green-700 px-4 py-3 rounded-md text-sm flex items-center gap-2">
+              <RefreshCw className="h-4 w-4" />
+              <span>
+                This pool uses the global events system for automatic score updates.
+                Manual sync is not needed.
               </span>
+            </div>
+            <p className="text-sm text-muted-foreground mt-4">
+              You can still use manual editing below to override or correct individual scores if needed.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <RefreshCw className="h-5 w-5" />
+              Sync Live Scores
+            </CardTitle>
+            <CardDescription>
+              Pull latest scores from the PGA Tour leaderboard
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {syncResult && (
+              <div className={cn(
+                'px-4 py-3 rounded-md text-sm flex items-center gap-2',
+                syncResult.success
+                  ? 'bg-green-50 text-green-700'
+                  : 'bg-amber-50 text-amber-700'
+              )}>
+                {syncResult.success ? <Check className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                {syncResult.message}
+              </div>
             )}
-          </div>
 
-          <p className="text-sm text-muted-foreground">
-            Syncing pulls scores from the Slash Golf API. Use manual editing below to override or correct individual scores.
-          </p>
-        </CardContent>
-      </Card>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                onClick={handleSync}
+                disabled={syncing || syncCooldownRemaining > 0}
+              >
+                {syncing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <RefreshCw className="mr-2 h-4 w-4" />
+                {syncCooldownRemaining > 0
+                  ? `Wait ${formatCooldown(syncCooldownRemaining)}`
+                  : 'Sync Scores'}
+              </Button>
+
+              {lastSyncTime && (
+                <span className="text-sm text-muted-foreground">
+                  Last synced: {lastSyncTime.toLocaleTimeString()}
+                </span>
+              )}
+            </div>
+
+            <p className="text-sm text-muted-foreground">
+              Syncing pulls scores from the Slash Golf API. Use manual editing below to override or correct individual scores.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Manual Score Entry */}
       <Card>
