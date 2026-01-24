@@ -7,22 +7,42 @@
 | Phase 1: Schema + Feature Flags | ✅ COMPLETE | All migrations applied, types regenerated |
 | Phase 2: Worker Infrastructure | ✅ COMPLETE | Edge Functions deployed, golf polling live |
 | Phase 3: Shadow Mode | ✅ COMPLETE | Legacy sync working, 0 mismatches verified |
-| Phase 4: Shadow Comparison | 🔲 NOT STARTED | Optional logging/alerting (deferred) |
+| Phase 4: Shadow Comparison | 🔲 SKIPPED | Not needed - 0 mismatches in Phase 3 |
 | Phase 5: Controlled Cutover | ✅ COMPLETE | UI reads from event_state when scoring_source='global' |
-| Pool Creation Wizard | 🔲 NOT STARTED | Can be done in parallel |
+| Pool Creation Wizard | 🔲 NEXT | See detailed spec in document below |
 
-**Last Updated:** January 2025
+**Last Updated:** January 24, 2025
+
+**Next Step:** Pool Creation Wizard (see section below for full spec)
 
 ### Phase 5 Implementation Details
 
 - Added `scoring_source` and `event_id` columns to `gp_pools`
 - Created mapper functions (`mappers.ts`) to transform event_state to legacy formats
 - Created fetch helpers (`fetch-event-state.ts`) for server-side event_state fetching
-- Modified golf components: standings API, public leaderboard, scores page
+- Modified golf components: standings API, public leaderboard, scores page, **setup page**
 - Modified squares components: live-scoring-control, game-score-card, playoff-content, single-game-content
-- Shows "Auto-Sync" indicator when pool uses global scoring
+- Shows "Auto-Sync" indicator when pool uses global scoring (both scores page AND setup page)
+- AMEX golf pool is live on global scoring
 - To enable: `UPDATE gp_pools SET scoring_source = 'global' WHERE id = 'pool-uuid'`
 - Rollback: Set `scoring_source = 'legacy'` (shadow mode keeps legacy tables in sync)
+
+### Files Created/Modified in Phase 5
+
+**New files:**
+- `frontend/src/lib/global-events/mappers.ts` - Transform event_state to legacy formats
+- `frontend/src/lib/global-events/fetch-event-state.ts` - Server-side event_state fetching
+
+**Modified files:**
+- `frontend/src/app/(dashboard)/pools/[id]/golf/scores/page.tsx` - Auto-sync card
+- `frontend/src/app/(dashboard)/pools/[id]/golf/setup/page.tsx` - Auto-sync indicator in Live Scoring card
+- `frontend/src/app/api/golf/standings/route.ts` - Read from event_state when global
+- `frontend/src/app/pools/golf/[slug]/page.tsx` - Public leaderboard supports global scoring
+- `frontend/src/components/squares/live-scoring-control.tsx` - Auto-sync badge
+- `frontend/src/components/squares/game-score-card.tsx` - Pass scoringSource prop
+- `frontend/src/components/squares/playoff-content.tsx` - Pass scoringSource prop
+- `frontend/src/components/squares/single-game-content.tsx` - Accept scoringSource prop
+- `frontend/src/app/(dashboard)/pools/[id]/page.tsx` - Pass scoringSource to components
 
 ---
 
@@ -825,6 +845,8 @@ Build the new pool creation wizard that integrates with global events:
 |--------|-------------|
 | `c9e4522` | Add dev environment setup and platform upgrade plan |
 | `5cd05a0` | Add Phase 3 shadow mode legacy sync for golf tournaments |
+| `cf029a7` | Add Phase 5 controlled cutover for global events scoring |
+| `00da7f1` | Add auto-sync indicator to golf setup page |
 
 ---
 
