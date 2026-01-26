@@ -3,8 +3,6 @@ import { Resend } from 'resend'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-
 // Create admin client for server-side operations
 function createAdminClient() {
   return createClient<Database>(
@@ -14,6 +12,8 @@ function createAdminClient() {
 }
 
 export async function POST(request: NextRequest) {
+  const resend = new Resend(process.env.RESEND_API_KEY)
+
   try {
     const { entryId, poolId, email, participantName } = await request.json()
 
