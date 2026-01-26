@@ -78,6 +78,7 @@ export default function GolfSetupPage() {
   const [loadingTournaments, setLoadingTournaments] = useState(false)
   const [importing, setImporting] = useState<string | null>(null)
   const [importSuccess, setImportSuccess] = useState<string | null>(null)
+  const [hasEntries, setHasEntries] = useState(false)
 
   // Form state
   const [minTierPoints, setMinTierPoints] = useState(21)
@@ -223,6 +224,14 @@ export default function GolfSetupPage() {
 
       setTournament(tournamentData)
     }
+
+    // Check if any entries exist for this pool (locks tier editing)
+    const { count: entryCount } = await supabase
+      .from('gp_entries')
+      .select('*', { count: 'exact', head: true })
+      .eq('pool_id', poolId)
+
+    setHasEntries((entryCount ?? 0) > 0)
 
     setLoading(false)
   }
@@ -876,6 +885,7 @@ export default function GolfSetupPage() {
               <GpElitePromotionModal
                 gpPoolId={gpPool.id}
                 tournamentId={gpPool.tournament_id}
+                locked={hasEntries}
               />
               <Link href={`/pools/${poolId}/golf/entries`}>
                 <Button variant="outline">Manage Entries</Button>

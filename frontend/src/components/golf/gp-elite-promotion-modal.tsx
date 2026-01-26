@@ -13,7 +13,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
-import { Crown, Loader2, ChevronUp, ChevronDown, Star } from 'lucide-react'
+import { Crown, Loader2, ChevronUp, ChevronDown, Star, Lock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface Golfer {
@@ -27,9 +27,10 @@ interface Golfer {
 interface GpElitePromotionModalProps {
   gpPoolId: string
   tournamentId: string | null
+  locked?: boolean
 }
 
-export function GpElitePromotionModal({ gpPoolId, tournamentId }: GpElitePromotionModalProps) {
+export function GpElitePromotionModal({ gpPoolId, tournamentId, locked = false }: GpElitePromotionModalProps) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -183,6 +184,15 @@ export function GpElitePromotionModal({ gpPoolId, tournamentId }: GpElitePromoti
           </div>
         )}
 
+        {locked && (
+          <div className="bg-amber-50 border border-amber-200 px-3 py-2 rounded-md flex items-start gap-2">
+            <Lock className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-amber-800">
+              <span className="font-medium">Locked.</span> Entries have been submitted. Elite status changes are disabled.
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -224,7 +234,7 @@ export function GpElitePromotionModal({ gpPoolId, tournamentId }: GpElitePromoti
                         variant="ghost"
                         size="sm"
                         onClick={() => handleDemote(golfer.id)}
-                        disabled={updating === golfer.id}
+                        disabled={updating === golfer.id || locked}
                         className="text-muted-foreground hover:text-foreground"
                       >
                         {updating === golfer.id ? (
@@ -269,7 +279,7 @@ export function GpElitePromotionModal({ gpPoolId, tournamentId }: GpElitePromoti
                         variant="outline"
                         size="sm"
                         onClick={() => handlePromote(golfer.id)}
-                        disabled={updating === golfer.id}
+                        disabled={updating === golfer.id || locked}
                         className="border-amber-500 text-amber-600 hover:bg-amber-50"
                       >
                         {updating === golfer.id ? (
