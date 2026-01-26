@@ -369,7 +369,14 @@ export default function GolfPicksPage() {
       .update({ submitted_at: new Date().toISOString() })
       .eq('id', currentEntryId)
 
-    setSuccessMessage('Picks saved successfully!')
+    // Send confirmation email (fire and forget - don't block on this)
+    fetch('/api/golf/confirm-entry', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entryId: currentEntryId, poolId }),
+    }).catch(err => console.error('Failed to send confirmation email:', err))
+
+    setSuccessMessage('Picks saved successfully! Confirmation email sent.')
     setSaving(false)
   }
 

@@ -299,6 +299,18 @@ export function GolfPublicEntryForm({
       return
     }
 
+    // Send confirmation email (fire and forget - don't block on this)
+    fetch('/api/golf/confirm-public-entry', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        entryId: entry.id,
+        poolId,
+        email: participantEmail.trim(),
+        participantName: participantName.trim(),
+      }),
+    }).catch(err => console.error('Failed to send confirmation email:', err))
+
     // Success
     setSubmitted(true)
     setSubmittedEntry({
@@ -362,6 +374,8 @@ export function GolfPublicEntryForm({
                 <h2 className="text-xl font-bold">Entry Submitted!</h2>
                 <p className="text-muted-foreground mt-1">
                   Your entry &quot;{submittedEntry.entryName}&quot; has been recorded.
+                  <br />
+                  <span className="text-sm">A confirmation email has been sent to you.</span>
                 </p>
               </div>
 
