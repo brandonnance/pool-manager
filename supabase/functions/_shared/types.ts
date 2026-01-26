@@ -86,7 +86,7 @@ export type EventStatePayload = TeamGamePayload | GolfTournamentPayload
 export const POLLING_INTERVALS = {
   PRE_GAME_LONG: 15 * 60,    // 15 minutes
   PRE_GAME_SHORT: 5 * 60,    // 5 minutes
-  IN_PROGRESS: 15,           // 15 seconds
+  IN_PROGRESS: 10,           // 10 seconds (faster to catch TD→XP sequences)
   HALFTIME: 30,              // 30 seconds
   FINAL: 0,                  // Stop polling
 } as const

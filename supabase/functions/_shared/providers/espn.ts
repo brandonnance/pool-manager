@@ -29,15 +29,23 @@ interface ESPNStatus {
   }
 }
 
+interface ESPNNote {
+  type: string
+  headline: string
+}
+
 interface ESPNCompetition {
   id: string
   competitors: ESPNCompetitor[]
   status: ESPNStatus
+  notes?: ESPNNote[]
 }
 
 interface ESPNEvent {
   id: string
   name: string
+  date: string // ISO 8601 format
+  shortName?: string
   competitions: ESPNCompetition[]
 }
 
@@ -62,6 +70,10 @@ const SEASON_TYPE_PARAMS: Record<Sport, string> = {
 
 export interface ESPNGameData {
   espnGameId: string
+  name: string
+  shortName: string
+  roundName: string | null // e.g., "AFC Championship", "NFC Wildcard"
+  startTime: string | null
   homeScore: number | null
   awayScore: number | null
   homeTeam: string
@@ -136,6 +148,9 @@ export function normalizeESPNEvent(event: ESPNEvent): ESPNGameData {
   const status = mapESPNStatus(espnStatus)
   const isHalftime = espnStatus === 'STATUS_HALFTIME' || competition.status.period === 2
 
+  // Extract round name from notes (e.g., "AFC Championship", "NFC Wildcard")
+  const roundName = competition.notes?.find((n) => n.type === 'event')?.headline || null
+
   const homeLinescores = homeCompetitor.linescores || []
   const awayLinescores = awayCompetitor.linescores || []
 
@@ -164,6 +179,10 @@ export function normalizeESPNEvent(event: ESPNEvent): ESPNGameData {
 
   return {
     espnGameId: event.id,
+    name: event.name,
+    shortName: event.shortName || event.name,
+    roundName,
+    startTime: event.date || null,
     homeScore,
     awayScore,
     homeTeam: homeCompetitor.team.displayName,
@@ -179,6 +198,18 @@ export function normalizeESPNEvent(event: ESPNEvent): ESPNGameData {
     q3HomeScore,
     q3AwayScore,
   }
+}
+
+/**
+ * Fetches all games from ESPN scoreboard for event discovery
+ * Returns normalized game data for all events in the current scoreboard
+ */
+export async function fetchAllESPNGames(sport: Sport): Promise<ESPNGameData[]> {
+  const data = await fetchESPNScoreboard(sport)
+  if (!data.events || data.events.length === 0) {
+    return []
+  }
+  return data.events.map(normalizeESPNEvent)
 }
 
 export function toTeamGamePayload(gameData: ESPNGameData): TeamGamePayload {

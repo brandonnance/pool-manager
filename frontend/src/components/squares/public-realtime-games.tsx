@@ -519,7 +519,7 @@ export function PublicRealtimeGames({
                     <div>
                       <div className="text-muted-foreground">Final</div>
                       <div className="font-mono font-bold">
-                        {game.away_score ?? '-'} - {game.home_score ?? '-'}
+                        {isFinal ? `${game.away_score ?? '-'} - ${game.home_score ?? '-'}` : '- - -'}
                       </div>
                     </div>
                   </div>

@@ -32,7 +32,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { CreatePoolButton } from '@/components/pools/create-pool-button'
 import { DeletePoolButton } from '@/components/pools/delete-pool-button'
 import { DeleteOrgButton } from '@/components/orgs/delete-org-button'
 import { SuperAdminJoinOrgButton } from '@/components/orgs/super-admin-join-org-button'
@@ -187,7 +186,11 @@ export default async function OrgDetailPage({ params }: PageProps) {
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <h2 className="text-xl font-semibold text-foreground">Pools</h2>
-          {isOrgAdmin && <CreatePoolButton orgId={id} />}
+          {isOrgAdmin && (
+            <Button asChild>
+              <Link href={`/create-pool?orgId=${id}`}>Create Pool</Link>
+            </Button>
+          )}
         </div>
 
         {!pools || pools.length === 0 ? (
@@ -204,7 +207,11 @@ export default async function OrgDetailPage({ params }: PageProps) {
                   ? 'Create your first pool to get started.'
                   : 'The admin hasn\'t created any pools yet.'}
               </p>
-              {isOrgAdmin && <CreatePoolButton orgId={id} />}
+              {isOrgAdmin && (
+                <Button asChild>
+                  <Link href={`/create-pool?orgId=${id}`}>Create Pool</Link>
+                </Button>
+              )}
             </CardContent>
           </Card>
         ) : (

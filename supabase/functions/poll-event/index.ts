@@ -12,7 +12,7 @@ import { createServiceClient } from '../_shared/supabase-client.ts'
 import { fetchESPNGame, toTeamGamePayload } from '../_shared/providers/espn.ts'
 import { fetchGolfTournamentState } from '../_shared/providers/slashgolf.ts'
 import { syncGolfToLegacy } from '../_shared/legacy-sync.ts'
-import type { Event, EventStatus, EventStatePayload, GolfTournamentPayload } from '../_shared/types.ts'
+import type { Event, EventStatus, EventStatePayload, GolfTournamentPayload, TeamGamePayload } from '../_shared/types.ts'
 
 interface PollRequest {
   event_id?: string
@@ -23,6 +23,7 @@ interface PollResponse {
   success: boolean
   event_id: string
   status?: EventStatus
+  winners_recorded?: number
   error?: string
 }
 
@@ -81,6 +82,7 @@ Deno.serve(async (req) => {
 
     let newStatus: EventStatus
     let payload: EventStatePayload
+    let startTime: string | null = null
 
     if (event.event_type === 'team_game') {
       const gameData = await fetchESPNGame(event.sport, event.provider_event_id)
@@ -94,6 +96,7 @@ Deno.serve(async (req) => {
 
       newStatus = gameData.status
       payload = toTeamGamePayload(gameData)
+      startTime = gameData.startTime
 
       console.log(`[poll-event] Fetched ${event.name}: ${gameData.homeTeam} ${gameData.homeScore} - ${gameData.awayScore} ${gameData.awayTeam}`)
 
@@ -157,15 +160,47 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Update event status if changed
+    // Score squares pools for team games
+    let winnersRecorded = 0
+    if (event.event_type === 'team_game') {
+      try {
+        const scoreResult = await scoreSquaresPools(
+          event.id,
+          payload as TeamGamePayload,
+          newStatus,
+          event.status as EventStatus
+        )
+        winnersRecorded = scoreResult.winners_recorded || 0
+        if (winnersRecorded > 0) {
+          console.log(`[poll-event] Recorded ${winnersRecorded} winners for squares pools`)
+        }
+      } catch (err) {
+        console.error('[poll-event] Error scoring squares pools:', err instanceof Error ? err.message : 'Unknown')
+      }
+    }
+
+    // Update event status and/or start_time if needed
+    const eventUpdates: Record<string, unknown> = {}
+
     if (event.status !== newStatus) {
+      eventUpdates.status = newStatus
+    }
+
+    // Sync start_time if it was null but provider has it
+    if (!event.start_time && startTime) {
+      eventUpdates.start_time = startTime
+      console.log(`[poll-event] Syncing start_time for ${event.name}: ${startTime}`)
+    }
+
+    if (Object.keys(eventUpdates).length > 0) {
+      eventUpdates.updated_at = new Date().toISOString()
       const { error: eventError } = await supabase
         .from('events')
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .update(eventUpdates)
         .eq('id', event.id)
 
       if (eventError) {
-        console.error('[poll-event] Error updating event status:', eventError)
+        console.error('[poll-event] Error updating event:', eventError)
       }
     }
 
@@ -173,6 +208,7 @@ Deno.serve(async (req) => {
       success: true,
       event_id: event.id,
       status: newStatus,
+      winners_recorded: winnersRecorded,
     }
 
     return new Response(JSON.stringify(response), {
@@ -188,3 +224,44 @@ Deno.serve(async (req) => {
     )
   }
 })
+
+/**
+ * Calls the score-squares-pools edge function to process winners
+ */
+async function scoreSquaresPools(
+  eventId: string,
+  payload: TeamGamePayload,
+  status: EventStatus,
+  previousStatus: EventStatus
+): Promise<{ winners_recorded: number }> {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    console.error('[poll-event] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
+    return { winners_recorded: 0 }
+  }
+
+  const response = await fetch(`${supabaseUrl}/functions/v1/score-squares-pools`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${serviceRoleKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      event_id: eventId,
+      payload,
+      status,
+      previous_status: previousStatus,
+    }),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error(`[poll-event] score-squares-pools failed: ${response.status} ${errorText}`)
+    return { winners_recorded: 0 }
+  }
+
+  const result = await response.json()
+  return { winners_recorded: result.winners_recorded || 0 }
+}

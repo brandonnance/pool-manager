@@ -75,6 +75,7 @@ export default async function DashboardPage() {
       pools (
         id,
         name,
+        type,
         status,
         season_label,
         visibility,
@@ -97,6 +98,7 @@ export default async function DashboardPage() {
         .select(`
           id,
           name,
+          type,
           status,
           season_label,
           visibility,
@@ -146,15 +148,36 @@ export default async function DashboardPage() {
     pendingCountMap.set(pc.pool_id, current + 1)
   })
 
+  // Get sq_pools data for squares pools to check numbers_locked status
+  const allPoolIds = [
+    ...(poolMemberships?.filter(pm => pm.pools).map(pm => pm.pools!.id) || []),
+    ...(discoverablePools?.map(p => p.id) || [])
+  ]
+
+  const { data: sqPoolsData } = allPoolIds.length > 0
+    ? await supabase
+        .from('sq_pools')
+        .select('pool_id, numbers_locked')
+        .in('pool_id', allPoolIds)
+    : { data: [] }
+
+  // Build a map of pool_id -> numbers_locked
+  const numbersLockedMap = new Map<string, boolean>()
+  sqPoolsData?.forEach(sq => {
+    numbersLockedMap.set(sq.pool_id, sq.numbers_locked ?? false)
+  })
+
   // Group pools by org
   interface PoolInfo {
     id: string
     name: string
+    type: string
     status: string
     season_label: string | null
     membership_status: 'approved' | 'pending' | 'discoverable'
     pending_count?: number
     is_commissioner?: boolean
+    numbers_locked?: boolean
   }
 
   interface OrgWithPools {
@@ -201,11 +224,13 @@ export default async function DashboardPage() {
         orgData.pools.push({
           id: pm.pools.id,
           name: pm.pools.name,
+          type: pm.pools.type,
           status: pm.pools.status,
           season_label: pm.pools.season_label,
           membership_status: pm.status as 'approved' | 'pending',
           pending_count: pendingCount,
           is_commissioner: isCommissioner,
+          numbers_locked: numbersLockedMap.get(pm.pools.id),
         })
       }
     }
@@ -221,9 +246,11 @@ export default async function DashboardPage() {
         orgData.pools.push({
           id: pool.id,
           name: pool.name,
+          type: pool.type,
           status: pool.status,
           season_label: pool.season_label,
           membership_status: 'discoverable',
+          numbers_locked: numbersLockedMap.get(pool.id),
         })
       }
     }
@@ -238,13 +265,23 @@ export default async function DashboardPage() {
   const activePools = poolMemberships?.filter(pm => pm.status === 'approved' && pm.pools?.status === 'open').length || 0
   const discoverableCount = discoverablePools?.length || 0
 
+  // Check if user is admin of any org (can create pools)
+  const canCreatePool = orgMemberships?.some(m => m.role === 'admin') || false
+
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Welcome back! Here&apos;s an overview of your pools.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Welcome back! Here&apos;s an overview of your pools.
+          </p>
+        </div>
+        {canCreatePool && (
+          <Button asChild>
+            <Link href="/create-pool">Create Pool</Link>
+          </Button>
+        )}
       </div>
 
       {/* Quick Stats */}
@@ -343,7 +380,8 @@ export default async function DashboardPage() {
                             'outline'
                           }
                           className={
-                            pool.status === 'open' ? 'bg-green-600' :
+                            pool.status === 'open' && !(pool.type === 'playoff_squares' && pool.numbers_locked) ? 'bg-green-600' :
+                            pool.status === 'open' && pool.type === 'playoff_squares' && pool.numbers_locked ? 'bg-blue-600' :
                             pool.status === 'locked' ? 'bg-blue-600' :
                             pool.status === 'draft' ? 'border-yellow-500 text-yellow-600' :
                             ''
@@ -351,6 +389,7 @@ export default async function DashboardPage() {
                         >
                           {pool.status === 'locked' ? 'In Progress' :
                            pool.status === 'completed' ? 'Completed' :
+                           pool.status === 'open' && pool.type === 'playoff_squares' && pool.numbers_locked ? 'Numbers Locked' :
                            pool.status === 'open' ? 'Accepting Entries' :
                            pool.status === 'draft' ? 'Draft' :
                            pool.status}

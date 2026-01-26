@@ -9,11 +9,13 @@
 | Phase 3: Shadow Mode | ✅ COMPLETE | Legacy sync working, 0 mismatches verified |
 | Phase 4: Shadow Comparison | 🔲 SKIPPED | Not needed - 0 mismatches in Phase 3 |
 | Phase 5: Controlled Cutover | ✅ COMPLETE | UI reads from event_state when scoring_source='global' |
-| Pool Creation Wizard | 🔲 NEXT | See detailed spec in document below |
+| Pool Creation Wizard | ✅ COMPLETE | 6-step wizard, event discovery, auto-fill metadata |
+| Phase 6: Automatic ESPN Scoring | ⚠️ DEPRECATED | Works but ESPN API unreliable for production |
+| **Phase 7: Admin-Controlled Scoring** | 🔲 NOT STARTED | New approach - admin UI replaces ESPN polling |
 
-**Last Updated:** January 24, 2025
+**Last Updated:** January 26, 2025
 
-**Next Step:** Pool Creation Wizard (see section below for full spec)
+**Current Status:** Pivoting from ESPN auto-polling to admin-controlled scoring for football. ESPN API reliability and ToS concerns make it unsuitable for production. Golf automation stays (paid API is reliable). Building admin UI in time for Super Bowl (Feb 9, 2025).
 
 ### Phase 5 Implementation Details
 
@@ -444,11 +446,272 @@ Each pool defines its own golfer tiers (existing gp_tier_assignments pattern).
 
 ---
 
-## Pool Creation Wizard 🔲 NOT STARTED
+## Pool Creation Wizard ✅ COMPLETE
 
-Replace the current modal-based pool creation with a step-by-step wizard that integrates with global events.
+Replaced the modal-based pool creation with a step-by-step wizard that integrates with global events.
 
-**Note:** This can be developed in parallel with Phase 5 since it's independent UI work.
+### Implementation Details
+
+- 6-step wizard: Organization → Sport → Pool Type → Event → Settings → Review
+- Supports NFL Squares (single game mode) and PGA Golf pools
+- Event discovery via `/api/events/upcoming` fetches from global `events` table
+- Event metadata (home_team, away_team, round_name) auto-fills pool settings
+- Event discovery edge function runs daily via pg_cron
+
+### Files Created
+
+| File | Purpose |
+|------|---------|
+| `frontend/src/app/(dashboard)/create-pool/page.tsx` | Wizard entry point |
+| `frontend/src/components/pool-wizard/wizard-container.tsx` | Main wizard state management |
+| `frontend/src/components/pool-wizard/wizard-progress.tsx` | Progress indicator |
+| `frontend/src/components/pool-wizard/org-step.tsx` | Step 1: Org selection |
+| `frontend/src/components/pool-wizard/sport-step.tsx` | Step 2: Sport selection |
+| `frontend/src/components/pool-wizard/pool-type-step.tsx` | Step 3: Pool type + mode |
+| `frontend/src/components/pool-wizard/event-step.tsx` | Step 4: Event picker |
+| `frontend/src/components/pool-wizard/settings-step.tsx` | Step 5: Pool settings |
+| `frontend/src/components/pool-wizard/review-step.tsx` | Step 6: Review and create |
+| `frontend/src/components/pool-wizard/types.ts` | Shared wizard types |
+| `frontend/src/app/api/events/upcoming/route.ts` | Event discovery API |
+| `supabase/functions/event-discovery/index.ts` | ESPN event discovery edge function |
+
+---
+
+## Phase 6: Automatic ESPN Scoring ⚠️ DEPRECATED FOR FOOTBALL
+
+> **Note:** This approach worked during testing but is being replaced by Phase 7 (Admin-Controlled Scoring) due to ESPN API reliability concerns and ToS issues. The edge functions remain deployed for reference but should not be used for production football pools. Golf automation continues to use this approach (paid API is reliable).
+
+Implements automatic winner detection and recording for squares pools linked to global events via ESPN polling.
+
+### Overview
+
+When `scoring_source='global'`, the system automatically:
+1. Polls ESPN every 10 seconds during live games
+2. Detects score changes and quarter transitions
+3. Records winners to `sq_winners` table
+4. Syncs scores to `sq_games` table
+
+### Scoring Modes
+
+| Mode | Description | Win Types |
+|------|-------------|-----------|
+| `score_change` | Winner on every score change | `score_change`, `score_change_final` |
+| `quarter` | Winners at period transitions | `q1`, `halftime`, `q3`, `normal` |
+
+Both modes support reverse scoring (swapped digits for additional winners).
+
+### Key Design Decisions
+
+1. **0-0 is a winner**: When game transitions to `in_progress`, 0-0 is recorded as the kickoff winner
+2. **10-second polling**: Reduced from 15s to catch TD→XP sequences (usually 30-60s apart)
+3. **Quarter detection**: Uses `event_state.payload.period` to detect quarter transitions
+4. **Idempotent**: Duplicate winner records are prevented via win_type checks
+
+### Database Changes
+
+```sql
+-- Track which quarters have been scored (quarter mode)
+ALTER TABLE sq_games ADD COLUMN last_scored_period integer DEFAULT 0;
+```
+
+### Files Created/Modified
+
+**New files:**
+- `supabase/functions/score-squares-pools/index.ts` - Core scoring edge function
+
+**Modified files:**
+- `supabase/functions/_shared/types.ts` - Changed `IN_PROGRESS` polling from 15→10 seconds
+- `supabase/functions/poll-event/index.ts` - Calls score-squares-pools after event_state update
+
+### Data Flow
+
+```
+ESPN API → poll-event → event_state (payload) → score-squares-pools → sq_winners
+                                               ↓
+                                         sq_score_changes (for score_change mode)
+                                               ↓
+                                         sq_games (sync period/scores)
+```
+
+### Test Pools Active
+
+| Pool | Mode | Event | Status |
+|------|------|-------|--------|
+| AFC Test | score_change | AFC Championship (Bills @ Chiefs) | 🔄 Live testing |
+| Nance Quarter Pool | quarter | AFC Championship (Bills @ Chiefs) | 🔄 Live testing |
+
+### Bugs Fixed During Live Testing
+
+**Edge Function Bugs (score-squares-pools v1→v3):**
+
+1. **Payout field stored wrong value** - Was passing `pool.per_change_payout` (null) instead of `change_order`. UI expects payout to contain change_order for grouping winners by score.
+   - Fix: Pass `newOrder` (change_order) to `recordWinnerForScore` for score_change mode
+
+2. **Duplicate check using `.single()` failed silently** - `.single()` returns error when 0 rows, causing data to be null and bypassing duplicate protection.
+   - Fix: Use `.maybeSingle()` for single-row queries, array result + length check for duplicate detection
+
+3. **Duplicate check blocked legitimate wins** - Check used `(game_id, square_id, win_type)` which prevented same square from winning on different scores.
+   - Fix: For score_change mode, check `(game_id, win_type, payout)` since payout=change_order
+
+4. **Current score not recorded after kickoff** - If game already had points when kickoff detected, only 0-0 was recorded.
+   - Fix: After kickoff, also check if current score != 0-0 and record it
+
+**UI Fixes:**
+
+**Issue:** Quarter mode game card showed current running score in both Q1 AND Final columns during live games. Final should only show when game is actually final.
+
+**Fix:** Modified conditional rendering to show "- - -" in Final column until `game.status === 'final'`:
+- `frontend/src/components/squares/single-game-content.tsx` (line 182)
+- `frontend/src/components/squares/public-realtime-games.tsx` (line 522)
+
+### Verification
+
+To verify after a live game:
+```sql
+-- Check score changes recorded
+SELECT * FROM sq_score_changes
+WHERE sq_game_id IN (SELECT id FROM sq_games WHERE event_id = '<event-id>')
+ORDER BY change_order;
+
+-- Check winners recorded
+SELECT * FROM sq_winners
+WHERE sq_game_id IN (SELECT id FROM sq_games WHERE event_id = '<event-id>')
+ORDER BY created_at;
+```
+
+---
+
+## Phase 7: Admin-Controlled Scoring 🔲 NOT STARTED
+
+### Why This Change
+
+Phase 6's ESPN auto-polling approach worked during testing but has critical issues for production:
+
+1. **ESPN API unreliability** - Free APIs aren't reliable for production, ToS concerns
+2. **Edge function complexity** - Timing issues with TD→XP sequences, hard to debug
+3. **No human oversight** - Missed scores require manual database fixes
+
+### New Architecture
+
+**Old (Deprecated for Football):**
+```
+ESPN API → poll-event → event_state → score-squares-pools → winners
+```
+
+**New:**
+```
+Admin UI → event_state → scoring logic → winners (for ALL linked pools)
+```
+
+**Golf (Unchanged):**
+```
+Paid API → poll-event → event_state → pools reference leaderboard
+(Paid API is reliable, keep automation)
+```
+
+### Key Benefits
+
+- **Reliability**: No dependency on flaky free APIs during live games
+- **Accuracy**: Human confirms each score, catches edge cases (XP after TD, corrections)
+- **Scalability**: One admin action updates ALL pools tied to that event
+- **Simplicity**: No complex polling/timing logic to maintain
+
+### Admin Interface
+
+#### 1. Event Management (`/admin/events`)
+
+**Features:**
+- List all global events with status (scheduled/in_progress/final)
+- Create new events (manual entry or ESPN metadata pull for teams/times)
+- Sport filter (NFL, NBA, etc.)
+- Quick actions: Edit, Start Scoring, View Linked Pools
+- Super admin only access
+
+#### 2. Live Scoring Control (`/admin/events/[id]/scoring`)
+
+**Score Display:**
+```
+┌─────────────────────────────────────────┐
+│  CHIEFS           BILLS                 │
+│    21      -       17                   │
+│           Q3  4:32                      │
+└─────────────────────────────────────────┘
+```
+
+**Quick Score Buttons:**
+```
+Chiefs: [+1] [+2] [+3] [+6] [+7] [+8]
+Bills:  [+1] [+2] [+3] [+6] [+7] [+8]
+```
+
+**Features:**
+- Quick increment buttons for speed during live games
+- Direct score input for corrections
+- Period end buttons: [End Q1] [End Half] [End Q3] [Game Final]
+- Each action updates `event_state` and triggers winner calculation
+- Action log showing recent score changes with timestamps
+
+### Scoring Logic (Reused)
+
+The winner calculation logic from Phase 6 stays the same - just triggered by admin action instead of ESPN polling.
+
+**Score Change Mode:**
+1. Admin clicks +7 for Chiefs
+2. System updates `event_state.payload` with new score
+3. For each linked pool with `scoring_mode='score_change'`:
+   - Insert `sq_score_changes` record
+   - Calculate winning square (home % 10, away % 10)
+   - Insert `sq_winners` record
+   - If reverse_scoring, insert reverse winner
+
+**Quarter Mode:**
+1. Admin clicks "End Q1"
+2. System records current score as Q1 score in `event_state`
+3. For each linked pool with `scoring_mode='quarter'`:
+   - Calculate winning square from Q1 cumulative score
+   - Insert `sq_winners` with `win_type='q1'`
+
+### Files to Create
+
+**Phase 7.1: Admin Event Management UI**
+- `frontend/src/app/(dashboard)/admin/events/page.tsx` - Event list
+- `frontend/src/app/(dashboard)/admin/events/[id]/page.tsx` - Event detail
+- `frontend/src/app/(dashboard)/admin/events/create/page.tsx` - Create event
+- `frontend/src/components/admin/event-list.tsx`
+- `frontend/src/components/admin/create-event-form.tsx`
+
+**Phase 7.2: Live Scoring Interface**
+- `frontend/src/app/(dashboard)/admin/events/[id]/scoring/page.tsx`
+- `frontend/src/components/admin/live-scoring-control.tsx`
+- `frontend/src/components/admin/score-buttons.tsx`
+- `frontend/src/components/admin/period-controls.tsx`
+
+**Phase 7.3: Scoring Logic Integration**
+- Server action or API route for score updates
+- Reuse logic from `score-squares-pools` edge function (port to Next.js API route)
+
+### Pool Creation Changes (Future)
+
+After admin scoring UI is complete, update pool creation:
+- Show global events prominently in event picker
+- Warn if user creates manual event that duplicates a global one
+- Explain benefits: "Global events get admin-managed live scoring"
+
+### Verification Checklist
+
+1. [ ] Admin can create global events at `/admin/events`
+2. [ ] Admin can start live scoring at `/admin/events/[id]/scoring`
+3. [ ] Quick buttons (+1, +3, +6, +7) record score changes correctly
+4. [ ] Direct input works for score corrections
+5. [ ] Period buttons (End Q1, End Half, etc.) record quarter winners
+6. [ ] All linked pools update automatically when admin enters scores
+7. [ ] Winner calculation works for score_change mode
+8. [ ] Winner calculation works for quarter mode
+9. [ ] Reverse winners created when pool has reverse_scoring enabled
+
+---
+
+## Pool Creation Wizard Spec (Reference)
 
 ### Entry Points
 
@@ -662,15 +925,43 @@ All pools consume the same upstream data, apply their own rules.
 17. [ ] Switch scoring_source = 'global' per-pool
 18. [ ] Disable legacy polling for cutover pools
 
-### Pool Creation Wizard Verification (Not Started)
-19. [ ] Wizard accessible from dashboard and org pages
-20. [ ] Sport selection filters pool types correctly
-21. [ ] Event picker shows upcoming events from `events` table
-22. [ ] "Already tracked" badge appears for events with `event_state`
-23. [ ] Search/filter works in event picker
-24. [ ] Duplicate event creation is prevented
-25. [ ] Pool-specific settings render correctly per pool type
-26. [ ] Pool creation completes and links to selected event
+### Pool Creation Wizard Verification ✅
+19. [x] Wizard accessible from dashboard and org pages
+20. [x] Sport selection filters pool types correctly
+21. [x] Event picker shows upcoming events from `events` table
+22. [x] "Already tracked" badge appears for events with `event_state`
+23. [x] Search/filter works in event picker
+24. [x] Duplicate event creation is prevented
+25. [x] Pool-specific settings render correctly per pool type
+26. [x] Pool creation completes and links to selected event
+
+### Phase 6: ESPN Auto-Scoring Verification (DEPRECATED - Tested Jan 25, 2025)
+27. [x] Score change mode: Every score change creates winner (verified with 10-7)
+28. [x] Score change mode: 0-0 recorded at game start (kickoff winner)
+29. [x] Score change mode: Reverse winners created when enabled
+30. [x] Score change mode: Final winner recorded on game final
+31. [x] Quarter mode: Q1 winner at period 1→2 transition (Finn + Victor reverse)
+32. [x] Quarter mode: Halftime winner at period 2→3 transition (Grace)
+33. [x] Quarter mode: Q3 winner at period 3→4 transition
+34. [x] Quarter mode: Final winner on game final
+35. [x] sq_games synced with current scores/period/status
+36. [x] UI shows real-time winners on pool page (pulsing "current winner" indicator)
+37. [x] UI fix: Final column shows "- - -" until game is final (not current score)
+38. [x] Edge function bugs fixed (payout field, duplicate check, kickoff+score)
+
+> **Note:** Phase 6 tested successfully but deprecated due to ESPN API reliability concerns. Replaced by Phase 7.
+
+### Phase 7: Admin-Controlled Scoring Verification (NOT STARTED)
+39. [ ] Admin event list page at `/admin/events`
+40. [ ] Admin can create new events (manual or ESPN metadata)
+41. [ ] Admin can edit event details
+42. [ ] Live scoring interface at `/admin/events/[id]/scoring`
+43. [ ] Quick score buttons (+1, +3, +6, +7) work correctly
+44. [ ] Direct score input for corrections
+45. [ ] Period buttons (End Q1, End Half, End Q3, Game Final)
+46. [ ] Score changes trigger winner calculation for all linked pools
+47. [ ] Quarter endings trigger quarter winners for linked pools
+48. [ ] Super Bowl test: Successfully score entire game via admin UI
 
 ---
 
@@ -804,38 +1095,51 @@ No feature is allowed to risk the live pool without a rollback path.
 
 ---
 
-## Next Steps (Choose Your Path)
+## Next Steps
 
-With Phases 1-3 complete, here are the recommended next steps:
+### Current Priority: Phase 7 Admin Scoring UI (Super Bowl Target)
 
-### Option A: Phase 4 - Shadow Comparison (Optional)
+**Goal:** Build admin-controlled scoring interface in time for Super Bowl (Feb 9, 2025).
 
-Add logging/alerting for production monitoring:
-- Log any discrepancies between global and legacy scores
-- Alert if mismatch rate exceeds threshold
-- This is **optional** since Phase 3 validation showed 0 mismatches
+**Timeline:** ~2 weeks to build and test
 
-### Option B: Phase 5 - Controlled Cutover
+**Implementation Order:**
+1. [ ] **Phase 7.1: Admin Event Management** - Create/list/edit events at `/admin/events`
+2. [ ] **Phase 7.2: Live Scoring Interface** - Score buttons + period controls at `/admin/events/[id]/scoring`
+3. [ ] **Phase 7.3: Scoring Logic Integration** - Port edge function logic to API route
+4. [ ] **Test with Super Bowl** - Real-world validation
 
-Switch pools to read from `event_state` directly:
-1. Create a test/demo pool
-2. Set `scoring_source = 'global'` on that pool
-3. Update UI components to read from `event_state` when `scoring_source = 'global'`
-4. Test thoroughly before rolling out to other pools
+**Super Bowl Plan:**
+- Create "Super Bowl LIX" event in admin UI
+- Link test pools to the event
+- Admin scores live during game using new UI
+- All linked pools auto-update
 
-**Files to modify:**
-- `frontend/src/components/squares/live-scoring-control.tsx` - Add conditional for scoring_source
-- `frontend/src/components/golf/leaderboard.tsx` - Read from event_state when enabled
+### Phase 6 Testing Results (AFC Championship - January 25, 2025)
 
-### Option C: Pool Creation Wizard (Can Run in Parallel)
+ESPN auto-polling tested during AFC Championship. The system worked but revealed reliability concerns:
 
-Build the new pool creation wizard that integrates with global events:
-1. Create wizard container page
-2. Build step components (sport → pool type → event → settings → review)
-3. Integrate with `/api/events/upcoming` for event discovery
-4. This can be developed in parallel with Phase 5
+**What Worked:**
+- [x] Both score_change and quarter mode pools linked to event
+- [x] 0-0 kickoff winner recorded when game started
+- [x] sq_games syncing scores/period/status from event_state
+- [x] UI showing "current winner" indicator with pulsing animation
+- [x] Score change mode verified (0-7, 7-7, 10-7 recorded correctly)
+- [x] Quarter mode Q1 + Halftime winners recorded
+- [x] Reverse winners working
 
-**Recommended order:** Start with the Pool Creation Wizard since it provides user-facing value while the current golf pool continues working with legacy sync.
+**Why Pivoting:**
+- ESPN API has no SLA, can be rate-limited or changed without notice
+- ToS may prohibit production use
+- Edge cases (TD+XP timing) required multiple bug fixes
+- No human oversight means errors require manual database fixes
+
+### Future Enhancements (Post-Super Bowl)
+
+1. **Pool Creation Integration** - Show global events in event picker, warn on duplicates
+2. **Notifications** - Alert commissioners when winners are recorded
+3. **NCAA/NBA Support** - Extend admin scoring to other sports
+4. **Payout Calculations** - Auto-calculate payouts based on pool settings
 
 ---
 
@@ -847,6 +1151,11 @@ Build the new pool creation wizard that integrates with global events:
 | `5cd05a0` | Add Phase 3 shadow mode legacy sync for golf tournaments |
 | `cf029a7` | Add Phase 5 controlled cutover for global events scoring |
 | `00da7f1` | Add auto-sync indicator to golf setup page |
+| `7b8304c` | Update pool_upgrade.md with Phase 5 completion details |
+| (completed) | Pool Creation Wizard implementation |
+| (completed) | Phase 6: Automatic Squares Scoring edge function deployed |
+| (completed) | Fix Final column showing during live games (single-game-content.tsx, public-realtime-games.tsx) |
+| (completed) | score-squares-pools v3: Fix payout field, duplicate check, kickoff+score logic |
 
 ---
 

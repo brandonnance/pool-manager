@@ -631,7 +631,8 @@ export default async function PoolDetailPage({ params }: PageProps) {
                       'outline'
                     }
                     className={
-                      pool.status === 'open' ? 'bg-green-600' :
+                      pool.status === 'open' && !(pool.type === 'playoff_squares' && sqPoolData?.numbers_locked) ? 'bg-green-600' :
+                      pool.status === 'open' && pool.type === 'playoff_squares' && sqPoolData?.numbers_locked ? 'bg-blue-600' :
                       pool.status === 'locked' ? 'bg-blue-600' :
                       pool.status === 'draft' ? 'border-amber-500 text-amber-600' :
                       ''
@@ -639,6 +640,7 @@ export default async function PoolDetailPage({ params }: PageProps) {
                   >
                     {pool.status === 'locked' ? 'In Progress' :
                      pool.status === 'completed' ? 'Completed' :
+                     pool.status === 'open' && pool.type === 'playoff_squares' && sqPoolData?.numbers_locked ? 'Numbers Locked' :
                      pool.status === 'open' ? 'Accepting Entries' :
                      pool.status === 'draft' ? 'Draft' :
                      pool.status}

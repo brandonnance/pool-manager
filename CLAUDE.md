@@ -44,6 +44,8 @@ A multi-tenant bowl pool management application built with Next.js 16 and Supaba
 - [x] Forgot password flow (`/forgot-password`)
 - [x] Account settings page (`/settings`)
 - [x] User dropdown menu in header
+- [x] Admin event management (`/admin/events`) - Create/edit global events
+- [x] Admin live scoring interface (`/admin/events/[id]/scoring`) - Manual score input for football pools
 
 ### MVP Complete!
 
@@ -132,6 +134,11 @@ pool-manager/
 | `frontend/src/app/(auth)/reset-password/page.tsx` | Reset password page |
 | `frontend/src/app/(dashboard)/settings/page.tsx` | Account settings page |
 | `frontend/src/components/auth/user-dropdown.tsx` | Header user dropdown |
+| `frontend/src/app/(dashboard)/admin/events/page.tsx` | Admin event management list |
+| `frontend/src/app/(dashboard)/admin/events/[id]/scoring/page.tsx` | Live scoring interface |
+| `frontend/src/components/admin/live-scoring-control.tsx` | Score buttons, period controls |
+| `frontend/src/app/api/admin/scoring/route.ts` | Admin scoring API (uses service role) |
+| `frontend/src/lib/supabase/admin.ts` | Service role Supabase client |
 
 ## Role & Permissions System
 
@@ -200,6 +207,19 @@ When teams are changed on games:
    - Pick accuracy percentages
    - Historical pool results
 
+## Environment Variables
+
+Required environment variables in `frontend/.env.local`:
+
+| Variable | Description |
+|----------|-------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous key (client-side safe) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server-side only, bypasses RLS). Required for admin scoring feature. |
+| `RAPIDAPI_KEY` | RapidAPI key for golf data (Slash Golf API) |
+
+**Security Note**: The `SUPABASE_SERVICE_ROLE_KEY` grants full database access and should NEVER be exposed to the client. It's used only in server-side API routes like `/api/admin/scoring`.
+
 ## Running the Project
 
 ```bash
@@ -238,3 +258,5 @@ The MCP server is configured in `.mcp.json`. Use these tools:
 - Self-service org creation: Any authenticated user can create organizations via dashboard or onboarding wizard
 - Org roles: `admin` (full control) or `member` (read-only) - note: renamed from previous "commissioner" terminology
 - Pool roles: `commissioner` (manage pool) or `member` (participate only) - stored in `pool_memberships.role`
+- Admin-controlled scoring for football/squares: Super admins score via `/admin/events/[id]/scoring`, updates all linked pools automatically
+- Golf pools use automated scoring via paid API (RapidAPI/Slash Golf) - see `supabase/functions/poll-event`

@@ -11,7 +11,6 @@
 
 import { createServiceClient } from '../_shared/supabase-client.ts'
 import { eventNeedsPolling, LEASE_DURATION_SECONDS, type Event } from '../_shared/types.ts'
-import { syncGolfToLegacy } from '../_shared/legacy-sync.ts'
 
 // Generate a unique worker ID for this invocation
 const WORKER_ID = `worker-${crypto.randomUUID().slice(0, 8)}`
@@ -159,114 +158,43 @@ Deno.serve(async (req) => {
 })
 
 /**
- * Polls a single event and updates its state
+ * Polls a single event by calling the poll-event edge function.
+ * This ensures all polling logic (including squares scoring) is centralized.
  */
 async function pollEvent(event: Event): Promise<{ success: boolean; error?: string }> {
-  const supabase = createServiceClient()
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    return { success: false, error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY' }
+  }
 
   try {
-    if (event.event_type === 'team_game') {
-      // Import ESPN provider dynamically to avoid loading if not needed
-      const { fetchESPNGame, toTeamGamePayload } = await import('../_shared/providers/espn.ts')
+    const response = await fetch(`${supabaseUrl}/functions/v1/poll-event`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${serviceRoleKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ event }),
+    })
 
-      const gameData = await fetchESPNGame(event.sport, event.provider_event_id)
-
-      if (!gameData) {
-        return { success: false, error: 'Game not found in ESPN data' }
-      }
-
-      const payload = toTeamGamePayload(gameData)
-
-      // Upsert event_state
-      const { error: stateError } = await supabase
-        .from('event_state')
-        .upsert({
-          event_id: event.id,
-          status: gameData.status,
-          payload,
-          last_provider_update_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-
-      if (stateError) {
-        return { success: false, error: stateError.message }
-      }
-
-      // Update event status if changed
-      if (event.status !== gameData.status) {
-        await supabase
-          .from('events')
-          .update({ status: gameData.status, updated_at: new Date().toISOString() })
-          .eq('id', event.id)
-      }
-
-      console.log(`[poll-event] Updated event ${event.id}: ${gameData.homeTeam} ${gameData.homeScore} - ${gameData.awayScore} ${gameData.awayTeam}`)
-      return { success: true }
-
-    } else if (event.event_type === 'golf_tournament') {
-      const { fetchGolfTournamentState } = await import('../_shared/providers/slashgolf.ts')
-
-      const rapidApiKey = Deno.env.get('RAPIDAPI_KEY')
-      if (!rapidApiKey) {
-        return { success: false, error: 'RAPIDAPI_KEY not configured' }
-      }
-
-      // Extract year from event start_time or use current year
-      const year = event.start_time
-        ? new Date(event.start_time).getFullYear()
-        : new Date().getFullYear()
-
-      const { payload, status } = await fetchGolfTournamentState(
-        rapidApiKey,
-        event.provider_event_id,
-        year
-      )
-
-      // Upsert event_state
-      const { error: stateError } = await supabase
-        .from('event_state')
-        .upsert({
-          event_id: event.id,
-          status,
-          payload,
-          last_provider_update_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-
-      if (stateError) {
-        return { success: false, error: stateError.message }
-      }
-
-      // Update event status if changed
-      if (event.status !== status) {
-        await supabase
-          .from('events')
-          .update({ status, updated_at: new Date().toISOString() })
-          .eq('id', event.id)
-      }
-
-      // Shadow mode: Sync to legacy tables for backward compatibility
-      const legacyResult = await syncGolfToLegacy(
-        supabase,
-        event.provider_event_id,
-        payload
-      )
-      if (legacyResult.synced > 0) {
-        console.log(`[poll-event] Synced ${legacyResult.synced} results to legacy tables`)
-      }
-      if (legacyResult.error) {
-        console.error('[poll-event] Legacy sync error:', legacyResult.error)
-      }
-
-      console.log(`[poll-event] Updated golf event ${event.id}: round ${payload.current_round}, ${payload.leaderboard.length} players`)
-      return { success: true }
-
-    } else {
-      return { success: false, error: `Unsupported event type: ${event.event_type}` }
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`[worker-tick] poll-event failed for ${event.id}: ${response.status} ${errorText}`)
+      return { success: false, error: `poll-event returned ${response.status}` }
     }
+
+    const result = await response.json()
+
+    if (result.winners_recorded > 0) {
+      console.log(`[worker-tick] Event ${event.id}: recorded ${result.winners_recorded} winners`)
+    }
+
+    return { success: result.success, error: result.error }
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error'
-    console.error(`[poll-event] Error polling event ${event.id}:`, errorMessage)
+    console.error(`[worker-tick] Error calling poll-event for ${event.id}:`, errorMessage)
     return { success: false, error: errorMessage }
   }
 }

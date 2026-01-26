@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { ChevronDown, Users, Settings } from 'lucide-react'
+import { ChevronDown, Users, Settings, Trophy } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,6 +17,12 @@ export function AdminDropdown() {
         <ChevronDown className="h-4 w-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-48">
+        <DropdownMenuItem asChild>
+          <Link href="/admin/events" className="cursor-pointer flex items-center">
+            <Trophy className="mr-2 h-4 w-4" />
+            Events
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href="/admin/users" className="cursor-pointer flex items-center">
             <Users className="mr-2 h-4 w-4" />

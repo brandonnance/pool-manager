@@ -1716,6 +1716,7 @@ export type Database = {
           home_score: number | null
           home_team: string
           id: string
+          last_scored_period: number | null
           normal_payout: number | null
           pays_halftime: boolean | null
           q1_away_score: number | null
@@ -1744,6 +1745,7 @@ export type Database = {
           home_score?: number | null
           home_team: string
           id?: string
+          last_scored_period?: number | null
           normal_payout?: number | null
           pays_halftime?: boolean | null
           q1_away_score?: number | null
@@ -1772,6 +1774,7 @@ export type Database = {
           home_score?: number | null
           home_team?: string
           id?: string
+          last_scored_period?: number | null
           normal_payout?: number | null
           pays_halftime?: boolean | null
           q1_away_score?: number | null
@@ -2059,6 +2062,22 @@ export type Database = {
       }
       get_enabled_pool_types: { Args: never; Returns: Json }
       get_game_winner: { Args: { p_game_id: string }; Returns: string }
+      get_upcoming_events: {
+        Args: { p_event_type?: string; p_limit?: number; p_sport?: string }
+        Returns: {
+          created_at: string
+          event_type: string
+          id: string
+          metadata: Json
+          name: string
+          provider: string
+          provider_event_id: string
+          sport: string
+          start_time: string
+          status: string
+          updated_at: string
+        }[]
+      }
       is_bowl_pick_locked: {
         Args: { p_pool_game_id: string }
         Returns: boolean
