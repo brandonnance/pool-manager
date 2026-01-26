@@ -76,11 +76,11 @@ export async function POST(request: NextRequest) {
 
     // Get tier assignments for picked golfers
     const golferIds = picks?.map(p => p.golfer_id) || []
-    const { data: tierAssignments } = golferIds.length > 0
+    const { data: tierAssignments } = golferIds.length > 0 && gpPool?.id
       ? await supabase
           .from('gp_tier_assignments')
           .select('golfer_id, tier_value')
-          .eq('pool_id', gpPool?.id)
+          .eq('pool_id', gpPool.id)
           .in('golfer_id', golferIds)
       : { data: [] }
 
