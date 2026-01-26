@@ -84,6 +84,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Must be commissioner' }, { status: 403 })
     }
 
+    // Check if entries exist - if so, block tier changes
+    const { count: entryCount } = await supabase
+      .from('gp_entries')
+      .select('*', { count: 'exact', head: true })
+      .eq('pool_id', poolId)
+
+    if ((entryCount ?? 0) > 0) {
+      return NextResponse.json(
+        { error: 'Cannot modify tiers: entries already exist for this pool' },
+        { status: 400 }
+      )
+    }
+
     // Get golf pool config
     const { data: gpPool } = await supabase
       .from('gp_pools')

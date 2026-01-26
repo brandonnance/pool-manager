@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
   const resend = new Resend(process.env.RESEND_API_KEY)
 
   try {
-    const { entryId, poolId, email, participantName } = await request.json()
+    const { entryId, poolId, email, participantName, editToken, editTokenExpiresAt } = await request.json()
 
     if (!entryId || !poolId || !email) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })

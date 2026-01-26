@@ -1,27 +1,22 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { createClient } from '@supabase/supabase-js'
-import type { Database } from '@/types/database'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
-import { Check, Clock, MapPin, Trophy, AlertCircle, Loader2, CheckCircle2, RotateCcw, Globe, Award } from 'lucide-react'
+import { Check, Clock, MapPin, Trophy, AlertCircle, Loader2, CheckCircle2, Lock, Award } from 'lucide-react'
+import Link from 'next/link'
 import { cn } from '@/lib/utils'
 
 // Tier color configurations
-// Tier 0 = Elite (commissioner-assigned for players on hot streaks)
-// Tiers 1-6 = OWGR-based automatic assignment
 const TIER_STYLES: Record<number, { bg: string; border: string; badge: string; label: string; desc: string }> = {
   0: {
     bg: 'bg-amber-100',
     border: 'border-amber-400',
     badge: 'bg-amber-500 text-white border-amber-500',
-    label: '⭐ ELITE',
+    label: 'Elite',
     desc: 'Hot Streak',
   },
   1: {
@@ -115,12 +110,6 @@ function getCountryFlag(country: string | null): string {
   return countryFlags[country] || '🌍'
 }
 
-// Email validation regex
-function isValidEmail(email: string): boolean {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  return emailRegex.test(email)
-}
-
 interface Golfer {
   id: string
   name: string
@@ -130,7 +119,7 @@ interface Golfer {
   tier_value: number
 }
 
-interface GolfPublicEntryFormProps {
+interface GolfPublicEditFormProps {
   poolName: string
   tournamentName: string
   tournamentVenue: string | null
@@ -139,13 +128,16 @@ interface GolfPublicEntryFormProps {
   poolId: string
   minTierPoints: number
   golfersByTier: Record<number, Golfer[]>
-}
-
-function createAnonClient() {
-  return createClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  entryId: string
+  entryName: string
+  participantName: string
+  participantEmail: string
+  currentPicks: Set<string>
+  golferMap: Map<string, Golfer>
+  editToken: string
+  isLocked: boolean
+  lockReason: 'locked' | 'expired' | null
+  slug: string
 }
 
 function formatCountdown(ms: number): string {
@@ -165,7 +157,7 @@ function formatCountdown(ms: number): string {
   return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
 }
 
-export function GolfPublicEntryForm({
+export function GolfPublicEditForm({
   poolName,
   tournamentName,
   tournamentVenue,
@@ -174,18 +166,33 @@ export function GolfPublicEntryForm({
   poolId,
   minTierPoints,
   golfersByTier,
-}: GolfPublicEntryFormProps) {
-  const [participantName, setParticipantName] = useState('')
-  const [participantEmail, setParticipantEmail] = useState('')
-  const [entryName, setEntryName] = useState('')
-  const [honeypot, setHoneypot] = useState('') // Bot detection
-  const [selectedGolfers, setSelectedGolfers] = useState<Map<string, Golfer>>(new Map())
+  entryId,
+  entryName,
+  participantName,
+  participantEmail,
+  currentPicks,
+  golferMap,
+  editToken,
+  isLocked: initialIsLocked,
+  lockReason,
+  slug,
+}: GolfPublicEditFormProps) {
+  // Initialize selected golfers from current picks
+  const [selectedGolfers, setSelectedGolfers] = useState<Map<string, Golfer>>(() => {
+    const map = new Map<string, Golfer>()
+    for (const golferId of currentPicks) {
+      const golfer = golferMap.get(golferId)
+      if (golfer) {
+        map.set(golferId, golfer)
+      }
+    }
+    return map
+  })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState(false)
-  const [submittedEntry, setSubmittedEntry] = useState<{ entryName: string; picks: string[] } | null>(null)
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null)
-  const [isLocked, setIsLocked] = useState(false)
+  const [isLocked, setIsLocked] = useState(initialIsLocked)
 
   // Calculate total tier points
   const totalTierPoints = Array.from(selectedGolfers.values()).reduce(
@@ -193,18 +200,19 @@ export function GolfPublicEntryForm({
     0
   )
 
-  // Check if email is valid (for UI feedback)
-  const emailValid = participantEmail.trim() === '' || isValidEmail(participantEmail.trim())
-
   // Check if form is valid
   const isFormValid =
-    participantName.trim() !== '' &&
-    participantEmail.trim() !== '' &&
-    isValidEmail(participantEmail.trim()) &&
-    entryName.trim() !== '' &&
     selectedGolfers.size === 6 &&
-    totalTierPoints >= minTierPoints &&
-    honeypot === '' // Bot check
+    totalTierPoints >= minTierPoints
+
+  // Check if picks have changed
+  const hasChanges = (() => {
+    if (selectedGolfers.size !== currentPicks.size) return true
+    for (const golferId of selectedGolfers.keys()) {
+      if (!currentPicks.has(golferId)) return true
+    }
+    return false
+  })()
 
   // Countdown timer
   useEffect(() => {
@@ -230,6 +238,8 @@ export function GolfPublicEntryForm({
   }, [lockTime])
 
   const handleGolferSelect = useCallback((golfer: Golfer) => {
+    if (isLocked) return
+
     setSelectedGolfers((prev) => {
       const newMap = new Map(prev)
       if (newMap.has(golfer.id)) {
@@ -239,106 +249,43 @@ export function GolfPublicEntryForm({
       }
       return newMap
     })
-  }, [])
+  }, [isLocked])
 
   const handleSubmit = async () => {
-    if (!isFormValid || isLocked) return
-
-    // Double-check honeypot (bot detection)
-    if (honeypot !== '') {
-      setError('Submission rejected')
-      return
-    }
+    if (!isFormValid || isLocked || !hasChanges) return
 
     setSubmitting(true)
     setError(null)
 
-    const supabase = createAnonClient()
-
-    // Generate edit token for this entry
-    const editToken = crypto.randomUUID()
-    // Token expires at lock time, or 7 days from now if no lock time
-    const editTokenExpiresAt = lockTime
-      ? new Date(lockTime).toISOString()
-      : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-
-    // Server-side lock time validation happens via RLS policy
-    // Create entry
-    const { data: entry, error: entryError } = await supabase
-      .from('gp_entries')
-      .insert({
-        pool_id: poolId,
-        participant_name: participantName.trim(),
-        participant_email: participantEmail.trim(),
-        entry_name: entryName.trim(),
-        submitted_at: new Date().toISOString(),
-        verified: false,
-        edit_token: editToken,
-        edit_token_expires_at: editTokenExpiresAt,
+    try {
+      const response = await fetch('/api/golf/update-public-entry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entryId,
+          editToken,
+          golferIds: Array.from(selectedGolfers.keys()),
+        }),
       })
-      .select('id')
-      .single()
 
-    if (entryError) {
-      if (entryError.message.includes('lock') || entryError.code === '42501') {
-        setError('Entries are now locked. Contact the commissioner if there was a problem.')
-        setIsLocked(true)
-      } else {
-        setError(entryError.message || 'Failed to submit entry')
+      const data = await response.json()
+
+      if (!response.ok) {
+        if (response.status === 403) {
+          setError('Entry editing is locked. Contact the commissioner if you need to make changes.')
+          setIsLocked(true)
+        } else {
+          setError(data.error || 'Failed to update entry')
+        }
+        return
       }
+
+      setSubmitted(true)
+    } catch (err) {
+      setError('Failed to update entry. Please try again.')
+    } finally {
       setSubmitting(false)
-      return
     }
-
-    // Create picks
-    const picks = Array.from(selectedGolfers.values()).map((golfer) => ({
-      entry_id: entry.id,
-      golfer_id: golfer.id,
-    }))
-
-    const { error: picksError } = await supabase
-      .from('gp_entry_picks')
-      .insert(picks)
-
-    if (picksError) {
-      // Try to clean up the entry
-      await supabase.from('gp_entries').delete().eq('id', entry.id)
-      setError(picksError.message || 'Failed to save picks')
-      setSubmitting(false)
-      return
-    }
-
-    // Send confirmation email (fire and forget - don't block on this)
-    fetch('/api/golf/confirm-public-entry', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        entryId: entry.id,
-        poolId,
-        email: participantEmail.trim(),
-        participantName: participantName.trim(),
-        editToken,
-        editTokenExpiresAt,
-      }),
-    }).catch(err => console.error('Failed to send confirmation email:', err))
-
-    // Success
-    setSubmitted(true)
-    setSubmittedEntry({
-      entryName: entryName.trim(),
-      picks: Array.from(selectedGolfers.values()).map((g) => g.name),
-    })
-    setSubmitting(false)
-  }
-
-  const handleNewEntry = () => {
-    setSubmitted(false)
-    setSubmittedEntry(null)
-    setParticipantName('')
-    setParticipantEmail('')
-    setEntryName('')
-    setSelectedGolfers(new Map())
-    setError(null)
   }
 
   // Locked modal
@@ -348,16 +295,26 @@ export function GolfPublicEntryForm({
         <Card className="max-w-md w-full">
           <CardContent className="pt-8 pb-8 text-center space-y-4">
             <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto">
-              <AlertCircle className="h-8 w-8 text-amber-600" />
+              <Lock className="h-8 w-8 text-amber-600" />
             </div>
-            <h2 className="text-xl font-bold">Entries Are Locked</h2>
+            <h2 className="text-xl font-bold">
+              {lockReason === 'expired' ? 'Edit Link Expired' : 'Entry Editing Locked'}
+            </h2>
             <p className="text-muted-foreground">
-              The entry deadline has passed. Contact the commissioner if you need assistance.
+              {lockReason === 'expired'
+                ? 'This edit link has expired. Contact the commissioner if you need to make changes.'
+                : 'The entry deadline has passed. Contact the commissioner if you need to make changes.'}
             </p>
             <div className="pt-4">
               <p className="text-sm text-muted-foreground">{poolName}</p>
               <p className="font-medium">{tournamentName}</p>
             </div>
+            <Link
+              href={`/pools/golf/${slug}`}
+              className="inline-block mt-4 text-primary hover:underline"
+            >
+              View Leaderboard
+            </Link>
           </CardContent>
         </Card>
       </div>
@@ -365,7 +322,7 @@ export function GolfPublicEntryForm({
   }
 
   // Success view
-  if (submitted && submittedEntry) {
+  if (submitted) {
     return (
       <div className="min-h-screen bg-gray-50">
         <header className="bg-white border-b shadow-sm">
@@ -382,29 +339,34 @@ export function GolfPublicEntryForm({
                 <CheckCircle2 className="h-8 w-8 text-green-600" />
               </div>
               <div>
-                <h2 className="text-xl font-bold">Entry Submitted!</h2>
+                <h2 className="text-xl font-bold">Entry Updated!</h2>
                 <p className="text-muted-foreground mt-1">
-                  Your entry &quot;{submittedEntry.entryName}&quot; has been recorded.
-                  <br />
-                  <span className="text-sm">A confirmation email has been sent to you.</span>
+                  Your entry &quot;{entryName}&quot; has been updated.
                 </p>
               </div>
 
               <div className="bg-muted rounded-lg p-4 text-left">
-                <p className="font-medium mb-2">Your Picks:</p>
+                <p className="font-medium mb-2">Your Updated Picks:</p>
                 <ul className="space-y-1">
-                  {submittedEntry.picks.map((name, i) => (
-                    <li key={i} className="text-sm text-muted-foreground">
-                      {i + 1}. {name}
-                    </li>
-                  ))}
+                  {Array.from(selectedGolfers.values())
+                    .sort((a, b) => a.tier_value - b.tier_value)
+                    .map((golfer, i) => (
+                      <li key={i} className="text-sm text-muted-foreground">
+                        <span className="inline-block w-8 text-xs font-medium text-gray-500">
+                          T{golfer.tier_value}
+                        </span>
+                        {golfer.name}
+                      </li>
+                    ))}
                 </ul>
               </div>
 
-              <Button onClick={handleNewEntry} className="gap-2">
-                <RotateCcw className="h-4 w-4" />
-                Make Another Entry
-              </Button>
+              <Link
+                href={`/pools/golf/${slug}`}
+                className="inline-flex items-center justify-center rounded-md bg-primary text-white px-6 py-3 font-medium hover:bg-primary/90"
+              >
+                View Leaderboard
+              </Link>
             </CardContent>
           </Card>
         </main>
@@ -412,7 +374,7 @@ export function GolfPublicEntryForm({
     )
   }
 
-  // Entry form
+  // Edit form
   const tiers = Object.keys(golfersByTier)
     .map(Number)
     .sort((a, b) => a - b)
@@ -430,7 +392,7 @@ export function GolfPublicEntryForm({
                 <span>{tournamentName}</span>
                 {tournamentVenue && (
                   <>
-                    <span className="text-muted-foreground/50">•</span>
+                    <span className="text-muted-foreground/50">|</span>
                     <MapPin className="h-3.5 w-3.5" />
                     <span>{tournamentVenue}</span>
                   </>
@@ -439,7 +401,7 @@ export function GolfPublicEntryForm({
             </div>
             {lockTime && timeRemaining !== null && (
               <div className="text-right">
-                <div className="text-xs text-muted-foreground">Entries lock in</div>
+                <div className="text-xs text-muted-foreground">Edit until</div>
                 <div className={cn(
                   'font-mono font-bold text-lg',
                   timeRemaining < 60 * 60 * 1000 && 'text-amber-600',
@@ -455,61 +417,19 @@ export function GolfPublicEntryForm({
       </header>
 
       <main className="max-w-4xl mx-auto p-4 pb-32 space-y-6">
-        {/* Entry Info Form */}
-        <Card>
-          <CardHeader className="pb-4">
-            <CardTitle className="text-lg">Your Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Name *</Label>
-                <Input
-                  id="name"
-                  placeholder="Your name"
-                  value={participantName}
-                  onChange={(e) => setParticipantName(e.target.value)}
-                />
+        {/* Entry Info */}
+        <Card className="bg-blue-50 border-blue-200">
+          <CardContent className="py-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                <Check className="h-5 w-5 text-blue-600" />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="your@email.com"
-                  value={participantEmail}
-                  onChange={(e) => setParticipantEmail(e.target.value)}
-                  className={cn(
-                    !emailValid && 'border-red-500 focus-visible:ring-red-500'
-                  )}
-                />
-                {!emailValid && (
-                  <p className="text-xs text-red-500">Please enter a valid email address</p>
-                )}
+              <div>
+                <p className="font-medium">Editing: {entryName}</p>
+                <p className="text-sm text-muted-foreground">
+                  Submitted by {participantName} ({participantEmail})
+                </p>
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="entryName">Entry Name *</Label>
-              <Input
-                id="entryName"
-                placeholder="Give your entry a fun name"
-                value={entryName}
-                onChange={(e) => setEntryName(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                This will be shown on the leaderboard
-              </p>
-            </div>
-            {/* Honeypot field - hidden from humans, visible to bots */}
-            <div className="absolute -left-[9999px]" aria-hidden="true">
-              <Label htmlFor="website">Website</Label>
-              <Input
-                id="website"
-                tabIndex={-1}
-                autoComplete="off"
-                value={honeypot}
-                onChange={(e) => setHoneypot(e.target.value)}
-              />
             </div>
           </CardContent>
         </Card>
@@ -517,9 +437,9 @@ export function GolfPublicEntryForm({
         {/* Pick Sheet */}
         <Card>
           <CardHeader className="pb-4">
-            <CardTitle className="text-lg">Select Your 6 Golfers</CardTitle>
+            <CardTitle className="text-lg">Edit Your 6 Golfers</CardTitle>
             <CardDescription>
-              Pick 6 golfers with a total of at least {minTierPoints} tier points.
+              Select 6 golfers with a total of at least {minTierPoints} tier points.
               Click a golfer to select/deselect.
             </CardDescription>
           </CardHeader>
@@ -542,7 +462,7 @@ export function GolfPublicEntryForm({
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-sm">{tierStyle.label}</span>
                       <span className="text-xs text-muted-foreground">
-                        • {tierStyle.desc} • {tier} pt{tier !== 1 && tier !== 0 ? 's' : ''}
+                        | {tierStyle.desc} | {tier} pt{tier !== 1 && tier !== 0 ? 's' : ''}
                       </span>
                     </div>
                     <span className="ml-auto text-xs text-muted-foreground">
@@ -681,16 +601,18 @@ export function GolfPublicEntryForm({
             <Button
               size="lg"
               onClick={handleSubmit}
-              disabled={!isFormValid || submitting}
+              disabled={!isFormValid || submitting || !hasChanges}
               className="shrink-0"
             >
               {submitting ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Submitting...
+                  Saving...
                 </>
+              ) : !hasChanges ? (
+                'No Changes'
               ) : (
-                'Submit Entry'
+                'Save Changes'
               )}
             </Button>
           </div>

@@ -559,6 +559,8 @@ export type Database = {
         Row: {
           created_at: string | null
           created_by: string | null
+          edit_token: string | null
+          edit_token_expires_at: string | null
           entry_name: string | null
           entry_number: number | null
           id: string
@@ -572,6 +574,8 @@ export type Database = {
         Insert: {
           created_at?: string | null
           created_by?: string | null
+          edit_token?: string | null
+          edit_token_expires_at?: string | null
           entry_name?: string | null
           entry_number?: number | null
           id?: string
@@ -585,6 +589,8 @@ export type Database = {
         Update: {
           created_at?: string | null
           created_by?: string | null
+          edit_token?: string | null
+          edit_token_expires_at?: string | null
           entry_name?: string | null
           entry_number?: number | null
           id?: string

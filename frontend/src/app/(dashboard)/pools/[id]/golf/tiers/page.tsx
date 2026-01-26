@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { ArrowLeft, Loader2, Search, Save, Users, Wand2, Crown } from 'lucide-react'
+import { ArrowLeft, Loader2, Search, Save, Users, Wand2, Crown, Lock } from 'lucide-react'
 import Link from 'next/link'
 import { getTierColor, getTierLabel, TIER_INFO } from '@/lib/golf/types'
 import { cn } from '@/lib/utils'
@@ -41,6 +41,8 @@ export default function TierEditorPage() {
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [hasChanges, setHasChanges] = useState(false)
+  const [hasEntries, setHasEntries] = useState(false)
+  const [entryCount, setEntryCount] = useState(0)
 
   useEffect(() => {
     loadData()
@@ -107,6 +109,16 @@ export default function TierEditorPage() {
     }
 
     setGpPoolId(gpPool.id)
+
+    // Check if any entries exist for this pool
+    const { count: existingEntryCount } = await supabase
+      .from('gp_entries')
+      .select('*', { count: 'exact', head: true })
+      .eq('pool_id', poolId)
+
+    const entriesExist = (existingEntryCount ?? 0) > 0
+    setHasEntries(entriesExist)
+    setEntryCount(existingEntryCount ?? 0)
 
     if (!gpPool.tournament_id) {
       setError('No tournament linked. Set up the tournament first.')
@@ -293,12 +305,12 @@ export default function TierEditorPage() {
           <p className="text-muted-foreground">Assign golfers to tiers 1-6 (lower tier = better player = fewer points)</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleAutoAssign} disabled={autoAssigning || saving}>
+          <Button variant="outline" onClick={handleAutoAssign} disabled={autoAssigning || saving || hasEntries}>
             {autoAssigning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             <Wand2 className="mr-2 h-4 w-4" />
             Auto-Assign (OWGR)
           </Button>
-          <Button onClick={handleSave} disabled={saving || !hasChanges}>
+          <Button onClick={handleSave} disabled={saving || !hasChanges || hasEntries}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             <Save className="mr-2 h-4 w-4" />
             Save Changes
@@ -315,6 +327,20 @@ export default function TierEditorPage() {
       {successMessage && (
         <div className="bg-green-50 text-green-800 border border-green-200 px-4 py-3 rounded-md">
           {successMessage}
+        </div>
+      )}
+
+      {/* Tier Lock Warning */}
+      {hasEntries && (
+        <div className="bg-amber-50 border border-amber-200 px-4 py-3 rounded-md flex items-start gap-3">
+          <Lock className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-amber-800 font-medium">Tier assignments are locked</p>
+            <p className="text-amber-700 text-sm">
+              {entryCount} {entryCount === 1 ? 'entry has' : 'entries have'} been submitted for this pool.
+              Tier changes would affect existing entries and their point calculations.
+            </p>
+          </div>
         </div>
       )}
 
@@ -423,11 +449,13 @@ export default function TierEditorPage() {
                       <button
                         key={tier}
                         onClick={() => updateTier(golfer.id, tier)}
+                        disabled={hasEntries}
                         className={cn(
                           'w-8 h-8 rounded text-xs font-medium transition-colors',
                           currentTier === tier
                             ? cn(getTierColor(tier), 'text-white')
-                            : 'bg-muted hover:bg-muted/80 text-muted-foreground'
+                            : 'bg-muted hover:bg-muted/80 text-muted-foreground',
+                          hasEntries && 'opacity-50 cursor-not-allowed'
                         )}
                       >
                         {tier}
@@ -442,7 +470,7 @@ export default function TierEditorPage() {
       </Card>
 
       {/* Floating save button for mobile */}
-      {hasChanges && (
+      {hasChanges && !hasEntries && (
         <div className="fixed bottom-4 right-4 md:hidden">
           <Button onClick={handleSave} disabled={saving} size="lg">
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

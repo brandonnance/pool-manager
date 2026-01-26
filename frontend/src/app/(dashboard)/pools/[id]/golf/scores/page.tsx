@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, Loader2, RefreshCw, Search, Save, X, Check, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Loader2, RefreshCw, Search, Save, X, Check, AlertCircle, UserX } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import {
@@ -33,6 +33,7 @@ interface GolferResult {
   to_par: number | null
   thru: number | null
   made_cut: boolean | null
+  status: string | null // 'withdrawn' | null
 }
 
 interface Tournament {
@@ -76,6 +77,15 @@ export default function GolfScoresPage() {
     made_cut: true,
   })
   const [saving, setSaving] = useState(false)
+
+  // Withdrawal dialog state
+  const [withdrawingGolfer, setWithdrawingGolfer] = useState<GolferResult | null>(null)
+  const [withdrawalProcessing, setWithdrawalProcessing] = useState(false)
+  const [withdrawalResult, setWithdrawalResult] = useState<{
+    success: boolean
+    message: string
+    replacements?: { entryName: string; participantName: string | null; replacement: string; tier: number }[]
+  } | null>(null)
 
   useEffect(() => {
     loadData()
@@ -191,6 +201,7 @@ export default function GolfScoresPage() {
       .from('gp_tournament_field')
       .select(`
         golfer_id,
+        status,
         gp_golfers!inner (
           id,
           name
@@ -233,6 +244,7 @@ export default function GolfScoresPage() {
         to_par: result?.to_par ?? null,
         thru: result?.thru ?? null,
         made_cut: result?.made_cut ?? null,
+        status: f.status ?? null,
       }
     })
 
@@ -364,6 +376,48 @@ export default function GolfScoresPage() {
     setEditingGolfer(null)
     setSaving(false)
     await loadData()
+  }
+
+  async function handleWithdrawal() {
+    if (!withdrawingGolfer) return
+
+    setWithdrawalProcessing(true)
+    setWithdrawalResult(null)
+
+    try {
+      const response = await fetch('/api/golf/process-withdrawal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          poolId,
+          golferId: withdrawingGolfer.golfer_id,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setWithdrawalResult({
+          success: false,
+          message: data.error || 'Failed to process withdrawal',
+        })
+      } else {
+        setWithdrawalResult({
+          success: true,
+          message: data.message,
+          replacements: data.replacements,
+        })
+        // Reload data after successful withdrawal
+        await loadData()
+      }
+    } catch (err) {
+      setWithdrawalResult({
+        success: false,
+        message: 'Failed to process withdrawal',
+      })
+    }
+
+    setWithdrawalProcessing(false)
   }
 
   // Filter golfers by search query
@@ -501,13 +555,14 @@ export default function GolfScoresPage() {
                     <th className="text-center px-3 py-2 font-medium">Total</th>
                     <th className="text-center px-3 py-2 font-medium">To Par</th>
                     <th className="text-center px-3 py-2 font-medium">Cut</th>
+                    <th className="text-center px-3 py-2 font-medium">WD</th>
                     <th className="px-3 py-2"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {filteredGolfers.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="px-3 py-8 text-center text-muted-foreground">
+                      <td colSpan={11} className="px-3 py-8 text-center text-muted-foreground">
                         {searchQuery ? 'No golfers match your search' : 'No golfers in field'}
                       </td>
                     </tr>
@@ -517,14 +572,15 @@ export default function GolfScoresPage() {
                         key={golfer.golfer_id}
                         className={cn(
                           'hover:bg-muted/30 cursor-pointer',
-                          golfer.made_cut === false && 'bg-red-50/50'
+                          golfer.made_cut === false && 'bg-red-50/50',
+                          golfer.status === 'withdrawn' && 'bg-amber-50/50 opacity-60'
                         )}
                         onClick={() => openEditDialog(golfer)}
                       >
                         <td className="px-3 py-2 font-medium">
-                          {golfer.position || '-'}
+                          {golfer.status === 'withdrawn' ? 'WD' : (golfer.position || '-')}
                         </td>
-                        <td className="px-3 py-2">
+                        <td className={cn('px-3 py-2', golfer.status === 'withdrawn' && 'line-through')}>
                           {golfer.golfer_name}
                         </td>
                         <td className="px-3 py-2 text-center">
@@ -558,6 +614,24 @@ export default function GolfScoresPage() {
                             <Check className="h-4 w-4 text-green-600 mx-auto" />
                           ) : (
                             '-'
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          {golfer.status === 'withdrawn' ? (
+                            <span className="text-amber-600 text-xs font-medium">WD</span>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-xs text-muted-foreground hover:text-amber-600"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setWithdrawingGolfer(golfer)
+                                setWithdrawalResult(null)
+                              }}
+                            >
+                              <UserX className="h-3 w-3" />
+                            </Button>
                           )}
                         </td>
                         <td className="px-3 py-2">
@@ -684,6 +758,107 @@ export default function GolfScoresPage() {
               <Save className="mr-2 h-4 w-4" />
               Save
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Withdrawal Dialog */}
+      <Dialog open={!!withdrawingGolfer} onOpenChange={(open) => {
+        if (!open) {
+          setWithdrawingGolfer(null)
+          setWithdrawalResult(null)
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserX className="h-5 w-5 text-amber-600" />
+              Mark as Withdrawn
+            </DialogTitle>
+            <DialogDescription>
+              {withdrawingGolfer?.golfer_name} will be marked as withdrawn from the tournament.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {withdrawalResult ? (
+              <div className={cn(
+                'px-4 py-3 rounded-md',
+                withdrawalResult.success
+                  ? 'bg-green-50 border border-green-200'
+                  : 'bg-red-50 border border-red-200'
+              )}>
+                <p className={cn(
+                  'font-medium mb-2',
+                  withdrawalResult.success ? 'text-green-800' : 'text-red-800'
+                )}>
+                  {withdrawalResult.success ? 'Withdrawal Processed' : 'Error'}
+                </p>
+                <p className={cn(
+                  'text-sm',
+                  withdrawalResult.success ? 'text-green-700' : 'text-red-700'
+                )}>
+                  {withdrawalResult.message}
+                </p>
+
+                {withdrawalResult.replacements && withdrawalResult.replacements.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-sm font-medium text-green-800">Replacements Made:</p>
+                    <ul className="text-sm text-green-700 space-y-1">
+                      {withdrawalResult.replacements.map((r, i) => (
+                        <li key={i} className="flex items-center gap-2">
+                          <span className="font-medium">{r.entryName}</span>
+                          <span className="text-green-600">→</span>
+                          <span>{r.replacement} (T{r.tier})</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="text-xs text-green-600 mt-2">
+                      Notification emails have been sent to affected participants.
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="bg-amber-50 border border-amber-200 px-4 py-3 rounded-md">
+                <p className="text-amber-800 text-sm">
+                  <strong>This will:</strong>
+                </p>
+                <ul className="text-amber-700 text-sm mt-2 space-y-1 list-disc list-inside">
+                  <li>Mark {withdrawingGolfer?.golfer_name} as withdrawn</li>
+                  <li>Find all entries that have this golfer picked</li>
+                  <li>Auto-replace with the best available golfer in the same tier (by OWGR)</li>
+                  <li>Send notification emails to affected participants</li>
+                </ul>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            {withdrawalResult ? (
+              <Button onClick={() => {
+                setWithdrawingGolfer(null)
+                setWithdrawalResult(null)
+              }}>
+                Close
+              </Button>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => setWithdrawingGolfer(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleWithdrawal}
+                  disabled={withdrawalProcessing}
+                  className="bg-amber-600 hover:bg-amber-700"
+                >
+                  {withdrawalProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  <UserX className="mr-2 h-4 w-4" />
+                  Process Withdrawal
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
