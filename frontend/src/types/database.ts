@@ -1691,6 +1691,7 @@ export type Database = {
           created_at: string | null
           home_score: number
           id: string
+          quarter_marker: string[] | null
           sq_game_id: string | null
         }
         Insert: {
@@ -1699,6 +1700,7 @@ export type Database = {
           created_at?: string | null
           home_score: number
           id?: string
+          quarter_marker?: string[] | null
           sq_game_id?: string | null
         }
         Update: {
@@ -1707,6 +1709,7 @@ export type Database = {
           created_at?: string | null
           home_score?: number
           id?: string
+          quarter_marker?: string[] | null
           sq_game_id?: string | null
         }
         Relationships: [
@@ -1862,6 +1865,10 @@ export type Database = {
         Returns: string
       }
       request_join_pool: { Args: { p_token: string }; Returns: Json }
+      update_quarter_marker: {
+        Args: { p_quarters: string[]; p_score_change_id: string }
+        Returns: undefined
+      }
       user_org_ids: { Args: never; Returns: string[] }
       validate_join_link: { Args: { p_token: string }; Returns: Json }
     }

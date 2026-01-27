@@ -87,7 +87,7 @@ describe('SquareCell', () => {
       )
     })
 
-    it('applies green styling for verified squares in commissioner view', () => {
+    it('applies neutral styling for verified squares in commissioner view', () => {
       render(
         <SquareCell
           {...defaultProps}
@@ -98,7 +98,9 @@ describe('SquareCell', () => {
       )
 
       const button = screen.getByRole('button')
-      expect(button.className).toContain('green')
+      // Verified squares use white background with gray border
+      expect(button.className).toContain('bg-white')
+      expect(button.className).toContain('border-gray')
     })
 
     it('applies red styling for unverified squares in commissioner view', () => {
@@ -218,6 +220,19 @@ describe('SquareCell', () => {
       'score_change_final',
       'score_change_final_reverse',
       'score_change_final_both',
+      // Hybrid mode winning rounds
+      'hybrid_q1',
+      'hybrid_q1_reverse',
+      'hybrid_q1_both',
+      'hybrid_halftime',
+      'hybrid_halftime_reverse',
+      'hybrid_halftime_both',
+      'hybrid_q3',
+      'hybrid_q3_reverse',
+      'hybrid_q3_both',
+      'hybrid_final',
+      'hybrid_final_reverse',
+      'hybrid_final_both',
     ]
 
     it.each(winningRounds)('renders winning square for %s round', (round) => {
@@ -238,6 +253,71 @@ describe('SquareCell', () => {
           {...defaultProps}
           participantName="Winner"
           winningRound="score_change_both"
+        />
+      )
+
+      const button = screen.getByRole('button')
+      expect(button.className).toContain('gradient')
+    })
+
+    it('applies gradient for score_change_final_both', () => {
+      render(
+        <SquareCell
+          {...defaultProps}
+          participantName="Winner"
+          winningRound="score_change_final_both"
+        />
+      )
+
+      const button = screen.getByRole('button')
+      expect(button.className).toContain('gradient')
+    })
+
+    it('applies gradient for hybrid_q1_both', () => {
+      render(
+        <SquareCell
+          {...defaultProps}
+          participantName="Winner"
+          winningRound="hybrid_q1_both"
+        />
+      )
+
+      const button = screen.getByRole('button')
+      expect(button.className).toContain('gradient')
+    })
+
+    it('applies gradient for hybrid_halftime_both', () => {
+      render(
+        <SquareCell
+          {...defaultProps}
+          participantName="Winner"
+          winningRound="hybrid_halftime_both"
+        />
+      )
+
+      const button = screen.getByRole('button')
+      expect(button.className).toContain('gradient')
+    })
+
+    it('applies gradient for hybrid_q3_both', () => {
+      render(
+        <SquareCell
+          {...defaultProps}
+          participantName="Winner"
+          winningRound="hybrid_q3_both"
+        />
+      )
+
+      const button = screen.getByRole('button')
+      expect(button.className).toContain('gradient')
+    })
+
+    it('applies gradient for hybrid_final_both', () => {
+      render(
+        <SquareCell
+          {...defaultProps}
+          participantName="Winner"
+          winningRound="hybrid_final_both"
         />
       )
 

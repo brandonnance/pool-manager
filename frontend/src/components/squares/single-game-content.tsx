@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/types/database'
@@ -25,6 +25,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Trash2 } from 'lucide-react'
 import type { WinningRound } from './square-cell'
 
 interface SqGame {
@@ -62,6 +73,7 @@ interface ScoreChange {
   away_score: number
   change_order: number
   sq_game_id: string | null
+  quarter_marker?: string[] | null
 }
 
 interface NoAccountSingleGameContentProps {
@@ -119,7 +131,7 @@ function SimpleGameScoreCard({
       currentPeriod = 'End Q1'
     }
   } else {
-    // Score change mode uses game.home_score/away_score directly
+    // Score change and hybrid modes use game.home_score/away_score directly
     displayHomeScore = game.home_score
     displayAwayScore = game.away_score
   }
@@ -197,6 +209,11 @@ function NoAccountScoreEntry({
   rowNumbers,
   colNumbers,
   scoreChanges,
+  onWinnersCreated,
+  onWinnersReplaced,
+  onGameScoreUpdated,
+  onScoreChangeCreated,
+  onScoreChangeUpdated,
 }: {
   game: SqGame
   sqPoolId: string
@@ -206,11 +223,34 @@ function NoAccountScoreEntry({
   rowNumbers: number[]
   colNumbers: number[]
   scoreChanges: ScoreChange[]
+  onWinnersCreated: (winners: SqWinner[]) => void
+  onWinnersReplaced: (payout: number, winners: SqWinner[]) => void
+  onGameScoreUpdated: (homeScore: number, awayScore: number, status?: string) => void
+  onScoreChangeCreated: (scoreChange: ScoreChange) => void
+  onScoreChangeUpdated: (scoreChange: ScoreChange) => void
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+
+  // Local state for score changes - initialized from props when dialog opens
+  const [localScoreChanges, setLocalScoreChanges] = useState<ScoreChange[]>(scoreChanges)
+
+  // Track if we have pending local changes that shouldn't be overwritten
+  const hasLocalChanges = useRef(false)
+
+  // Sync from props when they change (unless we have pending local changes while dialog is open)
+  useEffect(() => {
+    // Always sync when dialog is closed - props are the source of truth
+    if (!isOpen) {
+      setLocalScoreChanges(scoreChanges)
+      hasLocalChanges.current = false
+    } else if (!hasLocalChanges.current) {
+      // Dialog is open but no pending changes - safe to sync
+      setLocalScoreChanges(scoreChanges)
+    }
+  }, [isOpen, scoreChanges])
 
   // Score change mode state
   const [newScoreHome, setNewScoreHome] = useState('')
@@ -227,13 +267,24 @@ function NoAccountScoreEntry({
   const [finalAway, setFinalAway] = useState(game.away_score?.toString() ?? '')
   const [status, setStatus] = useState(game.status ?? 'scheduled')
 
-  const sortedScoreChanges = [...scoreChanges].sort((a, b) => a.change_order - b.change_order)
+  const isHybridMode = scoringMode === 'hybrid'
+  const isScoreChangeMode = scoringMode === 'score_change'
+
+  const sortedScoreChanges = [...localScoreChanges].sort((a, b) => a.change_order - b.change_order)
   const lastScoreChange = sortedScoreChanges[sortedScoreChanges.length - 1]
   const lastHomeScore = lastScoreChange?.home_score ?? 0
   const lastAwayScore = lastScoreChange?.away_score ?? 0
 
+  // Track which quarters are marked (for hybrid mode)
+  const quartersMarked = {
+    q1: localScoreChanges.some((sc) => sc.quarter_marker?.includes('q1')),
+    halftime: localScoreChanges.some((sc) => sc.quarter_marker?.includes('halftime')),
+    q3: localScoreChanges.some((sc) => sc.quarter_marker?.includes('q3')),
+    final: localScoreChanges.some((sc) => sc.quarter_marker?.includes('final')),
+  }
+
   const handleOpen = () => {
-    if (scoringMode === 'score_change') {
+    if (scoringMode === 'score_change' || scoringMode === 'hybrid') {
       setNewScoreHome(lastHomeScore.toString())
       setNewScoreAway(lastAwayScore.toString())
     } else {
@@ -324,7 +375,7 @@ function NoAccountScoreEntry({
     setError(null)
 
     const supabase = createClient()
-    const nextOrder = scoreChanges.length + 1
+    const nextOrder = localScoreChanges.length + 1
 
     // Insert score change
     const { error: insertError } = await supabase
@@ -342,6 +393,20 @@ function NoAccountScoreEntry({
       return
     }
 
+    // Immediately update local state
+    const newScoreChange: ScoreChange = {
+      id: crypto.randomUUID(),
+      sq_game_id: game.id,
+      home_score: homeScore,
+      away_score: awayScore,
+      change_order: nextOrder,
+      quarter_marker: null,
+    }
+    hasLocalChanges.current = true
+    setLocalScoreChanges((prev) => [...prev, newScoreChange])
+    // Notify parent for instant UI update outside the modal
+    onScoreChangeCreated(newScoreChange)
+
     // Update game
     await supabase
       .from('sq_games')
@@ -352,16 +417,28 @@ function NoAccountScoreEntry({
       })
       .eq('id', game.id)
 
-    // Create winners
+    // Notify parent of game score update for instant UI update
+    onGameScoreUpdated(homeScore, awayScore, 'in_progress')
+
+    // Create winners and track them locally
     const forwardWinnerName = getWinnerName(homeScore, awayScore, false)
     const homeDigit = homeScore % 10
     const awayDigit = awayScore % 10
     const forwardRowIndex = rowNumbers.findIndex((n) => n === homeDigit)
     const forwardColIndex = colNumbers.findIndex((n) => n === awayDigit)
     const forwardSquare = squares.find((s) => s.row_index === forwardRowIndex && s.col_index === forwardColIndex)
+    const newWinners: SqWinner[] = []
 
     if (forwardSquare?.id) {
       await supabase.from('sq_winners').insert({
+        sq_game_id: game.id,
+        square_id: forwardSquare.id,
+        win_type: 'score_change',
+        payout: nextOrder,
+        winner_name: forwardWinnerName,
+      })
+      newWinners.push({
+        id: crypto.randomUUID(),
         sq_game_id: game.id,
         square_id: forwardSquare.id,
         win_type: 'score_change',
@@ -384,13 +461,24 @@ function NoAccountScoreEntry({
           payout: nextOrder,
           winner_name: reverseWinnerName,
         })
+        newWinners.push({
+          id: crypto.randomUUID(),
+          sq_game_id: game.id,
+          square_id: reverseSquare.id,
+          win_type: 'score_change_reverse',
+          payout: nextOrder,
+          winner_name: reverseWinnerName,
+        })
       }
     }
+
+    // Notify parent of new winners for instant UI update
+    onWinnersCreated(newWinners)
 
     setNewScoreHome(homeScore.toString())
     setNewScoreAway(awayScore.toString())
     setIsLoading(false)
-    router.refresh()
+    // Don't router.refresh() here - local state already updated
   }
 
   const handleAddZeroZero = async () => {
@@ -405,20 +493,46 @@ function NoAccountScoreEntry({
       change_order: 1,
     })
 
+    // Immediately update local state
+    const newScoreChange: ScoreChange = {
+      id: crypto.randomUUID(),
+      sq_game_id: game.id,
+      home_score: 0,
+      away_score: 0,
+      change_order: 1,
+      quarter_marker: null,
+    }
+    hasLocalChanges.current = true
+    setLocalScoreChanges((prev) => [...prev, newScoreChange])
+    // Notify parent for instant UI update outside the modal
+    onScoreChangeCreated(newScoreChange)
+
     await supabase.from('sq_games').update({
       home_score: 0,
       away_score: 0,
       status: 'in_progress',
     }).eq('id', game.id)
 
-    // Create 0-0 winners
+    // Notify parent of game score update for instant UI update
+    onGameScoreUpdated(0, 0, 'in_progress')
+
+    // Create 0-0 winners and track them locally
     const winnerName = getWinnerName(0, 0, false)
     const zeroRowIndex = rowNumbers.findIndex((n) => n === 0)
     const zeroColIndex = colNumbers.findIndex((n) => n === 0)
     const forwardSquare = squares.find((s) => s.row_index === zeroRowIndex && s.col_index === zeroColIndex)
+    const newWinners: SqWinner[] = []
 
     if (forwardSquare?.id) {
       await supabase.from('sq_winners').insert({
+        sq_game_id: game.id,
+        square_id: forwardSquare.id,
+        win_type: 'score_change',
+        payout: 1,
+        winner_name: winnerName,
+      })
+      newWinners.push({
+        id: crypto.randomUUID(),
         sq_game_id: game.id,
         square_id: forwardSquare.id,
         win_type: 'score_change',
@@ -435,10 +549,25 @@ function NoAccountScoreEntry({
         payout: 1,
         winner_name: winnerName,
       })
+      newWinners.push({
+        id: crypto.randomUUID(),
+        sq_game_id: game.id,
+        square_id: forwardSquare.id,
+        win_type: 'score_change_reverse',
+        payout: 1,
+        winner_name: winnerName,
+      })
     }
 
+    // Notify parent of new winners for instant UI update
+    onWinnersCreated(newWinners)
+
+    // Pre-populate score inputs for next entry
+    setNewScoreHome('0')
+    setNewScoreAway('0')
+
     setIsLoading(false)
-    router.refresh()
+    // Don't router.refresh() here - local state already updated
   }
 
   const handleMarkFinal = async () => {
@@ -446,6 +575,11 @@ function NoAccountScoreEntry({
     const supabase = createClient()
 
     await supabase.from('sq_games').update({ status: 'final' }).eq('id', game.id)
+
+    // Notify parent of game status update
+    if (lastScoreChange) {
+      onGameScoreUpdated(lastScoreChange.home_score, lastScoreChange.away_score, 'final')
+    }
 
     if (lastScoreChange) {
       const homeScore = lastScoreChange.home_score
@@ -486,7 +620,135 @@ function NoAccountScoreEntry({
 
     setIsLoading(false)
     setIsOpen(false)
-    router.refresh()
+    // router.refresh() will be called by handleOpenChange when dialog closes
+  }
+
+  // Mark quarter winner (hybrid mode)
+  const handleMarkQuarter = async (quarter: 'q1' | 'halftime' | 'q3' | 'final') => {
+    if (!lastScoreChange) return
+
+    setIsLoading(true)
+    setError(null)
+    const supabase = createClient()
+
+    // Build new quarter_marker array by appending to existing (or creating new array)
+    // Ensure we always work with an array (handle legacy string data gracefully)
+    const rawMarkers = lastScoreChange.quarter_marker
+    const existingMarkers: string[] = Array.isArray(rawMarkers)
+      ? rawMarkers
+      : rawMarkers
+        ? [rawMarkers] // Convert legacy string to array
+        : []
+    const newMarkers: string[] = existingMarkers.includes(quarter)
+      ? existingMarkers // Already has this quarter
+      : [...existingMarkers, quarter]
+
+    // 1. Update last score_change with quarter_marker array using RPC
+    // (Direct update has issues with PostgreSQL array serialization)
+    const { error: markerError } = await supabase.rpc('update_quarter_marker', {
+      p_score_change_id: lastScoreChange.id,
+      p_quarters: newMarkers,
+    })
+
+    if (markerError) {
+      setError(markerError.message)
+      setIsLoading(false)
+      return
+    }
+
+    // Immediately update local state so UI reflects the quarter markers (match by change_order since local IDs may be temporary)
+    hasLocalChanges.current = true
+    const updatedScoreChange = { ...lastScoreChange, quarter_marker: newMarkers }
+    setLocalScoreChanges((prev) =>
+      prev.map((sc) =>
+        sc.change_order === lastScoreChange.change_order ? updatedScoreChange : sc
+      )
+    )
+    // Notify parent for instant UI update outside the modal
+    onScoreChangeUpdated(updatedScoreChange)
+
+    // 2. Delete score_change winners for this change_order
+    await supabase
+      .from('sq_winners')
+      .delete()
+      .eq('sq_game_id', game.id)
+      .eq('payout', lastScoreChange.change_order)
+      .in('win_type', ['score_change', 'score_change_reverse'])
+
+    // 3. Insert quarter winners with payout set to change_order for grouping
+    const homeScore = lastScoreChange.home_score
+    const awayScore = lastScoreChange.away_score
+    const homeDigit = homeScore % 10
+    const awayDigit = awayScore % 10
+    const winType = `hybrid_${quarter}`
+    const reverseWinType = `hybrid_${quarter}_reverse`
+
+    const forwardWinnerName = getWinnerName(homeScore, awayScore, false)
+    const forwardRowIndex = rowNumbers.findIndex((n) => n === homeDigit)
+    const forwardColIndex = colNumbers.findIndex((n) => n === awayDigit)
+    const forwardSquare = squares.find((s) => s.row_index === forwardRowIndex && s.col_index === forwardColIndex)
+    const newWinners: SqWinner[] = []
+
+    if (forwardSquare?.id) {
+      await supabase.from('sq_winners').insert({
+        sq_game_id: game.id,
+        square_id: forwardSquare.id,
+        win_type: winType,
+        payout: lastScoreChange.change_order,
+        winner_name: forwardWinnerName,
+      })
+      newWinners.push({
+        id: crypto.randomUUID(),
+        sq_game_id: game.id,
+        square_id: forwardSquare.id,
+        win_type: winType,
+        payout: lastScoreChange.change_order,
+        winner_name: forwardWinnerName,
+      })
+    }
+
+    if (reverseScoring) {
+      const reverseWinnerName = getWinnerName(homeScore, awayScore, true)
+      const reverseRowIndex = rowNumbers.findIndex((n) => n === awayDigit)
+      const reverseColIndex = colNumbers.findIndex((n) => n === homeDigit)
+      const reverseSquare = squares.find((s) => s.row_index === reverseRowIndex && s.col_index === reverseColIndex)
+
+      if (reverseSquare?.id) {
+        await supabase.from('sq_winners').insert({
+          sq_game_id: game.id,
+          square_id: reverseSquare.id,
+          win_type: reverseWinType,
+          payout: lastScoreChange.change_order,
+          winner_name: reverseWinnerName,
+        })
+        newWinners.push({
+          id: crypto.randomUUID(),
+          sq_game_id: game.id,
+          square_id: reverseSquare.id,
+          win_type: reverseWinType,
+          payout: lastScoreChange.change_order,
+          winner_name: reverseWinnerName,
+        })
+      }
+    }
+
+    // Notify parent to replace old score_change winners with new hybrid winners
+    onWinnersReplaced(lastScoreChange.change_order, newWinners)
+
+    // 4. If marking final, also set game status and close dialog
+    if (quarter === 'final') {
+      await supabase
+        .from('sq_games')
+        .update({ status: 'final' })
+        .eq('id', game.id)
+      // Notify parent of game status update
+      onGameScoreUpdated(homeScore, awayScore, 'final')
+      setIsOpen(false)
+      // router.refresh() will be called by handleOpenChange when dialog closes
+    }
+
+    setIsLoading(false)
+    // Don't refresh while dialog is open - local state is the source of truth
   }
 
   // Quarter mode submit handler
@@ -576,14 +838,23 @@ function NoAccountScoreEntry({
 
     setIsLoading(false)
     setIsOpen(false)
-    router.refresh()
+    // router.refresh() will be called by handleOpenChange when dialog closes
   }
 
   const isFinal = game.status === 'final'
   const isQuarterMode = scoringMode === 'quarter'
 
+  // Handle dialog close - refresh data when closing
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open)
+    if (!open) {
+      // Refresh server data when dialog closes
+      router.refresh()
+    }
+  }
+
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button variant="outline" onClick={handleOpen}>
           {isFinal ? 'View Scores' : 'Enter Scores'}
@@ -753,17 +1024,17 @@ function NoAccountScoreEntry({
                 {game.away_score ?? 0} - {game.home_score ?? 0}
               </div>
               <div className="text-xs text-muted-foreground">
-                {scoreChanges.length} score change{scoreChanges.length !== 1 ? 's' : ''}
+                {localScoreChanges.length} score change{localScoreChanges.length !== 1 ? 's' : ''}
               </div>
             </div>
 
-            {scoreChanges.length === 0 && !isFinal && (
+            {localScoreChanges.length === 0 && !isFinal && (
               <Button onClick={handleAddZeroZero} disabled={isLoading} className="w-full" variant="outline">
                 Start Game (0-0)
               </Button>
             )}
 
-            {scoreChanges.length > 0 && !isFinal && (
+            {localScoreChanges.length > 0 && !isFinal && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <Label>Add Score Change</Label>
@@ -798,7 +1069,60 @@ function NoAccountScoreEntry({
               </div>
             )}
 
-            {scoreChanges.length > 0 && !isFinal && (
+            {/* Quarter marker buttons (hybrid mode only) */}
+            {isHybridMode && localScoreChanges.length > 0 && !isFinal && (
+              <div className="space-y-2 border-t pt-4">
+                <Label className="text-sm">Mark Quarter Winner</Label>
+                <div className="text-xs text-muted-foreground mb-2">
+                  Current score ({lastAwayScore}-{lastHomeScore}) will be marked as quarter winner
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  <Button
+                    type="button"
+                    onClick={() => handleMarkQuarter('q1')}
+                    disabled={isLoading || quartersMarked.q1}
+                    variant={quartersMarked.q1 ? 'default' : 'outline'}
+                    size="sm"
+                    className={quartersMarked.q1 ? 'bg-amber-500 hover:bg-amber-500' : ''}
+                  >
+                    {quartersMarked.q1 ? '✓ Q1' : 'Q1'}
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => handleMarkQuarter('halftime')}
+                    disabled={isLoading || quartersMarked.halftime || !quartersMarked.q1}
+                    variant={quartersMarked.halftime ? 'default' : 'outline'}
+                    size="sm"
+                    className={quartersMarked.halftime ? 'bg-blue-500 hover:bg-blue-500' : ''}
+                  >
+                    {quartersMarked.halftime ? '✓ Half' : 'Half'}
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => handleMarkQuarter('q3')}
+                    disabled={isLoading || quartersMarked.q3 || !quartersMarked.halftime}
+                    variant={quartersMarked.q3 ? 'default' : 'outline'}
+                    size="sm"
+                    className={quartersMarked.q3 ? 'bg-teal-500 hover:bg-teal-500' : ''}
+                  >
+                    {quartersMarked.q3 ? '✓ Q3' : 'Q3'}
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => handleMarkQuarter('final')}
+                    disabled={isLoading || quartersMarked.final || !quartersMarked.q3}
+                    variant={quartersMarked.final ? 'default' : 'outline'}
+                    size="sm"
+                    className={quartersMarked.final ? 'bg-purple-500 hover:bg-purple-500' : ''}
+                  >
+                    {quartersMarked.final ? '✓ Final' : 'Final'}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Mark final button (score_change mode only) */}
+            {isScoreChangeMode && localScoreChanges.length > 0 && !isFinal && (
               <Button onClick={handleMarkFinal} disabled={isLoading} variant="secondary" className="w-full">
                 Mark Game Final
               </Button>
@@ -836,6 +1160,9 @@ function SimpleScoreChangeLog({
   colNumbers,
   reverseScoring,
   winners,
+  isCommissioner = false,
+  isFinal = false,
+  onDeleteScoreChange,
 }: {
   scoreChanges: ScoreChange[]
   squares: NoAccountSquare[]
@@ -843,11 +1170,36 @@ function SimpleScoreChangeLog({
   colNumbers: number[]
   reverseScoring: boolean
   winners: SqWinner[]
+  isCommissioner?: boolean
+  isFinal?: boolean
+  onDeleteScoreChange?: (changeOrder: number) => void
 }) {
-  // Group winners by change_order (stored in payout)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [scoreChangeToDelete, setScoreChangeToDelete] = useState<ScoreChange | null>(null)
+
+  const sortedScoreChanges = [...scoreChanges].sort((a, b) => a.change_order - b.change_order)
+  const deletesMultiple = scoreChangeToDelete
+    ? sortedScoreChanges.filter((sc) => sc.change_order >= scoreChangeToDelete.change_order).length > 1
+    : false
+
+  const handleDeleteClick = (change: ScoreChange) => {
+    setScoreChangeToDelete(change)
+    setDeleteConfirmOpen(true)
+  }
+
+  const confirmDelete = () => {
+    if (scoreChangeToDelete && onDeleteScoreChange) {
+      onDeleteScoreChange(scoreChangeToDelete.change_order)
+    }
+    setDeleteConfirmOpen(false)
+    setScoreChangeToDelete(null)
+  }
+  // Group winners by change_order (stored in payout) - includes both score_change and hybrid types
   const winnersByChangeOrder = new Map<number, SqWinner[]>()
   for (const w of winners) {
-    if (w.win_type === 'score_change' || w.win_type === 'score_change_reverse') {
+    // Include score_change, score_change_reverse, and hybrid quarter types
+    if (w.win_type === 'score_change' || w.win_type === 'score_change_reverse' ||
+        w.win_type.startsWith('hybrid_')) {
       const order = w.payout ?? 0
       if (!winnersByChangeOrder.has(order)) {
         winnersByChangeOrder.set(order, [])
@@ -856,58 +1208,147 @@ function SimpleScoreChangeLog({
     }
   }
 
+  // Get quarter badge color
+  const getQuarterBadgeStyle = (quarter: string) => {
+    switch (quarter) {
+      case 'q1': return 'bg-amber-100 text-amber-700'
+      case 'halftime': return 'bg-blue-100 text-blue-700'
+      case 'q3': return 'bg-teal-100 text-teal-700'
+      case 'final': return 'bg-purple-100 text-purple-700'
+      default: return 'bg-gray-100 text-gray-700'
+    }
+  }
+
+  // Get winner badge style based on win type
+  const getWinnerBadgeStyle = (winType: string) => {
+    if (winType.includes('_reverse')) {
+      if (winType.startsWith('hybrid_q1')) return 'bg-orange-100 text-orange-700'
+      if (winType.startsWith('hybrid_halftime')) return 'bg-cyan-100 text-cyan-700'
+      if (winType.startsWith('hybrid_q3')) return 'bg-green-100 text-green-700'
+      if (winType.startsWith('hybrid_final')) return 'bg-fuchsia-100 text-fuchsia-700'
+      return 'bg-rose-100 text-rose-700'
+    }
+    if (winType.startsWith('hybrid_q1')) return 'bg-amber-100 text-amber-700'
+    if (winType.startsWith('hybrid_halftime')) return 'bg-blue-100 text-blue-700'
+    if (winType.startsWith('hybrid_q3')) return 'bg-teal-100 text-teal-700'
+    if (winType.startsWith('hybrid_final')) return 'bg-purple-100 text-purple-700'
+    return 'bg-emerald-100 text-emerald-700'
+  }
+
   return (
-    <div className="space-y-2">
-      {scoreChanges
-        .sort((a, b) => b.change_order - a.change_order)
-        .map((change) => {
-          const changeWinners = winnersByChangeOrder.get(change.change_order) || []
-          const homeDigit = change.home_score % 10
-          const awayDigit = change.away_score % 10
+    <>
+      <div className="space-y-2">
+        {scoreChanges
+          .sort((a, b) => b.change_order - a.change_order)
+          .map((change) => {
+            const changeWinners = winnersByChangeOrder.get(change.change_order) || []
+            const homeDigit = change.home_score % 10
+            const awayDigit = change.away_score % 10
 
-          return (
-            <div key={change.id} className="p-3 rounded-lg border bg-muted/30">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Badge variant="outline" className="text-xs">
-                    #{change.change_order}
-                  </Badge>
-                  <div className="font-mono text-lg font-bold">
-                    {change.away_score} - {change.home_score}
-                  </div>
-                  <span className="text-xs text-muted-foreground font-mono">
-                    [{awayDigit}-{homeDigit}]
-                  </span>
-                </div>
-              </div>
-
-              {changeWinners.length > 0 && (
-                <div className="mt-2 pt-2 border-t border-dashed flex flex-wrap gap-2">
-                  {changeWinners.map((winner) => (
-                    <div
-                      key={winner.id}
-                      className={`text-xs px-2 py-1 rounded ${
-                        winner.win_type === 'score_change_reverse'
-                          ? 'bg-rose-100 text-rose-700'
-                          : 'bg-emerald-100 text-emerald-700'
-                      }`}
-                    >
-                      {winner.win_type === 'score_change_reverse' && <span className="mr-1">(R)</span>}
-                      {winner.winner_name || 'Unclaimed'}
+            return (
+              <div key={change.id} className="p-3 rounded-lg border bg-muted/30">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Badge variant="outline" className="text-xs">
+                      #{change.change_order}
+                    </Badge>
+                    <div className="font-mono text-lg font-bold">
+                      {change.away_score} - {change.home_score}
                     </div>
-                  ))}
+                    <span className="text-xs text-muted-foreground font-mono">
+                      [{awayDigit}-{homeDigit}]
+                    </span>
+                    {change.quarter_marker && change.quarter_marker.length > 0 && (
+                      <>
+                        {change.quarter_marker.map((qm) => (
+                          <span key={qm} className={`text-xs px-1.5 py-0.5 rounded font-medium ${getQuarterBadgeStyle(qm)}`}>
+                            {qm === 'q1' ? 'Q1' :
+                             qm === 'halftime' ? 'HALF' :
+                             qm === 'q3' ? 'Q3' :
+                             qm === 'final' ? 'FINAL' :
+                             qm.toUpperCase()}
+                          </span>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                  {isCommissioner && !isFinal && onDeleteScoreChange && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => handleDeleteClick(change)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
-              )}
-            </div>
-          )
-        })}
 
-      {scoreChanges.length === 0 && (
-        <div className="text-center py-6 text-muted-foreground text-sm">
-          No score changes recorded yet.
-        </div>
-      )}
-    </div>
+                {changeWinners.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-dashed flex flex-wrap gap-2">
+                    {changeWinners.map((winner) => (
+                      <div
+                        key={winner.id}
+                        className={`text-xs px-2 py-1 rounded ${getWinnerBadgeStyle(winner.win_type)}`}
+                      >
+                        {winner.win_type.includes('_reverse') && <span className="mr-1">(R)</span>}
+                        {winner.winner_name || 'Unclaimed'}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+
+        {scoreChanges.length === 0 && (
+          <div className="text-center py-6 text-muted-foreground text-sm">
+            No score changes recorded yet.
+          </div>
+        )}
+      </div>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {deletesMultiple ? 'Delete Multiple Score Changes?' : 'Delete Score Change?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {deletesMultiple ? (
+                <>
+                  Deleting score #{scoreChangeToDelete?.change_order} will also delete all{' '}
+                  <strong>
+                    {sortedScoreChanges.filter(
+                      (sc) => sc.change_order > (scoreChangeToDelete?.change_order ?? 0)
+                    ).length}{' '}
+                    score changes after it
+                  </strong>{' '}
+                  and their associated winners. This cannot be undone.
+                </>
+              ) : (
+                <>
+                  This will delete score #{scoreChangeToDelete?.change_order} (
+                  {scoreChangeToDelete?.away_score}-{scoreChangeToDelete?.home_score}) and its
+                  associated winners. This cannot be undone.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }
 
@@ -924,13 +1365,176 @@ export function SingleGameContent({
   poolStatus,
   squares: initialSquares,
   games,
-  winners,
-  scoreChanges,
+  winners: initialWinners,
+  scoreChanges: initialScoreChanges,
   isCommissioner,
   isSuperAdmin = false,
 }: NoAccountSingleGameContentProps) {
+  const router = useRouter()
+
   // Local state for squares with realtime updates
   const [squares, setSquares] = useState<NoAccountSquare[]>(initialSquares)
+
+  // Local state for winners - enables instant UI updates
+  const [winners, setWinners] = useState<SqWinner[]>(initialWinners)
+
+  // Local state for current game - enables instant score updates
+  const [currentGame, setCurrentGame] = useState<SqGame | null>(games[0] ?? null)
+
+  // Local state for score changes - enables instant UI updates
+  const [scoreChanges, setScoreChanges] = useState<ScoreChange[]>(initialScoreChanges)
+
+  // Sync winners from props when they change (e.g., after router.refresh())
+  useEffect(() => {
+    setWinners(initialWinners)
+  }, [initialWinners])
+
+  // Sync game from props when they change (e.g., after router.refresh())
+  useEffect(() => {
+    setCurrentGame(games[0] ?? null)
+  }, [games])
+
+  // Sync score changes from props when they change (e.g., after router.refresh())
+  useEffect(() => {
+    setScoreChanges(initialScoreChanges)
+  }, [initialScoreChanges])
+
+  // Callback for score entry to add new winners instantly
+  const handleWinnersCreated = (newWinners: SqWinner[]) => {
+    setWinners((prev) => [...prev, ...newWinners])
+  }
+
+  // Callback for quarter marking - replaces old winners with new ones for a specific payout
+  const handleWinnersReplaced = (payout: number, newWinners: SqWinner[]) => {
+    setWinners((prev) => {
+      // Remove old score_change winners for this payout
+      const filtered = prev.filter(
+        (w) =>
+          w.payout !== payout ||
+          (w.win_type !== 'score_change' && w.win_type !== 'score_change_reverse')
+      )
+      // Add the new hybrid quarter winners
+      return [...filtered, ...newWinners]
+    })
+  }
+
+  // Callback for score entry to update game score instantly
+  const handleGameScoreUpdated = (homeScore: number, awayScore: number, status?: string) => {
+    setCurrentGame((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        home_score: homeScore,
+        away_score: awayScore,
+        status: status ?? prev.status,
+      }
+    })
+  }
+
+  // Callback for score entry to add new score changes instantly
+  const handleScoreChangeCreated = (newScoreChange: ScoreChange) => {
+    setScoreChanges((prev) => [...prev, newScoreChange])
+  }
+
+  // Callback for score entry to update score change (e.g., quarter marker)
+  const handleScoreChangeUpdated = (updatedScoreChange: ScoreChange) => {
+    setScoreChanges((prev) =>
+      prev.map((sc) =>
+        sc.change_order === updatedScoreChange.change_order ? updatedScoreChange : sc
+      )
+    )
+  }
+
+  // Handler for deleting score changes from the main page score log
+  const handleDeleteScoreChange = async (changeOrder: number) => {
+    if (!currentGame) return
+
+    const supabase = createClient()
+    const sortedChanges = [...scoreChanges].sort((a, b) => a.change_order - b.change_order)
+
+    // Get all score changes that need to be deleted (this one and all after it)
+    const changesToDelete = sortedChanges.filter((sc) => sc.change_order >= changeOrder)
+    const changeOrdersToDelete = changesToDelete.map((sc) => sc.change_order)
+    const idsToDelete = changesToDelete.map((sc) => sc.id)
+
+    // Delete winners for all affected score changes
+    // Winners with payout matching the change_order, or hybrid quarter types
+    await supabase
+      .from('sq_winners')
+      .delete()
+      .eq('sq_game_id', currentGame.id)
+      .in('payout', changeOrdersToDelete)
+
+    // Also delete any hybrid final winners if we're deleting the final marker
+    const deletingFinal = changesToDelete.some((sc) => sc.quarter_marker?.includes('final'))
+    if (deletingFinal) {
+      await supabase
+        .from('sq_winners')
+        .delete()
+        .eq('sq_game_id', currentGame.id)
+        .in('win_type', ['hybrid_final', 'hybrid_final_reverse', 'score_change_final', 'score_change_final_reverse'])
+    }
+
+    // Delete the score changes
+    await supabase
+      .from('sq_score_changes')
+      .delete()
+      .in('id', idsToDelete)
+
+    // Update local state
+    setScoreChanges((prev) => prev.filter((sc) => !idsToDelete.includes(sc.id)))
+    setWinners((prev) => prev.filter((w) => !changeOrdersToDelete.includes(w.payout ?? -1)))
+
+    // Update game with the previous score (before deleted one)
+    const remainingChanges = sortedChanges.filter((sc) => sc.change_order < changeOrder)
+    const newLastChange = remainingChanges[remainingChanges.length - 1]
+
+    if (newLastChange) {
+      await supabase
+        .from('sq_games')
+        .update({
+          home_score: newLastChange.home_score,
+          away_score: newLastChange.away_score,
+          status: 'in_progress',
+        })
+        .eq('id', currentGame.id)
+
+      setCurrentGame((prev) =>
+        prev
+          ? {
+              ...prev,
+              home_score: newLastChange.home_score,
+              away_score: newLastChange.away_score,
+              status: 'in_progress',
+            }
+          : null
+      )
+    } else {
+      // No remaining changes - reset game
+      await supabase
+        .from('sq_games')
+        .update({
+          home_score: null,
+          away_score: null,
+          status: 'scheduled',
+        })
+        .eq('id', currentGame.id)
+
+      setCurrentGame((prev) =>
+        prev
+          ? {
+              ...prev,
+              home_score: null,
+              away_score: null,
+              status: 'scheduled',
+            }
+          : null
+      )
+    }
+
+    // Refresh to sync with server
+    router.refresh()
+  }
 
   // Realtime subscription for instant updates
   useEffect(() => {
@@ -1002,7 +1606,7 @@ export function SingleGameContent({
   // Build winning squares map
   const winningSquareRounds = new Map<string, WinningRound>()
 
-  // Define hierarchy for quarter/score_change mode (higher number = higher priority display)
+  // Define hierarchy for quarter/score_change/hybrid mode (higher number = higher priority display)
   const roundHierarchy: Record<string, number> = {
     score_change_forward: 1,
     score_change_reverse: 1,
@@ -1010,6 +1614,19 @@ export function SingleGameContent({
     score_change_final: 3,
     score_change_final_reverse: 3,
     score_change_final_both: 4,
+    // Hybrid mode quarters (higher priority than regular score_change)
+    hybrid_q1: 5,
+    hybrid_q1_reverse: 5,
+    hybrid_q1_both: 6,
+    hybrid_halftime: 7,
+    hybrid_halftime_reverse: 7,
+    hybrid_halftime_both: 8,
+    hybrid_q3: 9,
+    hybrid_q3_reverse: 9,
+    hybrid_q3_both: 10,
+    hybrid_final: 11,
+    hybrid_final_reverse: 11,
+    hybrid_final_both: 12,
   }
 
   if (numbersLocked) {
@@ -1052,6 +1669,22 @@ export function SingleGameContent({
           )
           round = alsoForward ? 'score_change_both' : 'score_change_reverse'
         }
+        // Hybrid mode - hybrid_q1, hybrid_halftime, hybrid_q3, hybrid_final (forward)
+        else if (winner.win_type === 'hybrid_q1' || winner.win_type === 'hybrid_halftime' || winner.win_type === 'hybrid_q3' || winner.win_type === 'hybrid_final') {
+          const reverseType = `${winner.win_type}_reverse`
+          const alsoReverse = winners.some(
+            (w) => w.square_id === winner.square_id && w.win_type === reverseType
+          )
+          round = alsoReverse ? `${winner.win_type}_both` as WinningRound : winner.win_type as WinningRound
+        }
+        // Hybrid mode - hybrid_q1_reverse, hybrid_halftime_reverse, hybrid_q3_reverse, hybrid_final_reverse
+        else if (winner.win_type === 'hybrid_q1_reverse' || winner.win_type === 'hybrid_halftime_reverse' || winner.win_type === 'hybrid_q3_reverse' || winner.win_type === 'hybrid_final_reverse') {
+          const forwardType = winner.win_type.replace('_reverse', '')
+          const alsoForward = winners.some(
+            (w) => w.square_id === winner.square_id && w.win_type === forwardType
+          )
+          round = alsoForward ? `${forwardType}_both` as WinningRound : winner.win_type as WinningRound
+        }
 
         if (round) {
           const existing = winningSquareRounds.get(winner.square_id)
@@ -1068,8 +1701,9 @@ export function SingleGameContent({
   }
 
   // Calculate live winning squares from in-progress games
+  // Skip if currentGame is final (state is more up-to-date than games prop)
   const liveWinningSquareIds = new Set<string>()
-  if (numbersLocked && rowNumbers && colNumbers) {
+  if (numbersLocked && rowNumbers && colNumbers && currentGame?.status !== 'final') {
     // Create a map of squares by position for quick lookup
     const squaresByPosition = new Map<string, NoAccountSquare>()
     for (const sq of squares) {
@@ -1130,7 +1764,7 @@ export function SingleGameContent({
     .sort((a, b) => b.total - a.total)
 
   // Get first game for labels
-  const firstGame = games[0] ?? null
+  const firstGame = currentGame
   const homeTeamLabel = firstGame?.home_team ?? 'Home'
   const awayTeamLabel = firstGame?.away_team ?? 'Away'
 
@@ -1206,9 +1840,9 @@ export function SingleGameContent({
 
                 {/* Final Winner Display */}
                 {firstGame.status === 'final' && (() => {
-                  // Both score_change and quarter modes use score_change_final types (DB constraint)
-                  const finalWinner = winners.find(w => w.win_type === 'score_change_final')
-                  const finalReverseWinner = winners.find(w => w.win_type === 'score_change_final_reverse')
+                  // Check for both score_change_final types and hybrid_final types
+                  const finalWinner = winners.find(w => w.win_type === 'score_change_final' || w.win_type === 'hybrid_final')
+                  const finalReverseWinner = winners.find(w => w.win_type === 'score_change_final_reverse' || w.win_type === 'hybrid_final_reverse')
 
                   if (!finalWinner && !finalReverseWinner) return null
 
@@ -1254,11 +1888,16 @@ export function SingleGameContent({
                     rowNumbers={rowNumbers ?? []}
                     colNumbers={colNumbers ?? []}
                     scoreChanges={scoreChanges}
+                    onWinnersCreated={handleWinnersCreated}
+                    onWinnersReplaced={handleWinnersReplaced}
+                    onGameScoreUpdated={handleGameScoreUpdated}
+                    onScoreChangeCreated={handleScoreChangeCreated}
+                    onScoreChangeUpdated={handleScoreChangeUpdated}
                   />
                 )}
 
-                {/* Score change log for score_change mode */}
-                {scoringMode === 'score_change' && scoreChanges.length > 0 && (
+                {/* Score change log for score_change and hybrid modes */}
+                {(scoringMode === 'score_change' || scoringMode === 'hybrid') && scoreChanges.length > 0 && (
                   <div className="pt-4 border-t">
                     <h3 className="font-medium mb-2">Score Changes</h3>
                     <SimpleScoreChangeLog
@@ -1268,6 +1907,9 @@ export function SingleGameContent({
                       colNumbers={colNumbers ?? []}
                       reverseScoring={reverseScoring}
                       winners={winners}
+                      isCommissioner={isCommissioner}
+                      isFinal={currentGame?.status === 'final'}
+                      onDeleteScoreChange={handleDeleteScoreChange}
                     />
                   </div>
                 )}

@@ -49,6 +49,7 @@ interface ScoreChange {
   away_score: number
   change_order: number
   sq_game_id: string | null
+  quarter_marker?: string[] | null
 }
 
 interface Square {
@@ -217,9 +218,9 @@ export function PublicRealtimeGames({
     }
   }, [sqPoolId, gameIds])
 
-  // Subscribe to score changes (for score_change mode)
+  // Subscribe to score changes (for score_change and hybrid modes)
   useEffect(() => {
-    if (scoringMode !== 'score_change') return
+    if (scoringMode !== 'score_change' && scoringMode !== 'hybrid') return
     if (gameIds.length === 0) return
 
     const supabase = createAnonClient()
@@ -255,10 +256,11 @@ export function PublicRealtimeGames({
     }
   }, [sqPoolId, gameIds, scoringMode])
 
-  // Group winners by change_order for score change log
+  // Group winners by change_order for score change log - includes both score_change and hybrid types
   const winnersByChangeOrder = new Map<number, Winner[]>()
   for (const w of winners) {
-    if (w.win_type === 'score_change' || w.win_type === 'score_change_reverse') {
+    if (w.win_type === 'score_change' || w.win_type === 'score_change_reverse' ||
+        w.win_type.startsWith('hybrid_')) {
       const order = w.payout ?? 0
       if (!winnersByChangeOrder.has(order)) {
         winnersByChangeOrder.set(order, [])
@@ -342,42 +344,6 @@ export function PublicRealtimeGames({
       {/* Games Column */}
       <div className="lg:col-span-2 space-y-4">
         <h2 className="text-lg font-semibold">Games</h2>
-
-        {/* Prominent Final Winner Display */}
-        {games[0]?.status === 'final' && (() => {
-          // Both score_change and quarter modes use score_change_final types (DB constraint)
-          const finalWinner = winners.find(w => w.win_type === 'score_change_final')
-          const finalReverseWinner = winners.find(w => w.win_type === 'score_change_final_reverse')
-          if (!finalWinner && !finalReverseWinner) return null
-
-          return (
-            <div className="rounded-lg border-2 border-purple-300 bg-purple-50 p-4">
-              <div className="text-center space-y-2">
-                <div className="text-xs font-medium text-purple-600 uppercase tracking-wide">
-                  Final Winner{reverseScoring && finalReverseWinner ? 's' : ''}
-                </div>
-                <div className="flex items-center justify-center gap-4 flex-wrap">
-                  {finalWinner && (
-                    <div className="text-xl font-bold text-purple-800">
-                      {finalWinner.winner_name || 'Unclaimed'}
-                    </div>
-                  )}
-                  {reverseScoring && finalReverseWinner && finalReverseWinner.winner_name !== finalWinner?.winner_name && (
-                    <div className="text-xl font-bold text-rose-700">
-                      <span className="text-sm font-normal opacity-70 mr-1">(R)</span>
-                      {finalReverseWinner.winner_name || 'Unclaimed'}
-                    </div>
-                  )}
-                  {reverseScoring && finalWinner && finalReverseWinner && finalWinner.winner_name === finalReverseWinner.winner_name && (
-                    <div className="text-sm text-purple-600">
-                      (wins both directions!)
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )
-        })()}
 
         <div className="grid gap-4 sm:grid-cols-2">
           {games.map((game) => {
@@ -569,8 +535,8 @@ export function PublicRealtimeGames({
           })}
         </div>
 
-        {/* Score Change Log for score_change mode */}
-        {scoringMode === 'score_change' && scoreChanges.length > 0 && (
+        {/* Score Change Log for score_change and hybrid modes */}
+        {(scoringMode === 'score_change' || scoringMode === 'hybrid') && scoreChanges.length > 0 && (
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Score Changes</CardTitle>
@@ -585,6 +551,17 @@ export function PublicRealtimeGames({
                     const homeDigit = change.home_score % 10
                     const awayDigit = change.away_score % 10
 
+                    // Get quarter badge color
+                    const getQuarterBadgeStyle = (quarter: string) => {
+                      switch (quarter) {
+                        case 'q1': return 'bg-amber-100 text-amber-700'
+                        case 'halftime': return 'bg-blue-100 text-blue-700'
+                        case 'q3': return 'bg-teal-100 text-teal-700'
+                        case 'final': return 'bg-purple-100 text-purple-700'
+                        default: return 'bg-gray-100 text-gray-700'
+                      }
+                    }
+
                     return (
                       <div key={change.id} className="p-3 rounded-lg border bg-muted/30">
                         <div className="flex items-center justify-between">
@@ -598,24 +575,51 @@ export function PublicRealtimeGames({
                             <span className="text-xs text-muted-foreground font-mono">
                               [{awayDigit}-{homeDigit}]
                             </span>
+                            {change.quarter_marker && change.quarter_marker.length > 0 && (
+                              <>
+                                {change.quarter_marker.map((qm) => (
+                                  <span key={qm} className={`text-xs px-1.5 py-0.5 rounded font-medium ${getQuarterBadgeStyle(qm)}`}>
+                                    {qm === 'q1' ? 'Q1' :
+                                     qm === 'halftime' ? 'HALF' :
+                                     qm === 'q3' ? 'Q3' :
+                                     qm === 'final' ? 'FINAL' :
+                                     qm.toUpperCase()}
+                                  </span>
+                                ))}
+                              </>
+                            )}
                           </div>
                         </div>
 
                         {changeWinners.length > 0 && (
                           <div className="mt-2 pt-2 border-t border-dashed flex flex-wrap gap-2">
-                            {changeWinners.map((winner) => (
-                              <div
-                                key={winner.id}
-                                className={`text-xs px-2 py-1 rounded ${
-                                  winner.win_type === 'score_change_reverse'
-                                    ? 'bg-rose-100 text-rose-700'
-                                    : 'bg-emerald-100 text-emerald-700'
-                                }`}
-                              >
-                                {winner.win_type === 'score_change_reverse' && <span className="mr-1">(R)</span>}
-                                {winner.winner_name || 'Unclaimed'}
-                              </div>
-                            ))}
+                            {changeWinners.map((winner) => {
+                              // Get appropriate color based on win type
+                              const getWinnerBadgeStyle = (winType: string) => {
+                                if (winType.includes('_reverse')) {
+                                  if (winType.startsWith('hybrid_q1')) return 'bg-orange-100 text-orange-700'
+                                  if (winType.startsWith('hybrid_halftime')) return 'bg-cyan-100 text-cyan-700'
+                                  if (winType.startsWith('hybrid_q3')) return 'bg-green-100 text-green-700'
+                                  if (winType.startsWith('hybrid_final')) return 'bg-fuchsia-100 text-fuchsia-700'
+                                  return 'bg-rose-100 text-rose-700'
+                                }
+                                if (winType.startsWith('hybrid_q1')) return 'bg-amber-100 text-amber-700'
+                                if (winType.startsWith('hybrid_halftime')) return 'bg-blue-100 text-blue-700'
+                                if (winType.startsWith('hybrid_q3')) return 'bg-teal-100 text-teal-700'
+                                if (winType.startsWith('hybrid_final')) return 'bg-purple-100 text-purple-700'
+                                return 'bg-emerald-100 text-emerald-700'
+                              }
+
+                              return (
+                                <div
+                                  key={winner.id}
+                                  className={`text-xs px-2 py-1 rounded ${getWinnerBadgeStyle(winner.win_type)}`}
+                                >
+                                  {winner.win_type.includes('_reverse') && <span className="mr-1">(R)</span>}
+                                  {winner.winner_name || 'Unclaimed'}
+                                </div>
+                              )
+                            })}
                           </div>
                         )}
                       </div>

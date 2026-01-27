@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -60,6 +60,7 @@ interface ScoreChange {
   home_score: number
   away_score: number
   change_order: number
+  quarter_marker?: string[] | null
 }
 
 interface SingleGameScoreEntryProps {
@@ -74,8 +75,34 @@ export function SingleGameScoreEntry({ game, sqPool, scoreChanges }: SingleGameS
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
+  // Local state for score changes - initialized from props when dialog opens
+  const [localScoreChanges, setLocalScoreChanges] = useState<ScoreChange[]>(scoreChanges)
+
+  // Track if we have pending local changes that shouldn't be overwritten
+  const hasLocalChanges = useRef(false)
+
+  // Only sync local state from props when dialog opens AND we don't have pending changes
+  useEffect(() => {
+    if (isOpen && !hasLocalChanges.current) {
+      setLocalScoreChanges(scoreChanges)
+    }
+    // Reset the flag when dialog closes
+    if (!isOpen) {
+      hasLocalChanges.current = false
+    }
+  }, [isOpen, scoreChanges])
+
   const isQuarterMode = sqPool.scoring_mode === 'quarter'
   const isScoreChangeMode = sqPool.scoring_mode === 'score_change'
+  const isHybridMode = sqPool.scoring_mode === 'hybrid'
+
+  // Derive which quarters are marked (for hybrid mode)
+  const quartersMarked = {
+    q1: localScoreChanges.some((sc) => sc.quarter_marker?.includes('q1')),
+    halftime: localScoreChanges.some((sc) => sc.quarter_marker?.includes('halftime')),
+    q3: localScoreChanges.some((sc) => sc.quarter_marker?.includes('q3')),
+    final: localScoreChanges.some((sc) => sc.quarter_marker?.includes('final')),
+  }
 
   // Quarter mode state
   const [q1Home, setQ1Home] = useState(game.q1_home_score?.toString() ?? '')
@@ -97,7 +124,7 @@ export function SingleGameScoreEntry({ game, sqPool, scoreChanges }: SingleGameS
   const [scoreChangeToDelete, setScoreChangeToDelete] = useState<ScoreChange | null>(null)
 
   // Get the last score change for pre-population
-  const sortedScoreChanges = [...scoreChanges].sort((a, b) => a.change_order - b.change_order)
+  const sortedScoreChanges = [...localScoreChanges].sort((a, b) => a.change_order - b.change_order)
   const lastScoreChange = sortedScoreChanges[sortedScoreChanges.length - 1]
   const lastHomeScore = lastScoreChange?.home_score ?? 0
   const lastAwayScore = lastScoreChange?.away_score ?? 0
@@ -175,7 +202,7 @@ export function SingleGameScoreEntry({ game, sqPool, scoreChanges }: SingleGameS
 
     setIsLoading(false)
     setIsOpen(false)
-    router.refresh()
+    // router.refresh() will be called by handleOpenChange when dialog closes
   }
 
   // Score change mode - add new score
@@ -216,7 +243,7 @@ export function SingleGameScoreEntry({ game, sqPool, scoreChanges }: SingleGameS
     setError(null)
 
     const supabase = createClient()
-    const nextOrder = scoreChanges.length + 1
+    const nextOrder = localScoreChanges.length + 1
 
     // Insert score change
     const { error: insertError } = await supabase
@@ -233,6 +260,18 @@ export function SingleGameScoreEntry({ game, sqPool, scoreChanges }: SingleGameS
       setIsLoading(false)
       return
     }
+
+    // Immediately update local state with constructed row
+    const newScoreChange: ScoreChange = {
+      id: crypto.randomUUID(),
+      sq_game_id: game.id,
+      home_score: homeScore,
+      away_score: awayScore,
+      change_order: nextOrder,
+      quarter_marker: null,
+    }
+    hasLocalChanges.current = true
+    setLocalScoreChanges((prev) => [...prev, newScoreChange])
 
     // Update game with current score
     const { error: updateError } = await supabase
@@ -269,7 +308,7 @@ export function SingleGameScoreEntry({ game, sqPool, scoreChanges }: SingleGameS
     setNewScoreHome(homeScore.toString())
     setNewScoreAway(awayScore.toString())
     setIsLoading(false)
-    router.refresh()
+    // Don't call router.refresh() - local state already updated
   }
 
   // Mark game as final (score change mode)
@@ -305,7 +344,86 @@ export function SingleGameScoreEntry({ game, sqPool, scoreChanges }: SingleGameS
 
     setIsLoading(false)
     setIsOpen(false)
-    router.refresh()
+    // router.refresh() will be called by handleOpenChange when dialog closes
+  }
+
+  // Mark quarter winner (hybrid mode)
+  const handleMarkQuarter = async (quarter: 'q1' | 'halftime' | 'q3' | 'final') => {
+    if (!lastScoreChange) return
+
+    setIsLoading(true)
+    setError(null)
+    const supabase = createClient()
+
+    // Build new quarter_marker array by appending to existing (or creating new array)
+    // Ensure we always work with an array (handle legacy string data gracefully)
+    const rawMarkers = lastScoreChange.quarter_marker
+    const existingMarkers: string[] = Array.isArray(rawMarkers)
+      ? rawMarkers
+      : rawMarkers
+        ? [rawMarkers] // Convert legacy string to array
+        : []
+    const newMarkers: string[] = existingMarkers.includes(quarter)
+      ? existingMarkers // Already has this quarter
+      : [...existingMarkers, quarter]
+
+    // 1. Update last score_change with quarter_marker array using RPC
+    // (Direct update has issues with PostgreSQL array serialization)
+    const { error: markerError } = await supabase.rpc('update_quarter_marker', {
+      p_score_change_id: lastScoreChange.id,
+      p_quarters: newMarkers,
+    })
+
+    if (markerError) {
+      setError(markerError.message)
+      setIsLoading(false)
+      return
+    }
+
+    // Immediately update local state so UI reflects the quarter markers
+    hasLocalChanges.current = true
+    setLocalScoreChanges((prev) =>
+      prev.map((sc) =>
+        sc.id === lastScoreChange.id ? { ...sc, quarter_marker: newMarkers } : sc
+      )
+    )
+
+    // 2. Delete score_change winners for this change_order
+    await supabase
+      .from('sq_winners')
+      .delete()
+      .eq('sq_game_id', game.id)
+      .eq('payout', lastScoreChange.change_order)
+      .in('win_type', ['score_change', 'score_change_reverse'])
+
+    // 3. Insert quarter winners instead
+    if (sqPool.row_numbers && sqPool.col_numbers) {
+      await calculateHybridQuarterWinner(
+        supabase,
+        game.id,
+        sqPool.id,
+        lastScoreChange.home_score,
+        lastScoreChange.away_score,
+        quarter,
+        lastScoreChange.change_order,
+        sqPool.row_numbers,
+        sqPool.col_numbers,
+        sqPool.reverse_scoring ?? true
+      )
+    }
+
+    // 4. If marking final, also set game status and close dialog
+    if (quarter === 'final') {
+      await supabase
+        .from('sq_games')
+        .update({ status: 'final' })
+        .eq('id', game.id)
+      setIsOpen(false)
+      // router.refresh() will be called by handleOpenChange when dialog closes
+    }
+
+    setIsLoading(false)
+    // Don't refresh while dialog is open - local state is the source of truth
   }
 
   // Add 0-0 as first score (score change mode)
@@ -330,6 +448,18 @@ export function SingleGameScoreEntry({ game, sqPool, scoreChanges }: SingleGameS
       setIsLoading(false)
       return
     }
+
+    // Immediately update local state with constructed row (don't rely on select() return)
+    const newScoreChange: ScoreChange = {
+      id: crypto.randomUUID(), // Temporary ID for local state
+      sq_game_id: game.id,
+      home_score: 0,
+      away_score: 0,
+      change_order: 1,
+      quarter_marker: null,
+    }
+    hasLocalChanges.current = true
+    setLocalScoreChanges((prev) => [...prev, newScoreChange])
 
     // Update game
     const { error: updateError } = await supabase
@@ -363,7 +493,8 @@ export function SingleGameScoreEntry({ game, sqPool, scoreChanges }: SingleGameS
     }
 
     setIsLoading(false)
-    router.refresh()
+    // Don't call router.refresh() here - local state already updated
+    // Will refresh when dialog closes
   }
 
   // Delete score change handler
@@ -410,6 +541,10 @@ export function SingleGameScoreEntry({ game, sqPool, scoreChanges }: SingleGameS
       return
     }
 
+    // Immediately update local state to remove deleted score changes
+    hasLocalChanges.current = true
+    setLocalScoreChanges((prev) => prev.filter((sc) => !idsToDelete.includes(sc.id)))
+
     // Update game with the previous score (before deleted one)
     const remainingChanges = sortedScoreChanges.filter(
       (sc) => sc.change_order < scoreChangeToDelete.change_order
@@ -439,7 +574,8 @@ export function SingleGameScoreEntry({ game, sqPool, scoreChanges }: SingleGameS
     setIsLoading(false)
     setDeleteConfirmOpen(false)
     setScoreChangeToDelete(null)
-    router.refresh()
+    // Don't refresh here - local state already updated
+    // router.refresh() will be called when dialog closes
   }
 
   const isFinal = game.status === 'final'
@@ -449,9 +585,18 @@ export function SingleGameScoreEntry({ game, sqPool, scoreChanges }: SingleGameS
     ? sortedScoreChanges.filter((sc) => sc.change_order >= scoreChangeToDelete.change_order).length > 1
     : false
 
+  // Handle dialog close - refresh data when closing
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open)
+    if (!open) {
+      // Refresh server data when dialog closes
+      router.refresh()
+    }
+  }
+
   return (
     <>
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button variant="outline" onClick={handleOpen}>
           {isFinal ? 'Edit Scores' : 'Enter Scores'}
@@ -651,7 +796,7 @@ export function SingleGameScoreEntry({ game, sqPool, scoreChanges }: SingleGameS
             </DialogFooter>
           </form>
         ) : (
-          /* Score Change Mode */
+          /* Score Change Mode OR Hybrid Mode */
           <div className="space-y-4 py-4">
             {/* Current score */}
             <div className="text-center py-2 bg-muted rounded-md">
@@ -660,12 +805,12 @@ export function SingleGameScoreEntry({ game, sqPool, scoreChanges }: SingleGameS
                 {game.away_score ?? 0} - {game.home_score ?? 0}
               </div>
               <div className="text-xs text-muted-foreground">
-                {scoreChanges.length} score change{scoreChanges.length !== 1 ? 's' : ''}
+                {localScoreChanges.length} score change{localScoreChanges.length !== 1 ? 's' : ''}
               </div>
             </div>
 
             {/* Start game button (adds 0-0) */}
-            {scoreChanges.length === 0 && (
+            {localScoreChanges.length === 0 && (
               <Button
                 onClick={handleAddZeroZero}
                 disabled={isLoading}
@@ -694,6 +839,25 @@ export function SingleGameScoreEntry({ game, sqPool, scoreChanges }: SingleGameS
                         <span className="text-xs text-muted-foreground">
                           [{sc.away_score % 10}-{sc.home_score % 10}]
                         </span>
+                        {sc.quarter_marker && sc.quarter_marker.length > 0 && (
+                          <>
+                            {sc.quarter_marker.map((qm) => (
+                              <span key={qm} className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                                qm === 'q1' ? 'bg-amber-100 text-amber-700' :
+                                qm === 'halftime' ? 'bg-blue-100 text-blue-700' :
+                                qm === 'q3' ? 'bg-teal-100 text-teal-700' :
+                                qm === 'final' ? 'bg-purple-100 text-purple-700' :
+                                'bg-gray-100 text-gray-700'
+                              }`}>
+                                {qm === 'q1' ? 'Q1' :
+                                 qm === 'halftime' ? 'HALF' :
+                                 qm === 'q3' ? 'Q3' :
+                                 qm === 'final' ? 'FINAL' :
+                                 qm.toUpperCase()}
+                              </span>
+                            ))}
+                          </>
+                        )}
                       </div>
                       {!isFinal && (
                         <Button
@@ -714,7 +878,7 @@ export function SingleGameScoreEntry({ game, sqPool, scoreChanges }: SingleGameS
             )}
 
             {/* Add new score change */}
-            {scoreChanges.length > 0 && !isFinal && (
+            {localScoreChanges.length > 0 && !isFinal && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <Label>Add Score Change</Label>
@@ -755,8 +919,60 @@ export function SingleGameScoreEntry({ game, sqPool, scoreChanges }: SingleGameS
               </div>
             )}
 
-            {/* Mark final button */}
-            {scoreChanges.length > 0 && !isFinal && (
+            {/* Quarter marker buttons (hybrid mode only) */}
+            {isHybridMode && localScoreChanges.length > 0 && !isFinal && (
+              <div className="space-y-2 border-t pt-4">
+                <Label className="text-sm">Mark Quarter Winner</Label>
+                <div className="text-xs text-muted-foreground mb-2">
+                  Current score ({lastAwayScore}-{lastHomeScore}) will be marked as quarter winner
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  <Button
+                    type="button"
+                    onClick={() => handleMarkQuarter('q1')}
+                    disabled={isLoading || quartersMarked.q1}
+                    variant={quartersMarked.q1 ? 'default' : 'outline'}
+                    size="sm"
+                    className={quartersMarked.q1 ? 'bg-amber-500 hover:bg-amber-500' : ''}
+                  >
+                    {quartersMarked.q1 ? '✓ Q1' : 'Q1'}
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => handleMarkQuarter('halftime')}
+                    disabled={isLoading || quartersMarked.halftime || !quartersMarked.q1}
+                    variant={quartersMarked.halftime ? 'default' : 'outline'}
+                    size="sm"
+                    className={quartersMarked.halftime ? 'bg-blue-500 hover:bg-blue-500' : ''}
+                  >
+                    {quartersMarked.halftime ? '✓ Half' : 'Half'}
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => handleMarkQuarter('q3')}
+                    disabled={isLoading || quartersMarked.q3 || !quartersMarked.halftime}
+                    variant={quartersMarked.q3 ? 'default' : 'outline'}
+                    size="sm"
+                    className={quartersMarked.q3 ? 'bg-teal-500 hover:bg-teal-500' : ''}
+                  >
+                    {quartersMarked.q3 ? '✓ Q3' : 'Q3'}
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => handleMarkQuarter('final')}
+                    disabled={isLoading || quartersMarked.final || !quartersMarked.q3}
+                    variant={quartersMarked.final ? 'default' : 'outline'}
+                    size="sm"
+                    className={quartersMarked.final ? 'bg-purple-500 hover:bg-purple-500' : ''}
+                  >
+                    {quartersMarked.final ? '✓ Final' : 'Final'}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Mark final button (score_change mode only) */}
+            {isScoreChangeMode && localScoreChanges.length > 0 && !isFinal && (
               <Button
                 onClick={handleMarkFinal}
                 disabled={isLoading}
@@ -1066,6 +1282,73 @@ async function calculateFinalScoreWinner(
         sq_game_id: gameId,
         square_id: reverseSquare.id,
         win_type: 'score_change_final_reverse',
+        winner_name: winnerName,
+      })
+    }
+  }
+}
+
+/// Helper: Calculate winner for hybrid quarter marker
+async function calculateHybridQuarterWinner(
+  supabase: ReturnType<typeof createClient>,
+  gameId: string,
+  sqPoolId: string,
+  homeScore: number,
+  awayScore: number,
+  quarter: 'q1' | 'halftime' | 'q3' | 'final',
+  changeOrder: number,
+  rowNumbers: number[],
+  colNumbers: number[],
+  reverseScoring: boolean
+) {
+  const homeDigit = homeScore % 10
+  const awayDigit = awayScore % 10
+
+  const rowIndex = rowNumbers.findIndex((n) => n === homeDigit)
+  const colIndex = colNumbers.findIndex((n) => n === awayDigit)
+
+  const winType = `hybrid_${quarter}`
+  const reverseWinType = `hybrid_${quarter}_reverse`
+
+  const { data: normalSquare } = await supabase
+    .from('sq_squares')
+    .select('id, user_id')
+    .eq('sq_pool_id', sqPoolId)
+    .eq('row_index', rowIndex)
+    .eq('col_index', colIndex)
+    .single()
+
+  if (normalSquare) {
+    const winnerName = await getWinnerName(supabase, normalSquare.user_id)
+    await supabase.from('sq_winners').insert({
+      sq_game_id: gameId,
+      square_id: normalSquare.id,
+      win_type: winType,
+      payout: changeOrder,
+      winner_name: winnerName,
+    })
+  }
+
+  if (reverseScoring) {
+    const reverseRowIndex = rowNumbers.findIndex((n) => n === awayDigit)
+    const reverseColIndex = colNumbers.findIndex((n) => n === homeDigit)
+
+    // Always create reverse winner (even if same square as forward)
+    const { data: reverseSquare } = await supabase
+      .from('sq_squares')
+      .select('id, user_id')
+      .eq('sq_pool_id', sqPoolId)
+      .eq('row_index', reverseRowIndex)
+      .eq('col_index', reverseColIndex)
+      .single()
+
+    if (reverseSquare) {
+      const winnerName = await getWinnerName(supabase, reverseSquare.user_id)
+      await supabase.from('sq_winners').insert({
+        sq_game_id: gameId,
+        square_id: reverseSquare.id,
+        win_type: reverseWinType,
+        payout: changeOrder,
         winner_name: winnerName,
       })
     }

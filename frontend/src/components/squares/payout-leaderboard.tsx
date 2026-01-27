@@ -21,9 +21,10 @@ interface PayoutLeaderboardProps {
 interface LeaderboardEntry {
   participantName: string
   totalWins: number
-  normalWins: number
-  reverseWins: number
-  halftimeWins: number
+  normalWins: number      // Forward wins (includes score_change, quarter forward, hybrid forward)
+  reverseWins: number     // Reverse wins (includes all _reverse types)
+  halftimeWins: number    // Halftime-specific wins
+  quarterWins: number     // Hybrid quarter wins (q1, halftime, q3, final)
 }
 
 export function PayoutLeaderboard({ squares, winners, currentUserId }: PayoutLeaderboardProps) {
@@ -48,13 +49,32 @@ export function PayoutLeaderboard({ squares, winners, currentUserId }: PayoutLea
       normalWins: 0,
       reverseWins: 0,
       halftimeWins: 0,
+      quarterWins: 0,
     }
 
     existing.totalWins++
-    if (winner.win_type === 'normal') existing.normalWins++
-    else if (winner.win_type === 'reverse') existing.reverseWins++
-    else if (winner.win_type === 'halftime' || winner.win_type === 'halftime_reverse')
+
+    const isReverse = winner.win_type.includes('_reverse')
+    const isHybridQuarter = winner.win_type.startsWith('hybrid_')
+    const isHalftime = winner.win_type === 'halftime' || winner.win_type === 'halftime_reverse' ||
+                       winner.win_type === 'hybrid_halftime' || winner.win_type === 'hybrid_halftime_reverse'
+
+    // Track forward vs reverse
+    if (isReverse) {
+      existing.reverseWins++
+    } else {
+      existing.normalWins++
+    }
+
+    // Track halftime separately
+    if (isHalftime) {
       existing.halftimeWins++
+    }
+
+    // Track hybrid quarter wins
+    if (isHybridQuarter) {
+      existing.quarterWins++
+    }
 
     winsByParticipant.set(name, existing)
   })
@@ -111,18 +131,18 @@ export function PayoutLeaderboard({ squares, winners, currentUserId }: PayoutLea
         </div>
 
         {/* Win breakdown legend */}
-        {leaderboard.some((e) => e.reverseWins > 0 || e.halftimeWins > 0) && (
+        {leaderboard.some((e) => e.reverseWins > 0 || e.halftimeWins > 0 || e.quarterWins > 0) && (
           <div className="mt-4 pt-4 border-t text-xs text-muted-foreground">
             <div className="font-medium mb-2">Win Breakdown</div>
             {leaderboard.slice(0, 3).map((entry) => (
               <div key={entry.participantName} className="flex justify-between py-0.5">
                 <span className="truncate mr-2">{entry.participantName}</span>
                 <span>
-                  {entry.normalWins > 0 && `${entry.normalWins} final`}
+                  {entry.normalWins > 0 && `${entry.normalWins}F`}
                   {entry.normalWins > 0 && entry.reverseWins > 0 && ', '}
-                  {entry.reverseWins > 0 && `${entry.reverseWins} rev`}
-                  {(entry.normalWins > 0 || entry.reverseWins > 0) && entry.halftimeWins > 0 && ', '}
-                  {entry.halftimeWins > 0 && `${entry.halftimeWins} HT`}
+                  {entry.reverseWins > 0 && `${entry.reverseWins}R`}
+                  {(entry.normalWins > 0 || entry.reverseWins > 0) && entry.quarterWins > 0 && ' '}
+                  {entry.quarterWins > 0 && `(${entry.quarterWins} qtr)`}
                 </span>
               </div>
             ))}

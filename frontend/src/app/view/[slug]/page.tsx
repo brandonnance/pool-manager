@@ -133,6 +133,7 @@ export default async function PublicViewPage({ params }: PageProps) {
     away_score: number
     change_order: number
     sq_game_id: string | null
+    quarter_marker?: string[] | null
   }> = []
 
   if (sqPool.numbers_locked) {
@@ -155,8 +156,8 @@ export default async function PublicViewPage({ params }: PageProps) {
 
       winners = winnersData ?? []
 
-      // Fetch score changes for score_change mode
-      if (sqPool.scoring_mode === 'score_change') {
+      // Fetch score changes for score_change and hybrid modes
+      if (sqPool.scoring_mode === 'score_change' || sqPool.scoring_mode === 'hybrid') {
         const { data: scoreChangesData } = await supabase
           .from('sq_score_changes')
           .select('*')
@@ -184,6 +185,19 @@ export default async function PublicViewPage({ params }: PageProps) {
     score_change_final: 3,
     score_change_final_reverse: 3,
     score_change_final_both: 4,
+    // Hybrid mode quarters
+    hybrid_q1: 5,
+    hybrid_q1_reverse: 5,
+    hybrid_q1_both: 6,
+    hybrid_halftime: 7,
+    hybrid_halftime_reverse: 7,
+    hybrid_halftime_both: 8,
+    hybrid_q3: 9,
+    hybrid_q3_reverse: 9,
+    hybrid_q3_both: 10,
+    hybrid_final: 11,
+    hybrid_final_reverse: 11,
+    hybrid_final_both: 12,
   }
 
   // Build winning squares map for grid highlighting
@@ -237,6 +251,22 @@ export default async function PublicViewPage({ params }: PageProps) {
             (w) => w.square_id === winner.square_id && w.win_type === forwardType
           )
           round = alsoForward ? 'score_change_both' : 'score_change_reverse'
+        }
+        // Hybrid mode - forward quarter winners
+        else if (winner.win_type === 'hybrid_q1' || winner.win_type === 'hybrid_halftime' || winner.win_type === 'hybrid_q3' || winner.win_type === 'hybrid_final') {
+          const reverseType = `${winner.win_type}_reverse`
+          const alsoReverse = winners.some(
+            (w) => w.square_id === winner.square_id && w.win_type === reverseType
+          )
+          round = alsoReverse ? `${winner.win_type}_both` as WinningRound : winner.win_type as WinningRound
+        }
+        // Hybrid mode - reverse quarter winners
+        else if (winner.win_type === 'hybrid_q1_reverse' || winner.win_type === 'hybrid_halftime_reverse' || winner.win_type === 'hybrid_q3_reverse' || winner.win_type === 'hybrid_final_reverse') {
+          const forwardType = winner.win_type.replace('_reverse', '')
+          const alsoForward = winners.some(
+            (w) => w.square_id === winner.square_id && w.win_type === forwardType
+          )
+          round = alsoForward ? `${forwardType}_both` as WinningRound : winner.win_type as WinningRound
         }
 
         if (round) {
@@ -328,6 +358,44 @@ export default async function PublicViewPage({ params }: PageProps) {
             />
           </CardContent>
         </Card>
+
+        {/* Final Winner Banner */}
+        {sqPool.numbers_locked && firstGame?.status === 'final' && (() => {
+          const finalWinner = winners.find(w => w.win_type === 'score_change_final' || w.win_type === 'hybrid_final')
+          const finalReverseWinner = winners.find(w => w.win_type === 'score_change_final_reverse' || w.win_type === 'hybrid_final_reverse')
+
+          if (!finalWinner && !finalReverseWinner) return null
+
+          return (
+            <div className="rounded-lg border-2 border-purple-300 bg-purple-50 p-6">
+              <div className="text-center space-y-3">
+                <div className="text-sm font-medium text-purple-600 uppercase tracking-wide">
+                  Final Winner{sqPool.reverse_scoring ? 's' : ''}
+                </div>
+                <div className="flex items-center justify-center gap-8">
+                  {finalWinner && (
+                    <div className="text-center">
+                      {sqPool.reverse_scoring && (
+                        <div className="text-xs text-muted-foreground mb-1">Forward</div>
+                      )}
+                      <div className="text-2xl font-bold text-purple-700">
+                        {finalWinner.winner_name || 'Unclaimed'}
+                      </div>
+                    </div>
+                  )}
+                  {sqPool.reverse_scoring && finalReverseWinner && (
+                    <div className="text-center">
+                      <div className="text-xs text-muted-foreground mb-1">Reverse</div>
+                      <div className="text-2xl font-bold text-fuchsia-700">
+                        {finalReverseWinner.winner_name || 'Unclaimed'}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        })()}
 
         {/* Games and Scores - only show after lock */}
         {sqPool.numbers_locked && games.length > 0 && (

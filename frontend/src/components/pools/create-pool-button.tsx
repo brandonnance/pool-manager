@@ -25,7 +25,7 @@ interface CreatePoolButtonProps {
 
 type PoolType = 'bowl_buster' | 'playoff_squares' | 'golf' | 'march_madness'
 type SquaresMode = 'full_playoff' | 'single_game'
-type ScoringMode = 'quarter' | 'score_change'
+type ScoringMode = 'quarter' | 'score_change' | 'hybrid'
 
 export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
   const [isOpen, setIsOpen] = useState(false)
@@ -200,7 +200,7 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
             away_team: awayTeam || 'TBD',
             round: 'single_game',
             display_order: 1,
-            pays_halftime: scoringMode === 'quarter', // Quarter mode pays halftime
+            pays_halftime: scoringMode === 'quarter' || scoringMode === 'hybrid', // Quarter/hybrid modes pay halftime
             status: 'scheduled',
           })
 
@@ -548,7 +548,7 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
 
                     <div className="space-y-2">
                       <Label>Scoring Mode</Label>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-3 gap-2">
                         <button
                           type="button"
                           onClick={() => setScoringMode('quarter')}
@@ -558,7 +558,7 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
                               : 'border-border hover:border-muted-foreground'
                           }`}
                         >
-                          <div className="font-medium text-sm">Quarter Scoring</div>
+                          <div className="font-medium text-sm">Quarter</div>
                           <div className="text-xs text-muted-foreground">Q1, Half, Q3, Final</div>
                         </button>
                         <button
@@ -571,7 +571,19 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
                           }`}
                         >
                           <div className="font-medium text-sm">Every Score</div>
-                          <div className="text-xs text-muted-foreground">Winner on each score change</div>
+                          <div className="text-xs text-muted-foreground">Winner each score</div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setScoringMode('hybrid')}
+                          className={`p-3 rounded-lg border text-left transition-all ${
+                            scoringMode === 'hybrid'
+                              ? 'border-primary bg-primary/10'
+                              : 'border-border hover:border-muted-foreground'
+                          }`}
+                        >
+                          <div className="font-medium text-sm">Hybrid</div>
+                          <div className="text-xs text-muted-foreground">Every score + quarters</div>
                         </button>
                       </div>
                     </div>

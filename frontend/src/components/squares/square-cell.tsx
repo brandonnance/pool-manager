@@ -16,6 +16,19 @@ export type WinningRound =
   | 'score_change_final'
   | 'score_change_final_reverse'
   | 'score_change_final_both'
+  // Hybrid mode quarter winners
+  | 'hybrid_q1'
+  | 'hybrid_q1_reverse'
+  | 'hybrid_q1_both'
+  | 'hybrid_halftime'
+  | 'hybrid_halftime_reverse'
+  | 'hybrid_halftime_both'
+  | 'hybrid_q3'
+  | 'hybrid_q3_reverse'
+  | 'hybrid_q3_both'
+  | 'hybrid_final'
+  | 'hybrid_final_reverse'
+  | 'hybrid_final_both'
   | null
 
 // Winning colors for each round type
@@ -68,11 +81,65 @@ const winningColors = {
     normal: 'border-violet-400',
     text: 'text-violet-700',
   },
+  // Hybrid mode quarter winners
+  hybrid_q1: {
+    normal: 'bg-amber-100 border-amber-400',
+    text: 'text-amber-700',
+  },
+  hybrid_q1_reverse: {
+    normal: 'bg-orange-100 border-orange-400',
+    text: 'text-orange-700',
+  },
+  hybrid_q1_both: {
+    normal: 'border-amber-400',
+    text: 'text-amber-700',
+  },
+  hybrid_halftime: {
+    normal: 'bg-blue-100 border-blue-400',
+    text: 'text-blue-700',
+  },
+  hybrid_halftime_reverse: {
+    normal: 'bg-cyan-100 border-cyan-400',
+    text: 'text-cyan-700',
+  },
+  hybrid_halftime_both: {
+    normal: 'border-blue-400',
+    text: 'text-blue-700',
+  },
+  hybrid_q3: {
+    normal: 'bg-teal-100 border-teal-400',
+    text: 'text-teal-700',
+  },
+  hybrid_q3_reverse: {
+    normal: 'bg-green-100 border-green-400',
+    text: 'text-green-700',
+  },
+  hybrid_q3_both: {
+    normal: 'border-teal-400',
+    text: 'text-teal-700',
+  },
+  hybrid_final: {
+    normal: 'bg-purple-100 border-purple-400',
+    text: 'text-purple-700',
+  },
+  hybrid_final_reverse: {
+    normal: 'bg-fuchsia-100 border-fuchsia-400',
+    text: 'text-fuchsia-700',
+  },
+  hybrid_final_both: {
+    normal: 'border-purple-400',
+    text: 'text-purple-700',
+  },
 } as const
 
 // Gradient backgrounds for "both" winning states
 const bothGradient = 'bg-gradient-to-br from-emerald-100 from-50% to-rose-100 to-50%'
 const finalBothGradient = 'bg-gradient-to-br from-purple-100 from-50% to-fuchsia-100 to-50%'
+// Hybrid mode gradients
+const hybridQ1BothGradient = 'bg-gradient-to-br from-amber-100 from-50% to-orange-100 to-50%'
+const hybridHalftimeBothGradient = 'bg-gradient-to-br from-blue-100 from-50% to-cyan-100 to-50%'
+const hybridQ3BothGradient = 'bg-gradient-to-br from-teal-100 from-50% to-green-100 to-50%'
+const hybridFinalBothGradient = 'bg-gradient-to-br from-purple-100 from-50% to-fuchsia-100 to-50%'
 
 export interface NoAccountSquareCellProps {
   rowIndex: number
@@ -118,6 +185,19 @@ export function SquareCell({
       }
       if (winningRound === 'score_change_final_both') {
         return cn(base, finalBothGradient, colors.normal)
+      }
+      // Hybrid mode "both" gradients
+      if (winningRound === 'hybrid_q1_both') {
+        return cn(base, hybridQ1BothGradient, colors.normal)
+      }
+      if (winningRound === 'hybrid_halftime_both') {
+        return cn(base, hybridHalftimeBothGradient, colors.normal)
+      }
+      if (winningRound === 'hybrid_q3_both') {
+        return cn(base, hybridQ3BothGradient, colors.normal)
+      }
+      if (winningRound === 'hybrid_final_both') {
+        return cn(base, hybridFinalBothGradient, colors.normal)
       }
       return cn(base, colors.normal)
     }

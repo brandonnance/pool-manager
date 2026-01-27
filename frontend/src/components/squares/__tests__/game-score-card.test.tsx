@@ -31,6 +31,8 @@ describe('GameScoreCard', () => {
     pays_halftime: false,
     display_order: 1,
     espn_game_id: null,
+    current_period: null,
+    current_clock: null,
   }
 
   const defaultProps = {

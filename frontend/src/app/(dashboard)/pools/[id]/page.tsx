@@ -273,8 +273,8 @@ export default async function PoolDetailPage({ params }: PageProps) {
           .in('sq_game_id', gameIds)
         sqWinnersData = winners ?? []
 
-        // Get score changes (for single_game mode with score_change scoring)
-        if (sqPool.mode === 'single_game' && sqPool.scoring_mode === 'score_change') {
+        // Get score changes (for single_game mode with score_change or hybrid scoring)
+        if (sqPool.mode === 'single_game' && (sqPool.scoring_mode === 'score_change' || sqPool.scoring_mode === 'hybrid')) {
           const { data: scoreChanges } = await supabase
             .from('sq_score_changes')
             .select('*')
