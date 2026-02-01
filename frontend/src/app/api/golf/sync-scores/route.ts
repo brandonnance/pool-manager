@@ -163,8 +163,17 @@ export async function POST(request: NextRequest) {
         totalStrokes += 80 + 80 // Penalty for missed cut
       }
 
-      // Store the to-par score for live display
-      const toPar = score.toPar ?? 0
+      // Calculate to-par score
+      // For CUT players, we need to add the penalty to their to_par
+      // since the API stops updating their score after they're cut
+      let toPar = score.toPar ?? 0
+      if (!madeCut) {
+        // Add penalty rounds to to_par calculation
+        // Each 80 on a par-X course = (80 - par) over par per round
+        // For R3 and R4, that's 2 * (80 - par) additional strokes over par
+        const penaltyToPar = (80 - par) * 2 // e.g., (80-72) * 2 = +16
+        toPar = toPar + penaltyToPar
+      }
 
       // Convert thru to number - "F" means finished (18 holes)
       let thruHoles: number | null = null

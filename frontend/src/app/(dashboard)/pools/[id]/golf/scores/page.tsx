@@ -345,7 +345,16 @@ export default function GolfScoresPage() {
 
     // Calculate to_par
     const par = tournament.par || 72
-    const toPar = roundsPlayed > 0 ? totalScore - (par * roundsPlayed) : 0
+    let toPar = 0
+    if (roundsPlayed > 0) {
+      if (!editForm.made_cut && roundsPlayed === 2) {
+        // For missed cut: to_par based on all 4 rounds (including 80s for R3/R4)
+        toPar = totalScore - (par * 4)
+      } else {
+        // Normal calculation based on rounds played
+        toPar = totalScore - (par * roundsPlayed)
+      }
+    }
 
     const upsertData = {
       tournament_id: tournament.id,
