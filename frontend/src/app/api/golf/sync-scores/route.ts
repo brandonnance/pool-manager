@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Prepare upserts
-    const results: { golfer_id: string; name: string; position: string; total: number }[] = []
+    const results: { golfer_id: string; name: string; position: string; total: number; status: string }[] = []
     const upserts: Array<{
       tournament_id: string
       golfer_id: string
@@ -110,10 +110,14 @@ export async function POST(request: NextRequest) {
       round_4: number | null
       total_score: number
       made_cut: boolean
+      status: string
       position: string
       thru: number | null
       to_par: number
     }> = []
+
+    // Track golfers who need field status updates (withdrawn/dq)
+    const fieldStatusUpdates: Array<{ golferId: string; status: string }> = []
 
     for (const score of scores) {
       const golferId = golferMap.get(score.playerId)
@@ -122,57 +126,64 @@ export async function POST(request: NextRequest) {
         continue
       }
 
-      const madeCut = score.status !== 'cut'
       const par = tournament.par || 72
+      const isWithdrawn = score.status === 'withdrawn'
+      const isDisqualified = score.status === 'disqualified'
+      const isCut = score.status === 'cut'
+      const madeCut = !isCut && !isWithdrawn && !isDisqualified
 
-      // Use totalStrokes from API if available (for completed rounds)
-      // Otherwise calculate from individual round scores
+      // Determine status string
+      let status = 'active'
+      if (isWithdrawn) status = 'withdrawn'
+      else if (isDisqualified) status = 'dq'
+      else if (isCut) status = 'cut'
+
+      // Track field status updates for WD/DQ players
+      if (isWithdrawn || isDisqualified) {
+        fieldStatusUpdates.push({ golferId, status })
+      }
+
+      // For withdrawn/DQ players: assign 80s for all 4 rounds
+      // For cut players: 80s for R3 and R4 only
+      // For active players: use actual scores
+      let round1 = score.round1 ?? null
+      let round2 = score.round2 ?? null
+      let round3 = score.round3 ?? null
+      let round4 = score.round4 ?? null
       let totalStrokes = 0
-      let roundsPlayed = 0
+      let toPar = 0
 
-      // First try to use the API's totalStrokes (from totalStrokesFromCompletedRounds)
-      if (score.totalStrokes !== undefined && !isNaN(score.totalStrokes)) {
-        totalStrokes = score.totalStrokes
-        // Count completed rounds
-        if (score.round1 !== undefined && score.round1 !== null) roundsPlayed++
-        if (score.round2 !== undefined && score.round2 !== null) roundsPlayed++
-        if (score.round3 !== undefined && score.round3 !== null) roundsPlayed++
-        if (score.round4 !== undefined && score.round4 !== null) roundsPlayed++
+      if (isWithdrawn || isDisqualified) {
+        // Withdrawn/DQ: 80s for all 4 rounds
+        round1 = 80
+        round2 = 80
+        round3 = 80
+        round4 = 80
+        totalStrokes = 320
+        toPar = (80 - par) * 4 // e.g., (80-72) * 4 = +32
+        console.log(`[sync-scores] ${score.playerName} ${status}: assigning 80s for all rounds, to_par=${toPar}`)
+      } else if (isCut) {
+        // Cut: Use actual R1/R2, 80s for R3/R4
+        round3 = 80
+        round4 = 80
+        totalStrokes = (round1 ?? 0) + (round2 ?? 0) + 160
+        // Calculate to_par: actual rounds + penalty
+        const actualToPar = score.toPar ?? 0
+        const penaltyToPar = (80 - par) * 2 // e.g., +16 for par 72
+        toPar = actualToPar + penaltyToPar
       } else {
-        // Fall back to calculating from round scores
-        if (score.round1 !== undefined && score.round1 !== null) {
-          totalStrokes += score.round1
-          roundsPlayed++
+        // Active player: use actual scores
+        // Use totalStrokes from API if available
+        if (score.totalStrokes !== undefined && !isNaN(score.totalStrokes)) {
+          totalStrokes = score.totalStrokes
+        } else {
+          // Calculate from round scores
+          if (round1 !== null) totalStrokes += round1
+          if (round2 !== null) totalStrokes += round2
+          if (round3 !== null) totalStrokes += round3
+          if (round4 !== null) totalStrokes += round4
         }
-        if (score.round2 !== undefined && score.round2 !== null) {
-          totalStrokes += score.round2
-          roundsPlayed++
-        }
-        if (score.round3 !== undefined && score.round3 !== null) {
-          totalStrokes += score.round3
-          roundsPlayed++
-        }
-        if (score.round4 !== undefined && score.round4 !== null) {
-          totalStrokes += score.round4
-          roundsPlayed++
-        }
-      }
-
-      // If player missed cut, add penalty rounds (80 each for R3 and R4)
-      if (!madeCut && roundsPlayed === 2) {
-        totalStrokes += 80 + 80 // Penalty for missed cut
-      }
-
-      // Calculate to-par score
-      // For CUT players, we need to add the penalty to their to_par
-      // since the API stops updating their score after they're cut
-      let toPar = score.toPar ?? 0
-      if (!madeCut) {
-        // Add penalty rounds to to_par calculation
-        // Each 80 on a par-X course = (80 - par) over par per round
-        // For R3 and R4, that's 2 * (80 - par) additional strokes over par
-        const penaltyToPar = (80 - par) * 2 // e.g., (80-72) * 2 = +16
-        toPar = toPar + penaltyToPar
+        toPar = score.toPar ?? 0
       }
 
       // Convert thru to number - "F" means finished (18 holes)
@@ -193,13 +204,14 @@ export async function POST(request: NextRequest) {
       upserts.push({
         tournament_id: tournament.id,
         golfer_id: golferId,
-        round_1: score.round1 ?? null,
-        round_2: score.round2 ?? null,
-        round_3: score.round3 ?? null,
-        round_4: score.round4 ?? null,
+        round_1: round1,
+        round_2: round2,
+        round_3: round3,
+        round_4: round4,
         total_score: totalStrokes,
         made_cut: madeCut,
-        position: score.position || '-',
+        status,
+        position: score.position || (isWithdrawn ? 'WD' : isDisqualified ? 'DQ' : '-'),
         thru: thruHoles,
         to_par: toPar,
       })
@@ -209,6 +221,7 @@ export async function POST(request: NextRequest) {
         name: score.playerName,
         position: score.position || '-',
         total: totalStrokes,
+        status,
       })
     }
 
@@ -225,6 +238,22 @@ export async function POST(request: NextRequest) {
       if (upsertError) {
         console.error('[sync-scores] Upsert error:', upsertError)
         return NextResponse.json({ error: 'Failed to save scores' }, { status: 500 })
+      }
+    }
+
+    // Update tournament field status for withdrawn/dq players
+    if (fieldStatusUpdates.length > 0) {
+      console.log(`[sync-scores] Updating field status for ${fieldStatusUpdates.length} players`)
+      for (const update of fieldStatusUpdates) {
+        const { error: fieldUpdateError } = await supabase
+          .from('gp_tournament_field')
+          .update({ status: update.status })
+          .eq('tournament_id', tournament.id)
+          .eq('golfer_id', update.golferId)
+
+        if (fieldUpdateError) {
+          console.error(`[sync-scores] Failed to update field status for ${update.golferId}:`, fieldUpdateError)
+        }
       }
     }
 
@@ -250,12 +279,20 @@ export async function POST(request: NextRequest) {
         .eq('id', tournament.id)
     }
 
+    // Count withdrawals and DQs
+    const withdrawals = results.filter(r => r.status === 'withdrawn').length
+    const disqualifications = results.filter(r => r.status === 'dq').length
+    const cuts = results.filter(r => r.status === 'cut').length
+
     return NextResponse.json({
       success: true,
       message: `Synced ${upserts.length} golfer scores`,
       matchedGolfers: upserts.length,
       totalFromApi: scores.length,
       tournamentStatus: newStatus,
+      withdrawals,
+      disqualifications,
+      cuts,
     })
 
   } catch (error) {

@@ -184,7 +184,7 @@ export default async function GolfPublicPage({ params }: PageProps) {
     const { data: golferResults } = golferIds.length > 0
       ? await supabase
           .from('gp_golfer_results')
-          .select('golfer_id, total_score, to_par, position, made_cut, round_1, round_2, round_3, round_4, thru')
+          .select('golfer_id, total_score, to_par, position, made_cut, round_1, round_2, round_3, round_4, thru, status')
           .eq('tournament_id', tournament.id)
           .in('golfer_id', golferIds)
       : { data: [] }
@@ -227,6 +227,7 @@ export default async function GolfPublicPage({ params }: PageProps) {
           score: golferScore,
           position: result?.position ?? '-',
           madeCut: result?.made_cut ?? true,
+          status: result?.status ?? 'active',
           thru: result?.thru ?? null,
           round1: result?.round_1 ?? null,
           round2: result?.round_2 ?? null,
@@ -247,6 +248,7 @@ export default async function GolfPublicPage({ params }: PageProps) {
         score: g.totalScore,
         position: g.position ?? '-',
         madeCut: g.madeCut,
+        status: g.status ?? 'active',
         thru: g.thru ?? null,
         round1: g.round1 ?? null,
         round2: g.round2 ?? null,
@@ -283,7 +285,7 @@ export default async function GolfPublicPage({ params }: PageProps) {
     const { data: allGolferResults } = allGolferIds.length > 0
       ? await supabase
           .from('gp_golfer_results')
-          .select('golfer_id, total_score, to_par, position, made_cut, round_1, round_2, round_3, round_4, thru')
+          .select('golfer_id, total_score, to_par, position, made_cut, round_1, round_2, round_3, round_4, thru, status')
           .eq('tournament_id', tournament.id)
           .in('golfer_id', allGolferIds)
       : { data: [] }
@@ -328,12 +330,59 @@ export default async function GolfPublicPage({ params }: PageProps) {
     // Calculate the unicorn team
     const unicornTeam = findUnicornTeam(unicornGolfersByTier, gpPool.min_tier_points ?? 21)
 
+    // Build field data for the "Field by Tier" tab
+    const fieldByTier: Record<number, Array<{
+      golferId: string
+      golferName: string
+      tier: number
+      toPar: number
+      position: string
+      madeCut: boolean
+      status?: string
+      thru: number | null
+      round1: number | null
+      round2: number | null
+      round3: number | null
+      round4: number | null
+    }>> = {}
+
+    for (const ta of allTierAssignments ?? []) {
+      const golfer = ta.gp_golfers as unknown as { id: string; name: string }
+      const result = allResultsMap.get(golfer.id)
+      const tier = ta.tier_value
+
+      if (!fieldByTier[tier]) {
+        fieldByTier[tier] = []
+      }
+
+      fieldByTier[tier].push({
+        golferId: golfer.id,
+        golferName: golfer.name,
+        tier: tier,
+        toPar: result?.to_par ?? 0,
+        position: result?.position ?? '-',
+        madeCut: result?.made_cut ?? true,
+        status: result?.status ?? 'active',
+        thru: result?.thru ?? null,
+        round1: result?.round_1 ?? null,
+        round2: result?.round_2 ?? null,
+        round3: result?.round_3 ?? null,
+        round4: result?.round_4 ?? null,
+      })
+    }
+
+    // Sort each tier by score (ascending - best first)
+    for (const tier in fieldByTier) {
+      fieldByTier[Number(tier)].sort((a, b) => a.toPar - b.toPar)
+    }
+
     return (
       <GolfPublicLeaderboard
         {...commonProps}
         entries={entriesWithScores}
         tournamentId={tournament.id}
         unicornTeam={unicornTeam}
+        fieldByTier={fieldByTier}
       />
     )
   }

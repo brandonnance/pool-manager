@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
   // Get golfer results
   const { data: results } = await supabase
     .from('gp_golfer_results')
-    .select('golfer_id, round_1, round_2, round_3, round_4, made_cut, total_score, to_par, thru, position')
+    .select('golfer_id, round_1, round_2, round_3, round_4, made_cut, total_score, to_par, thru, position, status')
     .eq('tournament_id', gpPool.tournament_id)
 
   const resultMap = new Map(results?.map(r => [r.golfer_id, r]) || [])
@@ -98,6 +98,7 @@ export async function GET(request: NextRequest) {
     const golferScores = entryPicks.map(pick => {
       const result = resultMap.get(pick.golfer_id)
       const madeCut = result?.made_cut ?? true
+      const status = result?.status ?? 'active'
 
       // Always use to_par for scoring - it's relative to par (e.g., -5 means 5 under)
       // This is consistent whether golfer is mid-round or finished
@@ -116,6 +117,7 @@ export async function GET(request: NextRequest) {
         thru: result?.thru ?? null,
         position: result?.position ?? null,
         madeCut,
+        status, // Include status for WD/DQ display
         counted: false, // Will be set by calculateEntryScore
       }
     })

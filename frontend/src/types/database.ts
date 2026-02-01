@@ -657,6 +657,7 @@ export type Database = {
           round_2: number | null
           round_3: number | null
           round_4: number | null
+          status: string | null
           thru: number | null
           to_par: number | null
           total_score: number | null
@@ -672,6 +673,7 @@ export type Database = {
           round_2?: number | null
           round_3?: number | null
           round_4?: number | null
+          status?: string | null
           thru?: number | null
           to_par?: number | null
           total_score?: number | null
@@ -687,6 +689,7 @@ export type Database = {
           round_2?: number | null
           round_3?: number | null
           round_4?: number | null
+          status?: string | null
           thru?: number | null
           to_par?: number | null
           total_score?: number | null

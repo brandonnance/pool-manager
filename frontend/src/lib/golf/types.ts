@@ -64,6 +64,7 @@ export interface GolferEntryScore {
   thru?: number | null // Holes completed in current round
   position?: string | null // Tournament position (e.g., "1", "T2")
   madeCut: boolean
+  status?: string // 'active' | 'cut' | 'withdrawn' | 'dq'
   counted: boolean // Whether this golfer counts towards best 4
 }
 

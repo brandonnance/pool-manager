@@ -4,9 +4,31 @@ import { useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Trophy, MapPin, Search, ChevronDown, ChevronUp } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Trophy, MapPin, Search, ChevronDown, ChevronUp, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { getTierColor } from '@/lib/golf/types'
+import { getTierColor, TIER_INFO } from '@/lib/golf/types'
+
+// Tier border colors for the Field by Tier view - must be explicit for Tailwind to include them
+const TIER_BORDER_COLORS: Record<number, string> = {
+  0: 'border-amber-500',
+  1: 'border-purple-600',
+  2: 'border-blue-600',
+  3: 'border-green-600',
+  4: 'border-yellow-600',
+  5: 'border-orange-600',
+  6: 'border-red-600',
+}
+
+const TIER_BG_LIGHT: Record<number, string> = {
+  0: 'bg-amber-50',
+  1: 'bg-purple-50',
+  2: 'bg-blue-50',
+  3: 'bg-green-50',
+  4: 'bg-yellow-50',
+  5: 'bg-orange-50',
+  6: 'bg-red-50',
+}
 import { UnicornCard } from './unicorn-card'
 import type { UnicornTeam } from '@/lib/golf/unicorn'
 
@@ -17,6 +39,7 @@ interface Pick {
   score: number
   position: string
   madeCut: boolean
+  status?: string // 'active' | 'cut' | 'withdrawn' | 'dq'
   thru: number | null
   round1: number | null
   round2: number | null
@@ -33,6 +56,21 @@ interface Entry {
   picks: Pick[]
 }
 
+interface FieldGolfer {
+  golferId: string
+  golferName: string
+  tier: number
+  toPar: number
+  position: string
+  madeCut: boolean
+  status?: string // 'active' | 'cut' | 'withdrawn' | 'dq'
+  thru: number | null
+  round1: number | null
+  round2: number | null
+  round3: number | null
+  round4: number | null
+}
+
 interface GolfPublicLeaderboardProps {
   poolName: string
   tournamentName: string
@@ -41,6 +79,7 @@ interface GolfPublicLeaderboardProps {
   entries: Entry[]
   tournamentId: string
   unicornTeam?: UnicornTeam | null
+  fieldByTier?: Record<number, FieldGolfer[]>
 }
 
 function formatScore(score: number): string {
@@ -55,9 +94,35 @@ export function GolfPublicLeaderboard({
   tournamentVenue,
   entries,
   unicornTeam,
+  fieldByTier,
 }: GolfPublicLeaderboardProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null)
+  const [fieldSearchQuery, setFieldSearchQuery] = useState('')
+
+  // Sort tiers numerically for the field view
+  const sortedTiers = useMemo(() => {
+    if (!fieldByTier) return []
+    return Object.keys(fieldByTier)
+      .map(Number)
+      .sort((a, b) => a - b)
+  }, [fieldByTier])
+
+  // Filter field golfers by search query
+  const filteredFieldByTier = useMemo(() => {
+    if (!fieldByTier || !fieldSearchQuery.trim()) return fieldByTier
+    const query = fieldSearchQuery.toLowerCase()
+    const filtered: Record<number, FieldGolfer[]> = {}
+    for (const [tier, golfers] of Object.entries(fieldByTier)) {
+      const matchingGolfers = golfers.filter(g =>
+        g.golferName.toLowerCase().includes(query)
+      )
+      if (matchingGolfers.length > 0) {
+        filtered[Number(tier)] = matchingGolfers
+      }
+    }
+    return filtered
+  }, [fieldByTier, fieldSearchQuery])
 
   // Calculate rankings on FULL list first (handle ties)
   const rankedEntries = useMemo(() => {
@@ -126,41 +191,55 @@ export function GolfPublicLeaderboard({
       </header>
 
       <main className="max-w-4xl mx-auto p-4 space-y-4">
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search entries..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
-        </div>
+        <Tabs defaultValue="standings" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="standings" className="flex items-center gap-2">
+              <Trophy className="h-4 w-4" />
+              Standings
+            </TabsTrigger>
+            <TabsTrigger value="field" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Field by Tier
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Stats */}
-        <div className="text-sm text-muted-foreground">
-          {filteredEntries.length} {filteredEntries.length === 1 ? 'entry' : 'entries'}
-          {searchQuery && filteredEntries.length !== entries.length && (
-            <span> (filtered from {entries.length})</span>
-          )}
-        </div>
+          {/* Standings Tab */}
+          <TabsContent value="standings" className="space-y-4 mt-4">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search entries..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
 
-        {/* Unicorn Team */}
-        {unicornTeam && <UnicornCard unicornTeam={unicornTeam} />}
+            {/* Stats */}
+            <div className="text-sm text-muted-foreground">
+              {filteredEntries.length} {filteredEntries.length === 1 ? 'entry' : 'entries'}
+              {searchQuery && filteredEntries.length !== entries.length && (
+                <span> (filtered from {entries.length})</span>
+              )}
+            </div>
 
-        {/* Leaderboard */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Standings</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {filteredEntries.length === 0 ? (
-              <div className="p-8 text-center text-muted-foreground">
-                {searchQuery ? 'No entries match your search' : 'No entries yet'}
-              </div>
-            ) : (
-              <div className="divide-y">
-                {filteredEntries.map((entry) => {
+            {/* Unicorn Team */}
+            {unicornTeam && <UnicornCard unicornTeam={unicornTeam} />}
+
+            {/* Leaderboard */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg">Standings</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                {filteredEntries.length === 0 ? (
+                  <div className="p-8 text-center text-muted-foreground">
+                    {searchQuery ? 'No entries match your search' : 'No entries yet'}
+                  </div>
+                ) : (
+                  <div className="divide-y">
+                    {filteredEntries.map((entry) => {
                   const isExpanded = expandedEntryId === entry.id
                   const isLeader = entry.rank === 1
 
@@ -245,8 +324,12 @@ export function GolfPublicLeaderboard({
                             {[...entry.picks].sort((a, b) => a.score - b.score).map((pick) => {
                               // Use the counted flag if available, otherwise fall back to sorting position
                               const isDropped = pick.counted === false
-                              // Format thru display - show CUT if missed cut, F if finished, hole number otherwise
+                              const isWithdrawn = pick.status === 'withdrawn'
+                              const isDQ = pick.status === 'dq'
+                              // Format thru display - show WD/DQ/CUT status, F if finished, hole number otherwise
                               const getThruDisplay = () => {
+                                if (isWithdrawn) return 'WD'
+                                if (isDQ) return 'DQ'
                                 if (!pick.madeCut) return 'CUT'
                                 if (pick.thru === 18) return 'F'
                                 // If thru is null but we have a completed round score, infer they finished
@@ -259,6 +342,7 @@ export function GolfPublicLeaderboard({
                                 return pick.thru.toString()
                               }
                               const thruDisplay = getThruDisplay()
+                              const hasNegativeStatus = isWithdrawn || isDQ || !pick.madeCut
 
                               // Format round score - show 80 for cut players in R3/R4
                               const formatRound = (score: number | null, roundNum: number): string => {
@@ -275,7 +359,7 @@ export function GolfPublicLeaderboard({
                                   className={cn(
                                     'rounded border',
                                     isDropped ? 'bg-red-50 border-red-200' : 'bg-white',
-                                    !pick.madeCut && 'opacity-60'
+                                    hasNegativeStatus && 'opacity-60'
                                   )}
                                 >
                                   {/* Mobile: Name row */}
@@ -392,6 +476,240 @@ export function GolfPublicLeaderboard({
             )}
           </CardContent>
         </Card>
+          </TabsContent>
+
+          {/* Field by Tier Tab */}
+          <TabsContent value="field" className="space-y-4 mt-4">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search golfers..."
+                value={fieldSearchQuery}
+                onChange={(e) => setFieldSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
+            {/* Stats */}
+            <div className="text-sm text-muted-foreground">
+              {Object.values(filteredFieldByTier ?? {}).flat().length} golfers in field
+              {fieldSearchQuery && (
+                <span> (filtered)</span>
+              )}
+            </div>
+
+            {/* Tier Groups */}
+            {!fieldByTier || sortedTiers.length === 0 ? (
+              <div className="p-8 text-center text-muted-foreground">
+                No field data available
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {sortedTiers.map((tier) => {
+                  const golfers = filteredFieldByTier?.[tier]
+                  if (!golfers || golfers.length === 0) return null
+
+                  // Sort golfers by score (best first)
+                  const sortedGolfers = [...golfers].sort((a, b) => a.toPar - b.toPar)
+
+                  // Get tier styling
+                  const tierInfo = TIER_INFO[tier] ?? { label: `Tier ${tier}`, color: 'bg-gray-500', owgrRange: '' }
+                  const tierBorderColor = TIER_BORDER_COLORS[tier] ?? 'border-gray-500'
+                  const tierBgLight = TIER_BG_LIGHT[tier] ?? 'bg-gray-50'
+
+                  return (
+                    <div
+                      key={tier}
+                      className={cn(
+                        'rounded-xl border-2 overflow-hidden',
+                        tierBorderColor
+                      )}
+                    >
+                      {/* Tier Header */}
+                      <div className={cn(
+                        'px-4 py-3 flex items-center justify-between',
+                        tierInfo.color,
+                        'text-white'
+                      )}>
+                        <div className="flex items-center gap-3">
+                          <span className="font-bold text-lg">
+                            {tier === 0 ? 'Elite' : `Tier ${tier}`}
+                          </span>
+                          <Badge variant="secondary" className="bg-white/20 text-white hover:bg-white/30">
+                            {sortedGolfers.length} golfer{sortedGolfers.length !== 1 ? 's' : ''}
+                          </Badge>
+                        </div>
+                        <div className="text-sm opacity-90">
+                          {tier === 0 ? 'Manually assigned' : `OWGR ${tierInfo.owgrRange}`}
+                        </div>
+                      </div>
+
+                      {/* Golfer List */}
+                      <div className={cn('divide-y', tierBgLight)}>
+                        {/* Column Headers - Desktop */}
+                        <div className="hidden sm:grid grid-cols-[2.5rem_1fr_3rem_2.5rem_2.5rem_2.5rem_2.5rem_2.5rem] gap-1 text-xs font-medium text-muted-foreground uppercase tracking-wide py-2 px-4 bg-white/50">
+                          <span>POS</span>
+                          <span>GOLFER</span>
+                          <span className="text-right">TOT</span>
+                          <span className="text-center">THR</span>
+                          <span className="text-center">R1</span>
+                          <span className="text-center">R2</span>
+                          <span className="text-center">R3</span>
+                          <span className="text-center">R4</span>
+                        </div>
+
+                        {sortedGolfers.map((golfer) => {
+                          const isWithdrawn = golfer.status === 'withdrawn'
+                          const isDQ = golfer.status === 'dq'
+                          const hasNegativeStatus = isWithdrawn || isDQ || !golfer.madeCut
+
+                          // Format thru display
+                          const getThruDisplay = () => {
+                            if (isWithdrawn) return 'WD'
+                            if (isDQ) return 'DQ'
+                            if (!golfer.madeCut) return 'CUT'
+                            if (golfer.thru === 18) return 'F'
+                            if (golfer.thru === null || golfer.thru === undefined) {
+                              if (golfer.round1 !== null || golfer.round2 !== null || golfer.round3 !== null || golfer.round4 !== null) {
+                                return 'F'
+                              }
+                              return '-'
+                            }
+                            return golfer.thru.toString()
+                          }
+                          const thruDisplay = getThruDisplay()
+
+                          // Format round score - WD/DQ players show 80 for all rounds
+                          const formatRound = (score: number | null, roundNum: number): string => {
+                            if (isWithdrawn || isDQ) {
+                              return '80'
+                            }
+                            if (!golfer.madeCut && (roundNum === 3 || roundNum === 4)) {
+                              return '80'
+                            }
+                            if (score === null || score === undefined) return '-'
+                            return score.toString()
+                          }
+
+                          return (
+                            <div
+                              key={golfer.golferId}
+                              className={cn(
+                                'bg-white',
+                                hasNegativeStatus && 'opacity-60'
+                              )}
+                            >
+                              {/* Mobile: Name row */}
+                              <div className="sm:hidden flex items-center gap-1.5 px-3 pt-2 pb-0.5">
+                                <span className={cn(
+                                  'text-sm font-medium truncate',
+                                  hasNegativeStatus && 'line-through text-muted-foreground'
+                                )}>
+                                  {golfer.golferName}
+                                </span>
+                              </div>
+
+                              {/* Mobile: Stats row */}
+                              <div className="sm:hidden grid grid-cols-[2rem_2.5rem_2rem_2rem_2rem_2rem_2rem] gap-1 text-sm px-3 pb-2 items-center font-mono">
+                                <span className="text-muted-foreground text-xs">{golfer.position}</span>
+                                <span className={cn(
+                                  'font-bold text-right',
+                                  golfer.toPar < 0 && 'text-green-600',
+                                  golfer.toPar > 0 && 'text-red-600'
+                                )}>
+                                  {formatScore(golfer.toPar)}
+                                </span>
+                                <span className={cn(
+                                  'text-center text-xs',
+                                  hasNegativeStatus ? 'text-red-600 font-medium' : 'text-muted-foreground'
+                                )}>
+                                  {thruDisplay}
+                                </span>
+                                <span className={cn(
+                                  'text-center text-muted-foreground text-xs',
+                                  (isWithdrawn || isDQ) && 'text-red-600'
+                                )}>{formatRound(golfer.round1, 1)}</span>
+                                <span className={cn(
+                                  'text-center text-muted-foreground text-xs',
+                                  (isWithdrawn || isDQ) && 'text-red-600'
+                                )}>{formatRound(golfer.round2, 2)}</span>
+                                <span className={cn(
+                                  'text-center text-xs',
+                                  hasNegativeStatus ? 'text-red-600' : 'text-muted-foreground'
+                                )}>
+                                  {formatRound(golfer.round3, 3)}
+                                </span>
+                                <span className={cn(
+                                  'text-center text-xs',
+                                  hasNegativeStatus ? 'text-red-600' : 'text-muted-foreground'
+                                )}>
+                                  {formatRound(golfer.round4, 4)}
+                                </span>
+                              </div>
+
+                              {/* Desktop: Single row layout */}
+                              <div className="hidden sm:grid grid-cols-[2.5rem_1fr_3rem_2.5rem_2.5rem_2.5rem_2.5rem_2.5rem] gap-1 text-sm py-2 px-4 items-center font-mono">
+                                {/* Position */}
+                                <span className="text-muted-foreground text-xs">
+                                  {golfer.position}
+                                </span>
+
+                                {/* Golfer name */}
+                                <span className={cn('truncate font-sans', hasNegativeStatus && 'line-through text-muted-foreground')}>
+                                  {golfer.golferName}
+                                </span>
+
+                                {/* Total to-par */}
+                                <span className={cn(
+                                  'font-bold text-right',
+                                  golfer.toPar < 0 && 'text-green-600',
+                                  golfer.toPar > 0 && 'text-red-600'
+                                )}>
+                                  {formatScore(golfer.toPar)}
+                                </span>
+
+                                {/* Thru */}
+                                <span className={cn(
+                                  'text-center text-xs',
+                                  hasNegativeStatus ? 'text-red-600 font-medium' : 'text-muted-foreground'
+                                )}>
+                                  {thruDisplay}
+                                </span>
+
+                                {/* R1-R4 */}
+                                <span className={cn(
+                                  'text-center text-muted-foreground',
+                                  (isWithdrawn || isDQ) && 'text-red-600'
+                                )}>{formatRound(golfer.round1, 1)}</span>
+                                <span className={cn(
+                                  'text-center text-muted-foreground',
+                                  (isWithdrawn || isDQ) && 'text-red-600'
+                                )}>{formatRound(golfer.round2, 2)}</span>
+                                <span className={cn(
+                                  'text-center',
+                                  hasNegativeStatus ? 'text-red-600' : 'text-muted-foreground'
+                                )}>
+                                  {formatRound(golfer.round3, 3)}
+                                </span>
+                                <span className={cn(
+                                  'text-center',
+                                  hasNegativeStatus ? 'text-red-600' : 'text-muted-foreground'
+                                )}>
+                                  {formatRound(golfer.round4, 4)}
+                                </span>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </main>
 
       {/* Footer */}

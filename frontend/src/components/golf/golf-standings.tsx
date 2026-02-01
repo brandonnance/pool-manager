@@ -20,6 +20,7 @@ interface GolferScore {
   thru?: number | null
   position?: string | null
   madeCut: boolean
+  status?: string // 'active' | 'cut' | 'withdrawn' | 'dq'
   counted: boolean
 }
 
@@ -213,9 +214,14 @@ export function GolfStandings({ standings, currentUserId, tournamentStatus }: Go
 function GolferScoreRow({ golfer }: { golfer: GolferScore }) {
   // golfer.totalScore is already to-par
   const toPar = golfer.totalScore
+  const isWithdrawn = golfer.status === 'withdrawn'
+  const isDQ = golfer.status === 'dq'
+  const hasNegativeStatus = isWithdrawn || isDQ || !golfer.madeCut
 
-  // Format thru display - show CUT if missed cut, F if finished round, hole number otherwise
+  // Format thru display - show WD/DQ/CUT if applicable, F if finished round, hole number otherwise
   const getThruDisplay = () => {
+    if (isWithdrawn) return 'WD'
+    if (isDQ) return 'DQ'
     if (!golfer.madeCut) return 'CUT'
     if (golfer.thru === 18) return 'F'
     // If thru is null but we have a completed round score, infer they finished
@@ -230,8 +236,11 @@ function GolferScoreRow({ golfer }: { golfer: GolferScore }) {
     return golfer.thru.toString()
   }
 
-  // Format round score - show 80 for cut players in R3/R4
+  // Format round score - WD/DQ players show 80 for all rounds, cut players show 80 for R3/R4
   const formatRound = (score: number | null, roundNum: number): string => {
+    if (isWithdrawn || isDQ) {
+      return '80'
+    }
     if (!golfer.madeCut && (roundNum === 3 || roundNum === 4)) {
       return '80'
     }
@@ -252,7 +261,7 @@ function GolferScoreRow({ golfer }: { golfer: GolferScore }) {
         )}>
           {golfer.tier}
         </span>
-        <span className={cn('truncate', !golfer.madeCut && 'line-through text-muted-foreground')}>
+        <span className={cn('truncate', hasNegativeStatus && 'line-through text-muted-foreground')}>
           {golfer.golferName}
         </span>
       </div>
@@ -269,23 +278,29 @@ function GolferScoreRow({ golfer }: { golfer: GolferScore }) {
       {/* Thru */}
       <span className={cn(
         'text-center text-xs',
-        !golfer.madeCut ? 'text-red-600 font-medium' : 'text-muted-foreground'
+        hasNegativeStatus ? 'text-red-600 font-medium' : 'text-muted-foreground'
       )}>
         {getThruDisplay()}
       </span>
 
       {/* R1-R4 */}
-      <span className="text-center text-muted-foreground">{formatRound(golfer.round1, 1)}</span>
-      <span className="text-center text-muted-foreground">{formatRound(golfer.round2, 2)}</span>
+      <span className={cn(
+        'text-center text-muted-foreground',
+        (isWithdrawn || isDQ) && 'text-red-600'
+      )}>{formatRound(golfer.round1, 1)}</span>
+      <span className={cn(
+        'text-center text-muted-foreground',
+        (isWithdrawn || isDQ) && 'text-red-600'
+      )}>{formatRound(golfer.round2, 2)}</span>
       <span className={cn(
         'text-center',
-        !golfer.madeCut ? 'text-red-600' : 'text-muted-foreground'
+        hasNegativeStatus ? 'text-red-600' : 'text-muted-foreground'
       )}>
         {formatRound(golfer.round3, 3)}
       </span>
       <span className={cn(
         'text-center',
-        !golfer.madeCut ? 'text-red-600' : 'text-muted-foreground'
+        hasNegativeStatus ? 'text-red-600' : 'text-muted-foreground'
       )}>
         {formatRound(golfer.round4, 4)}
       </span>
