@@ -540,7 +540,7 @@ export function SingleGameScoreEntry({ game, sqPool, scoreChanges }: SingleGameS
 
     // Immediately update local state to remove deleted score changes
     hasLocalChanges.current = true
-    setLocalScoreChanges((prev) => prev.filter((sc) => !idsToDelete.includes(sc.id)))
+    setLocalScoreChanges((prev) => prev.filter((sc) => !changeOrdersToDelete.includes(sc.change_order)))
 
     // Update game with the previous score (before deleted one)
     const remainingChanges = sortedScoreChanges.filter(
