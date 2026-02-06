@@ -1869,7 +1869,11 @@ export type Database = {
       }
       request_join_pool: { Args: { p_token: string }; Returns: Json }
       update_quarter_marker: {
-        Args: { p_quarters: string[]; p_score_change_id: string }
+        Args: {
+          p_change_order: number
+          p_quarters: string[]
+          p_sq_game_id: string
+        }
         Returns: undefined
       }
       user_org_ids: { Args: never; Returns: string[] }

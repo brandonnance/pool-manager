@@ -368,9 +368,10 @@ export function SingleGameScoreEntry({ game, sqPool, scoreChanges }: SingleGameS
       : [...existingMarkers, quarter]
 
     // 1. Update last score_change with quarter_marker array using RPC
-    // (Direct update has issues with PostgreSQL array serialization)
+    // Uses game_id + change_order (reliable) instead of id (may be temp UUID)
     const { error: markerError } = await supabase.rpc('update_quarter_marker', {
-      p_score_change_id: lastScoreChange.id,
+      p_sq_game_id: game.id,
+      p_change_order: lastScoreChange.change_order,
       p_quarters: newMarkers,
     })
 
@@ -516,23 +517,19 @@ export function SingleGameScoreEntry({ game, sqPool, scoreChanges }: SingleGameS
     )
     const changeOrdersToDelete = changesToDelete.map((sc) => sc.change_order)
 
-    // Delete winners for all affected score changes
-    // Winners with payout matching the change_order
-    for (const order of changeOrdersToDelete) {
-      await supabase
-        .from('sq_winners')
-        .delete()
-        .eq('sq_game_id', game.id)
-        .eq('payout', order)
-        .in('win_type', ['score_change', 'score_change_reverse'])
-    }
+    // Delete winners for all affected score changes (any win type with matching payout/change_order)
+    await supabase
+      .from('sq_winners')
+      .delete()
+      .eq('sq_game_id', game.id)
+      .in('payout', changeOrdersToDelete)
 
-    // Delete the score changes
-    const idsToDelete = changesToDelete.map((sc) => sc.id)
+    // Delete the score changes by change_order (not by id, since local IDs may be temp UUIDs)
     const { error: deleteError } = await supabase
       .from('sq_score_changes')
       .delete()
-      .in('id', idsToDelete)
+      .eq('sq_game_id', game.id)
+      .in('change_order', changeOrdersToDelete)
 
     if (deleteError) {
       setError(deleteError.message)

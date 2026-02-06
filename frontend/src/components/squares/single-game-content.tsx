@@ -644,9 +644,10 @@ function NoAccountScoreEntry({
       : [...existingMarkers, quarter]
 
     // 1. Update last score_change with quarter_marker array using RPC
-    // (Direct update has issues with PostgreSQL array serialization)
+    // Uses game_id + change_order (reliable) instead of id (may be temp UUID)
     const { error: markerError } = await supabase.rpc('update_quarter_marker', {
-      p_score_change_id: lastScoreChange.id,
+      p_sq_game_id: game.id,
+      p_change_order: lastScoreChange.change_order,
       p_quarters: newMarkers,
     })
 
@@ -1475,11 +1476,12 @@ export function SingleGameContent({
         .in('win_type', ['hybrid_final', 'hybrid_final_reverse', 'score_change_final', 'score_change_final_reverse'])
     }
 
-    // Delete the score changes
+    // Delete the score changes by change_order (not by id, since local IDs may be temp UUIDs)
     await supabase
       .from('sq_score_changes')
       .delete()
-      .in('id', idsToDelete)
+      .eq('sq_game_id', currentGame.id)
+      .in('change_order', changeOrdersToDelete)
 
     // Update local state
     setScoreChanges((prev) => prev.filter((sc) => !idsToDelete.includes(sc.id)))

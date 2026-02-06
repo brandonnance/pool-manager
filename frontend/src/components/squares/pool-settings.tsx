@@ -118,10 +118,10 @@ export function PoolSettings({
       return
     }
 
-    // Update pool status to 'open'
+    // Update pool status to 'locked' (In Progress) since squares are now playable
     const { error: poolError } = await supabase
       .from('pools')
-      .update({ status: 'open' })
+      .update({ status: 'locked' })
       .eq('id', poolId)
 
     if (poolError) {

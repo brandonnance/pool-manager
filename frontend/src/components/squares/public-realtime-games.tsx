@@ -241,6 +241,13 @@ export function PublicRealtimeGames({
             if (newChange.sq_game_id && gameIds.includes(newChange.sq_game_id)) {
               setScoreChanges((prev) => [...prev, newChange as ScoreChange])
             }
+          } else if (payload.eventType === 'UPDATE') {
+            const updated = payload.new as Database['public']['Tables']['sq_score_changes']['Row']
+            if (updated.sq_game_id && gameIds.includes(updated.sq_game_id)) {
+              setScoreChanges((prev) =>
+                prev.map((sc) => (sc.id === updated.id ? { ...sc, ...updated } as ScoreChange : sc))
+              )
+            }
           } else if (payload.eventType === 'DELETE') {
             const deleted = payload.old as { id: string }
             setScoreChanges((prev) => prev.filter((sc) => sc.id !== deleted.id))
