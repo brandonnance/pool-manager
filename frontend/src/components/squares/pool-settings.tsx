@@ -266,7 +266,7 @@ export function PoolSettings({
         <CardTitle className="text-base">Pool Settings</CardTitle>
         <CardDescription>
           {mode === 'single_game' ? 'Single Game' : 'NFL Playoffs'} -{' '}
-          {scoringMode === 'score_change' ? 'Score Change' : 'Quarter'} Scoring
+          {scoringMode === 'score_change' ? 'Every Score' : scoringMode === 'hybrid' ? 'Every Score + Quarter' : 'Quarter'} Scoring
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
