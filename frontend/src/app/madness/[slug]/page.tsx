@@ -1,92 +1,48 @@
 /**
- * @fileoverview Public March Madness Entry Request Page
+ * @fileoverview Public March Madness Entry List Page
  * @route /madness/[slug]
  * @auth Public (no authentication required)
  *
  * @description
- * Public page where users can request to join a March Madness blind draw pool.
- * Shows current entries, allows searching for existing entries, and lets users
- * submit entry requests (which go to pending status for commissioner approval).
+ * Read-only public page showing the current entries for a March Madness blind draw pool.
+ * Entries are managed exclusively by the commissioner via the dashboard.
  *
  * @features
  * - View pool name and entry count (X/64)
  * - Search existing approved entries by name
- * - Submit new entry request (goes to 'pending' status)
- * - Prevents duplicate names (approved or pending)
  * - Shows pool status (spots remaining, pool full, draw complete)
  *
  * @url_params
  * - slug: The public_slug from mm_pools
- *
- * @states
- * - loading: Initial data fetch in progress
- * - pool not found: Invalid slug
- * - pool full: 64 entries already approved
- * - draw completed: Teams have been assigned, no new entries
  */
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { use } from 'react'
 
-// =============================================================================
-// TYPE DEFINITIONS
-// =============================================================================
-
-/** Entry data structure for display */
 interface Entry {
-  /** UUID of the mm_entries record */
   id: string
-  /** Display name shown in the list */
   display_name: string | null
-  /** Entry status (approved, pending, denied) */
   status: string
 }
 
-/** Pool data fetched from mm_pools with parent pool info */
 interface PoolData {
-  /** UUID of the mm_pools record */
   id: string
-  /** UUID of the parent pools record */
   pool_id: string
-  /** Whether the blind draw has been executed */
   draw_completed: boolean
-  /** Parent pool relationship */
   pools: {
-    /** Display name of the pool */
     name: string
   }
 }
 
-// =============================================================================
-// MAIN COMPONENT
-// =============================================================================
-
-/**
- * Public entry request page component (Client Component)
- *
- * @param props.params - Contains the slug for pool lookup
- * @returns Interactive UI for searching/requesting pool entry
- *
- * @state
- * - pool: Loaded pool data or null if not found
- * - entries: Array of approved entries for display
- * - inputValue: Current search/name input
- * - isSubmitting: Request submission in progress
- * - message: Success/error feedback message
- * - loading: Initial data fetch in progress
- */
-export default function PublicEntryRequestPage({ params }: { params: Promise<{ slug: string }> }) {
+export default function PublicEntryListPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params)
   const [pool, setPool] = useState<PoolData | null>(null)
   const [entries, setEntries] = useState<Entry[]>([])
-  const [inputValue, setInputValue] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [searchValue, setSearchValue] = useState('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -106,7 +62,6 @@ export default function PublicEntryRequestPage({ params }: { params: Promise<{ s
 
       setPool(poolData as PoolData)
 
-      // Load approved entries
       const { data: entriesData } = await supabase
         .from('mm_entries')
         .select('id, display_name, status')
@@ -122,66 +77,12 @@ export default function PublicEntryRequestPage({ params }: { params: Promise<{ s
   }, [slug])
 
   const filteredEntries = useMemo(() => {
-    if (!inputValue.trim()) return entries
-    const search = inputValue.toLowerCase()
+    if (!searchValue.trim()) return entries
+    const search = searchValue.toLowerCase()
     return entries.filter(e =>
       e.display_name?.toLowerCase().includes(search)
     )
-  }, [entries, inputValue])
-
-  // Check if the current input exactly matches an existing entry
-  const exactMatch = useMemo(() => {
-    if (!inputValue.trim()) return null
-    return entries.find(e =>
-      e.display_name?.toLowerCase() === inputValue.trim().toLowerCase()
-    )
-  }, [entries, inputValue])
-
-  const handleSubmitRequest = async () => {
-    if (!inputValue.trim() || !pool) return
-
-    setIsSubmitting(true)
-    setMessage(null)
-
-    const supabase = createClient()
-
-    // Check if name already exists (approved or pending)
-    const { data: existing } = await supabase
-      .from('mm_entries')
-      .select('id, status')
-      .eq('mm_pool_id', pool.id)
-      .ilike('display_name', inputValue.trim())
-      .maybeSingle()
-
-    if (existing) {
-      if (existing.status === 'approved') {
-        setMessage({ type: 'error', text: 'This name is already in the pool!' })
-      } else if (existing.status === 'pending') {
-        setMessage({ type: 'error', text: 'This name already has a pending request.' })
-      } else {
-        setMessage({ type: 'error', text: 'This name was previously denied.' })
-      }
-      setIsSubmitting(false)
-      return
-    }
-
-    // Submit entry request
-    const { error } = await supabase
-      .from('mm_entries')
-      .insert({
-        mm_pool_id: pool.id,
-        display_name: inputValue.trim(),
-        status: 'pending',
-      })
-
-    if (error) {
-      setMessage({ type: 'error', text: 'Failed to submit request. Please try again.' })
-    } else {
-      setMessage({ type: 'success', text: 'Your entry request has been submitted! The commissioner will review it.' })
-      setInputValue('')
-    }
-    setIsSubmitting(false)
-  }
+  }, [entries, searchValue])
 
   if (loading) {
     return (
@@ -242,68 +143,34 @@ export default function PublicEntryRequestPage({ params }: { params: Promise<{ s
           </CardContent>
         </Card>
 
-        {/* Combined Search and Entry Request */}
         <Card>
           <CardHeader>
-            <CardTitle>
-              {pool.draw_completed ? 'Current Entries' : 'Find or Request Entry'}
-            </CardTitle>
+            <CardTitle>Current Entries</CardTitle>
             <CardDescription>
               {pool.draw_completed
                 ? 'Teams have been assigned. Check back for results!'
                 : isFull
-                  ? 'The pool is full. Search to find your name.'
-                  : 'Type your name to search. If not found, you can request entry.'}
+                  ? 'The pool is full.'
+                  : `${approvedCount} of 64 spots filled.`}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Single input for both search and entry request */}
-            <div className="flex gap-2">
-              <Input
-                placeholder={pool.draw_completed ? "Search entries..." : "Enter your name..."}
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && !pool.draw_completed && !isFull && !exactMatch && handleSubmitRequest()}
-              />
-              {!pool.draw_completed && !isFull && (
-                <Button
-                  onClick={handleSubmitRequest}
-                  disabled={isSubmitting || !inputValue.trim() || !!exactMatch}
-                >
-                  {isSubmitting ? 'Submitting...' : 'Request Entry'}
-                </Button>
-              )}
-            </div>
+            <Input
+              placeholder="Search entries..."
+              value={searchValue}
+              onChange={(e) => setSearchValue(e.target.value)}
+            />
 
-            {/* Feedback messages */}
-            {message && (
-              <p className={`text-sm ${message.type === 'error' ? 'text-destructive' : 'text-green-600'}`}>
-                {message.text}
-              </p>
-            )}
-
-            {/* Show hint when exact match found */}
-            {exactMatch && !message && (
-              <p className="text-sm text-green-600">
-                ✓ &quot;{exactMatch.display_name}&quot; is already entered in this pool!
-              </p>
-            )}
-
-            {/* Filtered entries list */}
             {filteredEntries.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">
-                {inputValue ? 'No matching entries found.' : 'No entries yet.'}
+                {searchValue ? 'No matching entries found.' : 'No entries yet.'}
               </p>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {filteredEntries.map((entry) => (
                   <div
                     key={entry.id}
-                    className={`px-3 py-2 rounded-md text-sm truncate ${
-                      exactMatch?.id === entry.id
-                        ? 'bg-green-100 text-green-800 font-medium'
-                        : 'bg-muted'
-                    }`}
+                    className="px-3 py-2 rounded-md text-sm truncate bg-muted"
                   >
                     {entry.display_name || 'Unnamed'}
                   </div>

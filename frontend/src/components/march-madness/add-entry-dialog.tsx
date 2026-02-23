@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
+import { Checkbox } from '@/components/ui/checkbox'
 
 interface AddEntryDialogProps {
   mmPoolId: string
@@ -29,18 +29,24 @@ export function AddEntryDialog({
   drawCompleted,
 }: AddEntryDialogProps) {
   const [open, setOpen] = useState(false)
-  const [mode, setMode] = useState<'single' | 'bulk'>('single')
   const [name, setName] = useState('')
-  const [bulkNames, setBulkNames] = useState('')
+  const [email, setEmail] = useState('')
+  const [verified, setVerified] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
   const spotsRemaining = 64 - currentEntryCount
 
-  const handleAddSingle = async () => {
+  const handleAdd = async () => {
     if (!name.trim()) {
       setError('Please enter a name')
+      return
+    }
+
+    const trimmedEmail = email.trim()
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setError('Please enter a valid email address')
       return
     }
 
@@ -48,14 +54,24 @@ export function AddEntryDialog({
     setIsSubmitting(true)
 
     const supabase = createClient()
-    const { error: insertError } = await supabase.from('mm_entries').insert({
+    const insertData: { mm_pool_id: string; display_name: string; email?: string; verified: boolean } = {
       mm_pool_id: mmPoolId,
       display_name: name.trim(),
-    })
+      verified,
+    }
+    if (trimmedEmail) {
+      insertData.email = trimmedEmail
+    }
+
+    const { error: insertError } = await supabase.from('mm_entries').insert(insertData)
 
     if (insertError) {
       if (insertError.code === '23505') {
-        setError('This name is already entered')
+        if (insertError.message?.includes('email')) {
+          setError('This email is already entered in this pool')
+        } else {
+          setError('This name is already entered')
+        }
       } else {
         setError(insertError.message)
       }
@@ -64,56 +80,8 @@ export function AddEntryDialog({
     }
 
     setName('')
-    setOpen(false)
-    setIsSubmitting(false)
-    router.refresh()
-  }
-
-  const handleAddBulk = async () => {
-    const names = bulkNames
-      .split('\n')
-      .map(n => n.trim())
-      .filter(n => n.length > 0)
-
-    if (names.length === 0) {
-      setError('Please enter at least one name')
-      return
-    }
-
-    if (names.length > spotsRemaining) {
-      setError(`Only ${spotsRemaining} spots remaining. You entered ${names.length} names.`)
-      return
-    }
-
-    // Check for duplicates in the input
-    const uniqueNames = new Set(names)
-    if (uniqueNames.size !== names.length) {
-      setError('Duplicate names found in your list')
-      return
-    }
-
-    setError(null)
-    setIsSubmitting(true)
-
-    const supabase = createClient()
-    const entries = names.map(n => ({
-      mm_pool_id: mmPoolId,
-      display_name: n,
-    }))
-
-    const { error: insertError } = await supabase.from('mm_entries').insert(entries)
-
-    if (insertError) {
-      if (insertError.code === '23505') {
-        setError('One or more names are already entered')
-      } else {
-        setError(insertError.message)
-      }
-      setIsSubmitting(false)
-      return
-    }
-
-    setBulkNames('')
+    setEmail('')
+    setVerified(false)
     setOpen(false)
     setIsSubmitting(false)
     router.refresh()
@@ -130,7 +98,15 @@ export function AddEntryDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(isOpen) => {
+      setOpen(isOpen)
+      if (!isOpen) {
+        setError(null)
+        setName('')
+        setEmail('')
+        setVerified(false)
+      }
+    }}>
       <DialogTrigger asChild>
         <Button>Add Entry</Button>
       </DialogTrigger>
@@ -142,54 +118,39 @@ export function AddEntryDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Mode toggle */}
-        <div className="flex gap-2 mb-4">
-          <Button
-            variant={mode === 'single' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setMode('single')}
-          >
-            Single
-          </Button>
-          <Button
-            variant={mode === 'bulk' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setMode('bulk')}
-          >
-            Bulk Add
-          </Button>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="name">Participant Name</Label>
+            <Input
+              id="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="John Smith"
+              onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="email">Email (optional)</Label>
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="john@example.com"
+              onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="verified"
+              checked={verified}
+              onCheckedChange={(val) => setVerified(val === true)}
+            />
+            <Label htmlFor="verified" className="text-sm font-normal cursor-pointer">
+              Mark as verified
+            </Label>
+          </div>
         </div>
-
-        {mode === 'single' ? (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Participant Name</Label>
-              <Input
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="John Smith"
-                onKeyDown={(e) => e.key === 'Enter' && handleAddSingle()}
-              />
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="bulkNames">Names (one per line)</Label>
-              <Textarea
-                id="bulkNames"
-                value={bulkNames}
-                onChange={(e) => setBulkNames(e.target.value)}
-                placeholder={"John Smith\nJane Doe\nBob Johnson"}
-                rows={8}
-              />
-              <p className="text-xs text-muted-foreground">
-                {bulkNames.split('\n').filter(n => n.trim()).length} names entered
-              </p>
-            </div>
-          </div>
-        )}
 
         {error && <p className="text-sm text-destructive">{error}</p>}
 
@@ -198,10 +159,10 @@ export function AddEntryDialog({
             Cancel
           </Button>
           <Button
-            onClick={mode === 'single' ? handleAddSingle : handleAddBulk}
+            onClick={handleAdd}
             disabled={isSubmitting}
           >
-            {isSubmitting ? 'Adding...' : mode === 'single' ? 'Add Entry' : 'Add All'}
+            {isSubmitting ? 'Adding...' : 'Add Entry'}
           </Button>
         </DialogFooter>
       </DialogContent>

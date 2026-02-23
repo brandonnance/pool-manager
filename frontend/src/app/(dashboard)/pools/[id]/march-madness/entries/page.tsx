@@ -48,6 +48,7 @@ import {
 } from '@/components/ui/table'
 import { RandomDrawButton, AddEntryDialog, EntryRequestActions, PublicLinkManager, DemoSeedButton } from '@/components/march-madness'
 import { DeleteEntryButton } from '@/components/march-madness/delete-entry-button'
+import { VerifyEntryToggle } from '@/components/march-madness/verify-entry-toggle'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -227,6 +228,7 @@ export default async function MarchMadnessEntriesPage({ params }: PageProps) {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
                     <TableHead>Requested</TableHead>
                     <TableHead className="w-24">Actions</TableHead>
                   </TableRow>
@@ -235,6 +237,9 @@ export default async function MarchMadnessEntriesPage({ params }: PageProps) {
                   {pendingEntries.map((entry) => (
                     <TableRow key={entry.id}>
                       <TableCell className="font-medium">{entry.display_name || 'Unknown'}</TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {entry.email || '—'}
+                      </TableCell>
                       <TableCell className="text-muted-foreground">
                         {new Date(entry.created_at).toLocaleDateString()}
                       </TableCell>
@@ -320,8 +325,10 @@ export default async function MarchMadnessEntriesPage({ params }: PageProps) {
                   <TableRow>
                     <TableHead className="w-12">#</TableHead>
                     <TableHead>Name</TableHead>
-                    <TableHead>Assigned Team</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Verified</TableHead>
+                    {mmPool.draw_completed && <TableHead>Assigned Team</TableHead>}
+                    {mmPool.draw_completed && <TableHead>Status</TableHead>}
                     {!mmPool.draw_completed && (
                       <TableHead className="w-16"></TableHead>
                     )}
@@ -334,26 +341,36 @@ export default async function MarchMadnessEntriesPage({ params }: PageProps) {
                       <TableRow key={entry.id}>
                         <TableCell className="font-medium">{idx + 1}</TableCell>
                         <TableCell className="font-medium">{entry.display_name || 'Unknown'}</TableCell>
-                        <TableCell>
-                          {team ? (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs font-bold text-muted-foreground bg-muted px-1 py-0.5 rounded">
-                                #{team.seed}
-                              </span>
-                              <span>{team.bb_teams?.name || 'Unknown'}</span>
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground">Pending draw</span>
-                          )}
+                        <TableCell className="text-muted-foreground text-sm">
+                          {entry.email || '—'}
                         </TableCell>
                         <TableCell>
-                          <Badge
-                            variant={entry.eliminated ? 'secondary' : 'default'}
-                            className={entry.eliminated ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}
-                          >
-                            {entry.eliminated ? 'Eliminated' : 'Alive'}
-                          </Badge>
+                          <VerifyEntryToggle entryId={entry.id} verified={entry.verified} />
                         </TableCell>
+                        {mmPool.draw_completed && (
+                          <TableCell>
+                            {team ? (
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-bold text-muted-foreground bg-muted px-1 py-0.5 rounded">
+                                  #{team.seed}
+                                </span>
+                                <span>{team.bb_teams?.name || 'Unknown'}</span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                        )}
+                        {mmPool.draw_completed && (
+                          <TableCell>
+                            <Badge
+                              variant={entry.eliminated ? 'secondary' : 'default'}
+                              className={entry.eliminated ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}
+                            >
+                              {entry.eliminated ? 'Eliminated' : 'Alive'}
+                            </Badge>
+                          </TableCell>
+                        )}
                         {!mmPool.draw_completed && (
                           <TableCell>
                             <DeleteEntryButton entryId={entry.id} entryName={entry.display_name || 'this entry'} />

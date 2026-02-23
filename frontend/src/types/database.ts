@@ -970,6 +970,7 @@ export type Database = {
           current_team_id: string | null
           display_name: string | null
           eliminated: boolean
+          email: string | null
           eliminated_round: string | null
           id: string
           mm_pool_id: string
@@ -978,12 +979,14 @@ export type Database = {
           total_payout: number
           updated_at: string
           user_id: string | null
+          verified: boolean
         }
         Insert: {
           created_at?: string
           current_team_id?: string | null
           display_name?: string | null
           eliminated?: boolean
+          email?: string | null
           eliminated_round?: string | null
           id?: string
           mm_pool_id: string
@@ -992,12 +995,14 @@ export type Database = {
           total_payout?: number
           updated_at?: string
           user_id?: string | null
+          verified?: boolean
         }
         Update: {
           created_at?: string
           current_team_id?: string | null
           display_name?: string | null
           eliminated?: boolean
+          email?: string | null
           eliminated_round?: string | null
           id?: string
           mm_pool_id?: string
@@ -1006,6 +1011,7 @@ export type Database = {
           total_payout?: number
           updated_at?: string
           user_id?: string | null
+          verified?: boolean
         }
         Relationships: [
           {
