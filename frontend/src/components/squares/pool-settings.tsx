@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Copy, ExternalLink, Lock, Edit2, Check, X } from 'lucide-react'
+import { Copy, ExternalLink, Lock, Edit2, Check, X, Trophy, CheckCircle2 } from 'lucide-react'
 
 interface PoolSettingsProps {
   sqPoolId: string
@@ -23,6 +23,9 @@ interface PoolSettingsProps {
   poolStatus: string
   onBulkAssignClick: () => void
   isSuperAdmin?: boolean
+  allGamesFinal?: boolean
+  finalGamesCount?: number
+  totalGamesCount?: number
 }
 
 // Random first names for auto-fill
@@ -45,9 +48,13 @@ export function PoolSettings({
   poolStatus,
   onBulkAssignClick,
   isSuperAdmin = false,
+  allGamesFinal = false,
+  finalGamesCount = 0,
+  totalGamesCount = 0,
 }: PoolSettingsProps) {
   const router = useRouter()
   const [isLocking, setIsLocking] = useState(false)
+  const [isCompleting, setIsCompleting] = useState(false)
   const [isUpdatingSlug, setIsUpdatingSlug] = useState(false)
   const [isUpdatingReverse, setIsUpdatingReverse] = useState(false)
   const [isAutoFilling, setIsAutoFilling] = useState(false)
@@ -260,6 +267,100 @@ export function PoolSettings({
     router.refresh()
   }
 
+  const handleComplete = async () => {
+    if (!confirm('Are you sure you want to complete this pool? This will finalize the grid and no more scores can be entered.')) {
+      return
+    }
+
+    setIsCompleting(true)
+    setError(null)
+
+    const supabase = createClient()
+
+    const { error: updateError } = await supabase
+      .from('pools')
+      .update({ status: 'completed' })
+      .eq('id', poolId)
+
+    if (updateError) {
+      setError(updateError.message)
+      setIsCompleting(false)
+      return
+    }
+
+    router.refresh()
+  }
+
+  const isCompleted = poolStatus === 'completed'
+
+  // Completed pools show a read-only archive view
+  if (isCompleted) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <Trophy className="size-5 text-amber-500" />
+            <CardTitle className="text-base">Pool Complete</CardTitle>
+          </div>
+          <CardDescription>
+            This pool has been finalized. No further changes can be made.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Public URL (read-only) */}
+          {publicUrl && (
+            <div className="space-y-2">
+              <Label>Public View URL</Label>
+              <div className="p-3 bg-muted rounded-md border">
+                <p className="text-sm font-mono break-all text-foreground">
+                  {publicUrl}
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={copyToClipboard}
+                  className="w-full"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="size-4 mr-1.5" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="size-4 mr-1.5" />
+                      Copy Link
+                    </>
+                  )}
+                </Button>
+                <Button size="sm" variant="outline" className="w-full" asChild>
+                  <a href={publicUrl} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="size-4 mr-1.5" />
+                    Open
+                  </a>
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Pool info summary */}
+          <div className="space-y-1 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Games</span>
+              <span>{totalGamesCount} final</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Reverse Scoring</span>
+              <span>{reverseScoring ? 'Yes' : 'No'}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -451,6 +552,29 @@ export function PoolSettings({
             <p className="text-xs text-muted-foreground mt-1 text-center">
               Fills empty squares with random names
             </p>
+          </div>
+        )}
+
+        {/* Complete Pool */}
+        {poolStatus === 'locked' && (
+          <div className="pt-2 border-t">
+            {allGamesFinal ? (
+              <Button
+                onClick={handleComplete}
+                disabled={isCompleting}
+                className="w-full"
+              >
+                <CheckCircle2 className="size-4 mr-1.5" />
+                {isCompleting ? 'Completing...' : 'Complete Pool'}
+              </Button>
+            ) : (
+              <div className="text-sm text-muted-foreground bg-muted rounded-md p-3">
+                <p className="font-medium">Games in progress</p>
+                <p className="text-xs mt-1">
+                  {finalGamesCount} of {totalGamesCount} games final
+                </p>
+              </div>
+            )}
           </div>
         )}
 

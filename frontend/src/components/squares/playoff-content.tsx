@@ -558,6 +558,12 @@ export function PlayoffContent({
     setSquares(initialSquares)
   }, [initialSquares])
 
+  // Game completion stats (for pool-settings complete button)
+  const totalGamesCount = games.length
+  const finalGamesCount = games.filter((g) => g.status === 'final').length
+  const allGamesFinal = totalGamesCount > 0 && finalGamesCount === totalGamesCount
+  const isCompleted = poolStatus === 'completed'
+
   // Dialog states
   const [assignDialogOpen, setAssignDialogOpen] = useState(false)
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false)
@@ -691,7 +697,7 @@ export function PlayoffContent({
   )
 
   const handleSquareClick = (rowIndex: number, colIndex: number, square: Square | null) => {
-    if (!isCommissioner) return
+    if (!isCommissioner || isCompleted) return
     setSelectedSquare({ rowIndex, colIndex, square })
     setAssignDialogOpen(true)
   }
@@ -765,7 +771,7 @@ export function PlayoffContent({
                           <SimplePlayoffGameCard
                             key={game.id}
                             game={game}
-                            isCommissioner={isCommissioner}
+                            isCommissioner={isCommissioner && !isCompleted}
                             sqPoolId={sqPoolId}
                             reverseScoring={reverseScoring}
                             squares={squares}
@@ -803,6 +809,9 @@ export function PlayoffContent({
               poolStatus={poolStatus}
               onBulkAssignClick={() => setBulkDialogOpen(true)}
               isSuperAdmin={isSuperAdmin}
+              allGamesFinal={allGamesFinal}
+              finalGamesCount={finalGamesCount}
+              totalGamesCount={totalGamesCount}
             />
           )}
 

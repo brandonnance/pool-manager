@@ -1770,11 +1770,17 @@ export function SingleGameContent({
   const homeTeamLabel = firstGame?.home_team ?? 'Home'
   const awayTeamLabel = firstGame?.away_team ?? 'Away'
 
+  // Game completion stats (for pool-settings complete button)
+  const totalGamesCount = games.length
+  const finalGamesCount = games.filter((g) => g.status === 'final').length
+  const allGamesFinal = totalGamesCount > 0 && finalGamesCount === totalGamesCount
+  const isCompleted = poolStatus === 'completed'
+
   // Both score_change and quarter modes use the same color scheme now
   const legendMode = 'score_change'
 
   const handleSquareClick = (rowIndex: number, colIndex: number, square: Square | null) => {
-    if (!isCommissioner) return
+    if (!isCommissioner || isCompleted) return
     setSelectedSquare({ rowIndex, colIndex, square })
     setAssignDialogOpen(true)
   }
@@ -1823,7 +1829,7 @@ export function SingleGameContent({
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg">Game</CardTitle>
-                  {isCommissioner && (
+                  {isCommissioner && !isCompleted && (
                     <EditGameTeamsButton
                       gameId={firstGame.id}
                       gameName={firstGame.game_name}
@@ -1880,7 +1886,7 @@ export function SingleGameContent({
                 })()}
 
                 {/* Commissioner score entry */}
-                {isCommissioner && (
+                {isCommissioner && !isCompleted && (
                   <ScoreEntry
                     game={firstGame}
                     sqPoolId={sqPoolId}
@@ -1909,7 +1915,7 @@ export function SingleGameContent({
                       colNumbers={colNumbers ?? []}
                       reverseScoring={reverseScoring}
                       winners={winners}
-                      isCommissioner={isCommissioner}
+                      isCommissioner={isCommissioner && !isCompleted}
                       isFinal={currentGame?.status === 'final'}
                       onDeleteScoreChange={handleDeleteScoreChange}
                     />
@@ -1935,6 +1941,9 @@ export function SingleGameContent({
               poolStatus={poolStatus}
               onBulkAssignClick={() => setBulkDialogOpen(true)}
               isSuperAdmin={isSuperAdmin}
+              allGamesFinal={allGamesFinal}
+              finalGamesCount={finalGamesCount}
+              totalGamesCount={totalGamesCount}
             />
           )}
 
