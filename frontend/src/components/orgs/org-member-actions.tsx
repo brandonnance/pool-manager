@@ -151,7 +151,7 @@ export function OrgMemberActions({
                 .delete()
                 .in('id', entryIds)
             }
-          } else if (pool.type === 'squares' || pool.type === 'playoff_squares' || pool.type === 'single_game_squares') {
+          } else if (pool.type === 'squares') {
             // Get the sq_pool and check lock status
             const { data: sqPool } = await supabase
               .from('sq_pools')

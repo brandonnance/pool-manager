@@ -283,6 +283,29 @@ export function MarchMadnessContent({
   const completedGames = games.filter(g => g.status === 'final').length
   const totalGames = games.length
 
+  // Determine current round
+  const roundDefs = [
+    { round: 'R64', label: 'Round of 64' },
+    { round: 'R32', label: 'Round of 32' },
+    { round: 'S16', label: 'Sweet 16' },
+    { round: 'E8', label: 'Elite 8' },
+    { round: 'F4', label: 'Final Four' },
+    { round: 'Final', label: 'Championship' },
+  ]
+
+  const currentRound = (() => {
+    for (const def of roundDefs) {
+      const roundGames = games.filter(g => g.round === def.round)
+      if (roundGames.length === 0) continue
+      const allFinal = roundGames.every(g => g.status === 'final')
+      if (!allFinal) return def
+    }
+    return roundDefs[roundDefs.length - 1]
+  })()
+
+  const currentRoundGames = games.filter(g => g.round === currentRound.round)
+  const currentRoundPending = currentRoundGames.filter(g => g.status !== 'final').length
+
   // Check setup status
   const teamsReady = poolTeams.length === 64
   const entriesReady = entries.length === 64
@@ -390,6 +413,31 @@ export function MarchMadnessContent({
 
   return (
     <div className="space-y-6">
+      {/* Current round + progress */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Badge variant="default">{currentRound.label}</Badge>
+              {currentRoundPending > 0 ? (
+                <span className="text-sm text-muted-foreground">
+                  {currentRoundPending} game{currentRoundPending !== 1 ? 's' : ''} remaining
+                </span>
+              ) : (
+                <span className="text-sm text-emerald-600 font-medium">Round complete</span>
+              )}
+            </div>
+            <span className="text-sm font-medium">{completedGames}/{totalGames} games</span>
+          </div>
+          <div className="w-full bg-muted rounded-full h-2">
+            <div
+              className="bg-primary rounded-full h-2 transition-all"
+              style={{ width: totalGames > 0 ? `${(completedGames / totalGames) * 100}%` : '0%' }}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Stats bar */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
@@ -455,11 +503,36 @@ export function MarchMadnessContent({
 
       {/* Commissioner tools */}
       {isCommissioner && (
-        <CommissionerToolsCard
-          mmPoolId={mmPool.id}
-          poolId={poolId}
-          publicSlug={mmPool.public_slug}
-        />
+        <>
+          {/* Next action card */}
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-sm font-medium text-muted-foreground mb-1">Next Action</p>
+              {completedGames === totalGames && totalGames > 0 ? (
+                <p className="font-semibold text-emerald-600">Tournament complete!</p>
+              ) : currentRoundPending > 0 ? (
+                <p className="font-semibold">
+                  {currentRoundPending} game{currentRoundPending !== 1 ? 's' : ''} in {currentRound.label} need scores
+                </p>
+              ) : (
+                <p className="font-semibold text-muted-foreground">Waiting for games to be played</p>
+              )}
+              <div className="mt-2">
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={`/pools/${poolId}/march-madness/scores`}>
+                    Enter Scores
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <CommissionerToolsCard
+            mmPoolId={mmPool.id}
+            poolId={poolId}
+            publicSlug={mmPool.public_slug}
+          />
+        </>
       )}
     </div>
   )

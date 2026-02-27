@@ -702,63 +702,14 @@ export function BracketView({
         </div>
       </div>
 
-      {/* Tablet/Mobile view - stacked by round */}
-      <div className="xl:hidden space-y-6">
-        <MobileRoundView
-          round="R64"
-          label="Round of 64"
-          games={games}
-          poolTeams={poolTeams}
-          entries={entries}
-          currentUserId={currentUserId}
-          highlightEntryId={highlightEntryId}
-        />
-        <MobileRoundView
-          round="R32"
-          label="Round of 32"
-          games={games}
-          poolTeams={poolTeams}
-          entries={entries}
-          currentUserId={currentUserId}
-          highlightEntryId={highlightEntryId}
-        />
-        <MobileRoundView
-          round="S16"
-          label="Sweet 16"
-          games={games}
-          poolTeams={poolTeams}
-          entries={entries}
-          currentUserId={currentUserId}
-          highlightEntryId={highlightEntryId}
-        />
-        <MobileRoundView
-          round="E8"
-          label="Elite 8"
-          games={games}
-          poolTeams={poolTeams}
-          entries={entries}
-          currentUserId={currentUserId}
-          highlightEntryId={highlightEntryId}
-        />
-        <MobileRoundView
-          round="F4"
-          label="Final Four"
-          games={games}
-          poolTeams={poolTeams}
-          entries={entries}
-          currentUserId={currentUserId}
-          highlightEntryId={highlightEntryId}
-        />
-        <MobileRoundView
-          round="Final"
-          label="Championship"
-          games={games}
-          poolTeams={poolTeams}
-          entries={entries}
-          currentUserId={currentUserId}
-          highlightEntryId={highlightEntryId}
-        />
-      </div>
+      {/* Tablet/Mobile view - stacked by round with filter buttons */}
+      <MobileBracketView
+        games={games}
+        poolTeams={poolTeams}
+        entries={entries}
+        currentUserId={currentUserId}
+        highlightEntryId={highlightEntryId}
+      />
 
       {/* Legend */}
       <Card className="p-3">
@@ -789,6 +740,167 @@ export function BracketView({
   );
 }
 
+// Round definitions for mobile view
+const ROUND_DEFS = [
+  { round: "R64", label: "Round of 64", abbrev: "R64", gameCount: 32 },
+  { round: "R32", label: "Round of 32", abbrev: "R32", gameCount: 16 },
+  { round: "S16", label: "Sweet 16", abbrev: "S16", gameCount: 8 },
+  { round: "E8", label: "Elite 8", abbrev: "E8", gameCount: 4 },
+  { round: "F4", label: "Final Four", abbrev: "F4", gameCount: 2 },
+  { round: "Final", label: "Championship", abbrev: "Final", gameCount: 1 },
+] as const;
+
+// Mobile bracket view with round filter and collapsible sections
+interface MobileBracketViewProps {
+  games: MmGame[];
+  poolTeams: MmPoolTeam[];
+  entries: MmEntry[];
+  currentUserId: string | null;
+  highlightEntryId: string | null;
+}
+
+function MobileBracketView({
+  games,
+  poolTeams,
+  entries,
+  currentUserId,
+  highlightEntryId,
+}: MobileBracketViewProps) {
+  // Determine current round (first round with non-final games where all prior rounds are complete)
+  const currentRound = useMemo(() => {
+    for (const def of ROUND_DEFS) {
+      const roundGames = games.filter((g) => g.round === def.round);
+      if (roundGames.length === 0) continue;
+      const allFinal = roundGames.every((g) => g.status === "final");
+      if (!allFinal) return def.round;
+    }
+    // All games final or no games
+    return ROUND_DEFS[ROUND_DEFS.length - 1].round;
+  }, [games]);
+
+  const [selectedRound, setSelectedRound] = useState<string | null>(null);
+
+  // Auto-select current round on mount
+  useEffect(() => {
+    if (selectedRound === null) {
+      setSelectedRound(currentRound);
+    }
+  }, [currentRound, selectedRound]);
+
+  // Collapsible state - expand selected, collapse others
+  const [expandedRounds, setExpandedRounds] = useState<Set<string>>(
+    new Set([currentRound])
+  );
+
+  const toggleRound = (round: string) => {
+    setExpandedRounds((prev) => {
+      const next = new Set(prev);
+      if (next.has(round)) {
+        next.delete(round);
+      } else {
+        next.add(round);
+      }
+      return next;
+    });
+  };
+
+  const handleFilterClick = (round: string) => {
+    setSelectedRound(round);
+    setExpandedRounds(new Set([round]));
+  };
+
+  return (
+    <div className="xl:hidden space-y-4">
+      {/* Round filter buttons */}
+      <div className="flex gap-1.5 overflow-x-auto pb-1">
+        {ROUND_DEFS.map((def) => {
+          const roundGames = games.filter((g) => g.round === def.round);
+          const completedCount = roundGames.filter(
+            (g) => g.status === "final"
+          ).length;
+          const isComplete = roundGames.length > 0 && completedCount === roundGames.length;
+          const isCurrent = def.round === currentRound;
+          const isSelected = def.round === selectedRound;
+
+          return (
+            <button
+              key={def.round}
+              type="button"
+              onClick={() => handleFilterClick(def.round)}
+              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                isSelected
+                  ? "bg-primary text-primary-foreground"
+                  : isCurrent
+                    ? "bg-primary/10 text-primary border border-primary/30"
+                    : isComplete
+                      ? "bg-muted text-muted-foreground"
+                      : "bg-muted/50 text-muted-foreground"
+              }`}
+            >
+              {def.abbrev}
+              {roundGames.length > 0 && (
+                <span className="ml-1 opacity-70">
+                  {completedCount}/{roundGames.length}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Collapsible round sections */}
+      <div className="space-y-3">
+        {ROUND_DEFS.map((def) => {
+          const roundGames = games.filter((g) => g.round === def.round);
+          if (roundGames.length === 0) return null;
+          const isExpanded = expandedRounds.has(def.round);
+          const completedCount = roundGames.filter(
+            (g) => g.status === "final"
+          ).length;
+          const isCurrent = def.round === currentRound;
+
+          return (
+            <div key={def.round}>
+              <button
+                type="button"
+                onClick={() => toggleRound(def.round)}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <span className="font-semibold text-sm">{def.label}</span>
+                  {isCurrent && (
+                    <Badge variant="default" className="text-[10px] py-0 px-1.5">
+                      Current
+                    </Badge>
+                  )}
+                </span>
+                <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                  {completedCount}/{roundGames.length}
+                  <span className="text-base">{isExpanded ? "\u25B2" : "\u25BC"}</span>
+                </span>
+              </button>
+              {isExpanded && (
+                <div className="mt-2">
+                  <MobileRoundView
+                    round={def.round}
+                    label={def.label}
+                    games={games}
+                    poolTeams={poolTeams}
+                    entries={entries}
+                    currentUserId={currentUserId}
+                    highlightEntryId={highlightEntryId}
+                    hideHeader
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // Mobile round view component
 interface MobileRoundViewProps {
   round: string;
@@ -798,6 +910,7 @@ interface MobileRoundViewProps {
   entries: MmEntry[];
   currentUserId: string | null;
   highlightEntryId: string | null;
+  hideHeader?: boolean;
 }
 
 function MobileRoundView({
@@ -808,6 +921,7 @@ function MobileRoundView({
   entries,
   currentUserId,
   highlightEntryId,
+  hideHeader = false,
 }: MobileRoundViewProps) {
   const roundGames = games
     .filter((g) => g.round === round)
@@ -833,17 +947,18 @@ function MobileRoundView({
   // For Final Four and Championship, don't group by region
   const isFinalRounds = round === "F4" || round === "Final";
 
-  return (
-    <Card>
-      <CardContent className="p-4">
+  const content = (
+    <>
+      {!hideHeader && (
         <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
           {label}
           <Badge variant="secondary" className="text-xs">
             {completedCount}/{roundGames.length}
           </Badge>
         </h3>
+      )}
 
-        {isFinalRounds ? (
+      {isFinalRounds ? (
           <div
             className={`flex flex-wrap justify-center gap-3 ${
               round === "Final" ? "max-w-xs mx-auto" : ""
@@ -885,7 +1000,16 @@ function MobileRoundView({
             ))}
           </div>
         )}
-      </CardContent>
+    </>
+  );
+
+  if (hideHeader) {
+    return content;
+  }
+
+  return (
+    <Card>
+      <CardContent className="p-4">{content}</CardContent>
     </Card>
   );
 }

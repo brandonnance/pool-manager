@@ -82,7 +82,7 @@ export default async function PoolMembersPage({ params }: PageProps) {
   }
 
   // For squares pools (any type), get the lock status
-  const isSquaresPool = pool.type === 'squares' || pool.type === 'playoff_squares' || pool.type === 'single_game_squares'
+  const isSquaresPool = pool.type === 'squares'
   let isSquaresLocked = false
 
   if (isSquaresPool) {

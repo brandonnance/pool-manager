@@ -210,7 +210,7 @@ export default async function OrgDetailPage({ params }: PageProps) {
 
               const poolTypeLabel = pool.type === 'bowl_buster'
                 ? 'Bowl Buster'
-                : pool.type === 'playoff_squares' || pool.type === 'single_game_squares'
+                : pool.type === 'squares'
                 ? 'Squares'
                 : pool.type
 

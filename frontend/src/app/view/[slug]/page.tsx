@@ -70,7 +70,8 @@ export default async function PublicViewPage({ params }: PageProps) {
       col_numbers,
       mode,
       scoring_mode,
-      reverse_scoring
+      reverse_scoring,
+      event_type
     `)
     .eq('public_slug', slug)
     .single()
@@ -174,6 +175,13 @@ export default async function PublicViewPage({ params }: PageProps) {
     conference: 3,
     super_bowl_halftime: 4,
     super_bowl: 5,
+    // March Madness rounds
+    mm_r64: 1,
+    mm_r32: 2,
+    mm_s16: 3,
+    mm_e8: 4,
+    mm_f4: 5,
+    mm_final: 6,
     // Single game mode
     single_game: 1,
     // Score change mode
@@ -295,7 +303,9 @@ export default async function PublicViewPage({ params }: PageProps) {
   // Both score_change and quarter modes use the same color scheme
   const legendMode = sqPool.mode === 'single_game'
     ? 'score_change'
-    : 'full_playoff'
+    : sqPool.event_type === 'march_madness'
+      ? 'march_madness'
+      : 'full_playoff'
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -306,7 +316,11 @@ export default async function PublicViewPage({ params }: PageProps) {
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{pool.name}</h1>
               <p className="text-sm text-muted-foreground mt-1">
-                {sqPool.mode === 'single_game' ? 'Single Game Squares' : 'NFL Playoff Squares'}
+                {sqPool.mode === 'single_game'
+                  ? 'Single Game Squares'
+                  : sqPool.event_type === 'march_madness'
+                    ? 'March Madness Squares'
+                    : 'NFL Playoff Squares'}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -412,6 +426,7 @@ export default async function PublicViewPage({ params }: PageProps) {
             colNumbers={sqPool.col_numbers}
             reverseScoring={sqPool.reverse_scoring ?? false}
             scoringMode={sqPool.scoring_mode}
+            eventType={sqPool.event_type ?? 'nfl_playoffs'}
           />
         )}
 

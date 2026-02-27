@@ -71,7 +71,7 @@ export function DeletePoolButton({ poolId, poolName, poolType, orgId }: DeletePo
       }
 
       // Delete based on pool type
-      if (poolType === 'playoff_squares') {
+      if (poolType === 'squares') {
         // Get sq_pool id first
         const { data: sqPool } = await supabase
           .from('sq_pools')
@@ -301,7 +301,7 @@ export function DeletePoolButton({ poolId, poolName, poolType, orgId }: DeletePo
               <ul className="list-disc ml-4 mt-2 space-y-1">
                 <li>All pool memberships</li>
                 <li>All entries and picks</li>
-                {poolType === 'playoff_squares' && (
+                {poolType === 'squares' && (
                   <>
                     <li>All squares and ownership data</li>
                     <li>All games and scores</li>

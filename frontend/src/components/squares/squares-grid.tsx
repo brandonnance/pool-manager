@@ -5,7 +5,7 @@ import { SquareCell } from './square-cell'
 import { cn } from '@/lib/utils'
 import type { WinningRound } from './square-cell'
 
-export type LegendMode = 'full_playoff' | 'single_game' | 'score_change'
+export type LegendMode = 'full_playoff' | 'single_game' | 'score_change' | 'march_madness'
 
 interface SelectedSquare {
   rowIndex: number
@@ -333,6 +333,33 @@ export function SquaresGrid({
             <div className="flex items-center gap-1">
               <div className="size-3 sm:size-4 rounded border border-purple-400 bg-purple-100" />
               <span>Super Bowl</span>
+            </div>
+          </>
+        ) : legendMode === 'march_madness' ? (
+          <>
+            <div className="flex items-center gap-1">
+              <div className="size-3 sm:size-4 rounded border border-slate-400 bg-slate-100" />
+              <span>R64</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="size-3 sm:size-4 rounded border border-amber-400 bg-amber-100" />
+              <span>R32</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="size-3 sm:size-4 rounded border border-emerald-400 bg-emerald-100" />
+              <span>Sweet 16</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="size-3 sm:size-4 rounded border border-blue-400 bg-blue-100" />
+              <span>Elite 8</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="size-3 sm:size-4 rounded border border-red-400 bg-red-100" />
+              <span>Final Four</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="size-3 sm:size-4 rounded border border-purple-400 bg-purple-100" />
+              <span>Championship</span>
             </div>
           </>
         ) : legendMode === 'score_change' ? (

@@ -40,7 +40,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 /** Available pool types during onboarding */
-type PoolType = 'bowl_buster' | 'playoff_squares'
+type PoolType = 'bowl_buster' | 'squares'
 
 function generateToken(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
@@ -203,8 +203,8 @@ function OnboardingContent() {
       return
     }
 
-    // For Playoff Squares, create sq_pool
-    if (selectedPoolType === 'playoff_squares') {
+    // For Squares, create sq_pool
+    if (selectedPoolType === 'squares') {
       const { error: sqError } = await supabase
         .from('sq_pools')
         .insert({
@@ -222,8 +222,8 @@ function OnboardingContent() {
 
     setIsLoading(false)
 
-    // Skip games step for playoff_squares
-    if (selectedPoolType === 'playoff_squares') {
+    // Skip games step for squares
+    if (selectedPoolType === 'squares') {
       updateStep(4, { poolId: pool.id, poolType: selectedPoolType })
     } else {
       updateStep(3, { poolId: pool.id, poolType: selectedPoolType })
@@ -357,9 +357,9 @@ function OnboardingContent() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => setSelectedPoolType('playoff_squares')}
+                          onClick={() => setSelectedPoolType('squares')}
                           className={`p-4 rounded-lg border text-left transition-all ${
-                            selectedPoolType === 'playoff_squares'
+                            selectedPoolType === 'squares'
                               ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-500'
                               : 'border-gray-200 hover:border-gray-300'
                           }`}

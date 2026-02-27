@@ -10,6 +10,13 @@ export type WinningRound =
   | 'super_bowl'
   | 'super_bowl_halftime'
   | 'single_game'
+  // March Madness rounds
+  | 'mm_r64'
+  | 'mm_r32'
+  | 'mm_s16'
+  | 'mm_e8'
+  | 'mm_f4'
+  | 'mm_final'
   | 'score_change_forward'
   | 'score_change_reverse'
   | 'score_change_both'
@@ -56,6 +63,31 @@ const winningColors = {
   single_game: {
     normal: 'bg-teal-100 border-teal-400',
     text: 'text-teal-700',
+  },
+  // March Madness rounds
+  mm_r64: {
+    normal: 'bg-slate-100 border-slate-400',
+    text: 'text-slate-700',
+  },
+  mm_r32: {
+    normal: 'bg-amber-100 border-amber-400',
+    text: 'text-amber-700',
+  },
+  mm_s16: {
+    normal: 'bg-emerald-100 border-emerald-400',
+    text: 'text-emerald-700',
+  },
+  mm_e8: {
+    normal: 'bg-blue-100 border-blue-400',
+    text: 'text-blue-700',
+  },
+  mm_f4: {
+    normal: 'bg-red-100 border-red-400',
+    text: 'text-red-700',
+  },
+  mm_final: {
+    normal: 'bg-purple-100 border-purple-400',
+    text: 'text-purple-700',
   },
   score_change_forward: {
     normal: 'bg-emerald-100 border-emerald-400',

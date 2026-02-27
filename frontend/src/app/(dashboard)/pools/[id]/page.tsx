@@ -6,12 +6,12 @@
  *
  * @description
  * Central page for viewing and managing any pool type. Dynamically renders
- * content based on pool type (bowl_buster, playoff_squares, march_madness, etc.).
+ * content based on pool type (bowl_buster, squares, march_madness, etc.).
  * Handles membership status, commissioner tools, and type-specific features.
  *
  * @pool_types
  * - bowl_buster: Bowl picks with margin-of-victory scoring
- * - playoff_squares: Football squares (single_game or playoffs mode)
+ * - squares: Football squares (single_game or playoffs mode)
  * - march_madness: 64-player blind draw tournament
  *
  * @features
@@ -211,7 +211,7 @@ export default async function PoolDetailPage({ params }: PageProps) {
   }> = []
   const sqOwnerProfiles = new Map<string, string | null>()
 
-  if (pool.type === 'playoff_squares') {
+  if (pool.type === 'squares') {
     // Get sq_pool config
     const { data: sqPool } = await supabase
       .from('sq_pools')
@@ -637,7 +637,7 @@ export default async function PoolDetailPage({ params }: PageProps) {
                   )}
                 </div>
                 <p className="text-muted-foreground text-sm mt-2">
-                  {pool.type === 'bowl_buster' ? 'Bowl Buster' : pool.type === 'playoff_squares' || pool.type === 'single_game_squares' ? 'Squares' : pool.type === 'march_madness' ? 'March Madness Blind Draw' : pool.type === 'golf' ? 'Golf Pool' : pool.type}
+                  {pool.type === 'bowl_buster' ? 'Bowl Buster' : pool.type === 'squares' ? 'Squares' : pool.type === 'march_madness' ? 'March Madness Blind Draw' : pool.type === 'golf' ? 'Golf Pool' : pool.type}
                   {pool.season_label && ` - ${pool.season_label}`}
                 </p>
                 <p className="text-xs sm:text-sm text-muted-foreground mt-1">
@@ -678,7 +678,7 @@ export default async function PoolDetailPage({ params }: PageProps) {
 
       {/* Main Content - Conditional based on pool type */}
       {/* Squares - Single Game Mode */}
-      {pool.type === 'playoff_squares' && sqPoolData && sqPoolData.mode === 'single_game' ? (
+      {pool.type === 'squares' && sqPoolData && sqPoolData.mode === 'single_game' ? (
         <SingleGameContent
           sqPoolId={sqPoolData.id}
           poolId={pool.id}
@@ -697,7 +697,7 @@ export default async function PoolDetailPage({ params }: PageProps) {
           isCommissioner={isCommissioner}
           isSuperAdmin={isSuperAdmin}
         />
-      ) : pool.type === 'playoff_squares' && sqPoolData ? (
+      ) : pool.type === 'squares' && sqPoolData ? (
         /* Squares - Full Playoffs Mode */
         <PlayoffContent
           sqPoolId={sqPoolData.id}
@@ -708,6 +708,7 @@ export default async function PoolDetailPage({ params }: PageProps) {
           rowNumbers={sqPoolData.row_numbers}
           colNumbers={sqPoolData.col_numbers}
           mode={sqPoolData.mode}
+          eventType={sqPoolData.event_type ?? 'nfl_playoffs'}
           poolStatus={pool.status}
           squares={publicSquares}
           games={sqGamesData}
@@ -715,7 +716,7 @@ export default async function PoolDetailPage({ params }: PageProps) {
           isCommissioner={isCommissioner}
           isSuperAdmin={isSuperAdmin}
         />
-      ) : pool.type === 'playoff_squares' && !sqPoolData ? (
+      ) : pool.type === 'squares' && !sqPoolData ? (
         <Card>
           <CardContent className="py-8 text-center">
             <h2 className="text-lg font-semibold text-foreground mb-2">Pool Not Configured</h2>

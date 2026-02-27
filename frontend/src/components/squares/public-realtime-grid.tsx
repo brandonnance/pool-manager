@@ -27,7 +27,7 @@ interface PublicRealtimeGridProps {
   winningSquareRoundsArray: Array<[string, WinningRound]>
   homeTeamLabel: string
   awayTeamLabel: string
-  legendMode: 'full_playoff' | 'single_game' | 'score_change'
+  legendMode: 'full_playoff' | 'single_game' | 'score_change' | 'march_madness'
 }
 
 // Create anonymous client for realtime

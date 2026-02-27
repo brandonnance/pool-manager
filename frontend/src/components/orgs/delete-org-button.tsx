@@ -64,7 +64,7 @@ export function DeleteOrgButton({ orgId, orgName }: DeleteOrgButtonProps) {
 
       // Delete each pool's data
       for (const pool of pools ?? []) {
-        if (pool.type === 'playoff_squares' || pool.type === 'single_game_squares') {
+        if (pool.type === 'squares') {
           // Get sq_pool id first
           const { data: sqPool } = await supabase
             .from('sq_pools')

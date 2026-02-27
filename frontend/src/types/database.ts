@@ -1626,6 +1626,7 @@ export type Database = {
         Row: {
           col_numbers: number[] | null
           created_at: string | null
+          event_type: string
           final_bonus_payout: number | null
           final_payout: number | null
           halftime_payout: number | null
@@ -1644,6 +1645,7 @@ export type Database = {
         Insert: {
           col_numbers?: number[] | null
           created_at?: string | null
+          event_type?: string
           final_bonus_payout?: number | null
           final_payout?: number | null
           halftime_payout?: number | null
@@ -1662,6 +1664,7 @@ export type Database = {
         Update: {
           col_numbers?: number[] | null
           created_at?: string | null
+          event_type?: string
           final_bonus_payout?: number | null
           final_payout?: number | null
           halftime_payout?: number | null
@@ -2009,4 +2012,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

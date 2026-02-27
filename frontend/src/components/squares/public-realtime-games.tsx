@@ -6,6 +6,7 @@ import type { Database } from '@/types/database'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { formatRoundWins as formatRoundWinsFromConfig } from '@/lib/squares/round-config'
 
 interface Game {
   id: string
@@ -69,6 +70,7 @@ interface PublicRealtimeGamesProps {
   colNumbers: number[] | null
   reverseScoring: boolean
   scoringMode: string | null
+  eventType?: string
 }
 
 function createAnonClient() {
@@ -88,6 +90,7 @@ export function PublicRealtimeGames({
   colNumbers,
   reverseScoring,
   scoringMode,
+  eventType = 'nfl_playoffs',
 }: PublicRealtimeGamesProps) {
   const [games, setGames] = useState<Game[]>(initialGames)
   const [winners, setWinners] = useState<Winner[]>(initialWinners)
@@ -279,11 +282,7 @@ export function PublicRealtimeGames({
   // Calculate wins by participant name for leaderboard with round breakdown
   interface RoundWins {
     total: number
-    wc: number // wild card
-    d: number // divisional
-    c: number // conference
-    sbh: number // super bowl halftime
-    sb: number // super bowl final
+    rounds: Record<string, number>
   }
   const winsByName = new Map<string, RoundWins>()
 
@@ -294,11 +293,7 @@ export function PublicRealtimeGames({
     if (winner.winner_name) {
       const current = winsByName.get(winner.winner_name) ?? {
         total: 0,
-        wc: 0,
-        d: 0,
-        c: 0,
-        sbh: 0,
-        sb: 0,
+        rounds: {},
       }
 
       current.total++
@@ -307,21 +302,10 @@ export function PublicRealtimeGames({
       const game = gamesById.get(winner.sq_game_id)
       if (game) {
         const isHalftime = winner.win_type === 'halftime' || winner.win_type === 'halftime_reverse'
-        switch (game.round) {
-          case 'wild_card':
-            current.wc++
-            break
-          case 'divisional':
-            current.d++
-            break
-          case 'conference':
-            current.c++
-            break
-          case 'super_bowl':
-            if (isHalftime) current.sbh++
-            else current.sb++
-            break
-        }
+        const roundKey = game.round === 'super_bowl' && isHalftime
+          ? 'super_bowl_halftime'
+          : game.round
+        current.rounds[roundKey] = (current.rounds[roundKey] ?? 0) + 1
       }
 
       winsByName.set(winner.winner_name, current)
@@ -331,17 +315,6 @@ export function PublicRealtimeGames({
   const leaderboardEntries = Array.from(winsByName.entries())
     .map(([name, stats]) => ({ name, ...stats }))
     .sort((a, b) => b.total - a.total)
-
-  // Helper to format round wins as compact string (e.g., "1WC, 2D, 1C")
-  const formatRoundWins = (entry: RoundWins): string => {
-    const parts: string[] = []
-    if (entry.wc > 0) parts.push(`${entry.wc}WC`)
-    if (entry.d > 0) parts.push(`${entry.d}D`)
-    if (entry.c > 0) parts.push(`${entry.c}C`)
-    if (entry.sbh > 0) parts.push(`${entry.sbh}SBH`)
-    if (entry.sb > 0) parts.push(`${entry.sb}SB`)
-    return parts.join(', ')
-  }
 
   // Check if this is a playoff pool (has rounds other than single_game)
   const isPlayoffPool = games.some((g) => g.round !== 'single_game')
@@ -652,7 +625,7 @@ export function PublicRealtimeGames({
                   >
                     <span className="truncate">{entry.name}</span>
                     <span className="text-xs text-muted-foreground ml-2 whitespace-nowrap">
-                      {isPlayoffPool ? formatRoundWins(entry) : `${entry.total} win${entry.total !== 1 ? 's' : ''}`}
+                      {isPlayoffPool ? formatRoundWinsFromConfig(eventType, entry.rounds) : `${entry.total} win${entry.total !== 1 ? 's' : ''}`}
                     </span>
                   </div>
                 ))}

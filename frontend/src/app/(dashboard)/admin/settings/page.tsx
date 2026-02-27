@@ -9,7 +9,7 @@
  * Manages global settings stored in the site_settings table.
  *
  * @features
- * - Pool Types toggle: Enable/disable pool types (bowl_buster, playoff_squares, golf, march_madness)
+ * - Pool Types toggle: Enable/disable pool types (bowl_buster, squares, golf, march_madness)
  * - NFL Playoff Games template: Configure default games for new Squares pools
  *
  * @components
@@ -56,7 +56,7 @@ export default async function AdminSettingsPage() {
 
   const poolTypes = settings?.find(s => s.key === 'enabled_pool_types')?.value as {
     bowl_buster: boolean
-    playoff_squares: boolean
+    squares: boolean
     golf: boolean
     march_madness: boolean
   } | null
@@ -87,7 +87,7 @@ export default async function AdminSettingsPage() {
         </CardHeader>
         <CardContent>
           <PoolTypesSettings
-            initialPoolTypes={poolTypes ?? { bowl_buster: true, playoff_squares: true, golf: true, march_madness: true }}
+            initialPoolTypes={poolTypes ?? { bowl_buster: true, squares: true, golf: true, march_madness: true }}
           />
         </CardContent>
       </Card>

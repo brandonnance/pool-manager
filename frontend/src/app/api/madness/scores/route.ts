@@ -4,16 +4,11 @@
  * @auth Requires commissioner role or super admin
  *
  * @description
- * Handles score entry for March Madness tournament games. When a game is marked
- * as final, this route calculates the spread cover, determines the advancing
- * entry based on the spread (not just who won), and updates elimination status.
- *
- * @features
- * - Update game scores (higher_seed_score, lower_seed_score)
- * - Mark games as final
- * - Calculate spread cover winner (who advances based on spread)
- * - Transfer winning team to advancing entry
- * - Mark eliminated entries and teams
+ * Handles score entry for March Madness tournament games. Updates game scores
+ * and status. When a game is marked as final, the DB trigger
+ * `mm_process_game_result()` automatically handles all downstream effects:
+ * spread cover calculation, entry elimination, team transfer, and next-round
+ * game population.
  *
  * @request_body
  * - gameId: string - The mm_games.id to update
@@ -23,7 +18,6 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { calculateSpreadCover } from '@/lib/madness'
 import { checkSuperAdmin, checkOrgAdmin, checkPoolCommissioner } from '@/lib/permissions'
 
 /**
@@ -37,15 +31,8 @@ import { checkSuperAdmin, checkOrgAdmin, checkPoolCommissioner } from '@/lib/per
  * 2. Authenticate user
  * 3. Fetch game with pool info for permission check
  * 4. Verify user is commissioner (pool, org, or super admin)
- * 5. Build update object from provided fields
- * 6. If marking as final with spread:
- *    - Calculate spread cover result
- *    - Determine winning team and spread covering team
- *    - Identify advancing and eliminated entries
- *    - Update eliminated entry (set eliminated=true, clear current_team_id)
- *    - Transfer winning team to advancing entry
- *    - Mark eliminated team
- * 7. Update the game record
+ * 5. Build update object from provided scores/status
+ * 6. Update the game record (trigger handles elimination, advancement, next round)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -73,15 +60,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get game with pool info
+    // Get game with pool info (only need pool_id and org_id for permission check)
     const { data: game, error: gameError } = await supabase
       .from('mm_games')
       .select(`
-        *,
+        id,
         mm_pools!inner(
-          id,
           pool_id,
-          push_rule,
           pools!inner(org_id)
         )
       `)
@@ -113,7 +98,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Build update object
+    // Build update object — only scores and status.
+    // The DB trigger mm_process_game_result() handles all downstream effects
+    // when status changes to 'final': spread cover, elimination, team transfer,
+    // and next-round game population.
     const updates: Record<string, unknown> = {}
 
     if (higherSeedScore !== undefined) {
@@ -126,79 +114,7 @@ export async function POST(request: NextRequest) {
       updates.status = status
     }
 
-    // If marking as final, calculate winner and spread cover
-    if (status === 'final' && game.spread !== null) {
-      const hScore = higherSeedScore ?? game.higher_seed_score
-      const lScore = lowerSeedScore ?? game.lower_seed_score
-
-      if (hScore !== null && lScore !== null) {
-        const result = calculateSpreadCover(
-          hScore,
-          lScore,
-          game.spread,
-          game.mm_pools.push_rule as 'favorite_advances' | 'underdog_advances' | 'coin_flip'
-        )
-
-        // Determine winning and covering teams
-        updates.winning_team_id = result.winner === 'higher'
-          ? game.higher_seed_team_id
-          : game.lower_seed_team_id
-
-        updates.spread_covering_team_id = result.spreadCover === 'push'
-          ? (result.advancingTeam === 'higher' ? game.higher_seed_team_id : game.lower_seed_team_id)
-          : (result.spreadCover === 'higher' ? game.higher_seed_team_id : game.lower_seed_team_id)
-
-        // Determine advancing and eliminated entries
-        const advancingEntryId = result.advancingTeam === 'higher'
-          ? game.higher_seed_entry_id
-          : game.lower_seed_entry_id
-
-        const eliminatedEntryId = result.advancingTeam === 'higher'
-          ? game.lower_seed_entry_id
-          : game.higher_seed_entry_id
-
-        updates.advancing_entry_id = advancingEntryId
-
-        // Update eliminated entry - clear their current_team_id since they no longer own a team
-        if (eliminatedEntryId) {
-          await supabase
-            .from('mm_entries')
-            .update({
-              eliminated: true,
-              eliminated_round: game.round,
-              current_team_id: null,
-            })
-            .eq('id', eliminatedEntryId)
-        }
-
-        // Transfer winning team to advancing entry
-        if (advancingEntryId && updates.winning_team_id) {
-          await supabase
-            .from('mm_entries')
-            .update({
-              current_team_id: updates.winning_team_id as string,
-            })
-            .eq('id', advancingEntryId)
-        }
-
-        // Mark eliminated team
-        const eliminatedTeamId = result.winner === 'higher'
-          ? game.lower_seed_team_id
-          : game.higher_seed_team_id
-
-        if (eliminatedTeamId) {
-          await supabase
-            .from('mm_pool_teams')
-            .update({
-              eliminated: true,
-              eliminated_round: game.round,
-            })
-            .eq('id', eliminatedTeamId)
-        }
-      }
-    }
-
-    // Update game
+    // Update game — trigger fires on status='final' and handles everything else
     const { error: updateError } = await supabase
       .from('mm_games')
       .update(updates)

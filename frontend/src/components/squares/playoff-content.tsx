@@ -27,6 +27,11 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import type { WinningRound } from './square-cell'
+import {
+  getRoundConfig,
+  getRoundLabel as getRoundLabelFromConfig,
+  formatRoundWins as formatRoundWinsFromConfig,
+} from '@/lib/squares/round-config'
 
 interface SqGame {
   id: string
@@ -64,6 +69,7 @@ interface PlayoffContentProps {
   rowNumbers: number[] | null
   colNumbers: number[] | null
   mode: string | null
+  eventType?: string
   poolStatus: string
   squares: Square[]
   games: SqGame[]
@@ -72,20 +78,7 @@ interface PlayoffContentProps {
   isSuperAdmin?: boolean
 }
 
-function getRoundLabel(round: string): string {
-  switch (round) {
-    case 'wild_card':
-      return 'Wild Card'
-    case 'divisional':
-      return 'Divisional'
-    case 'conference':
-      return 'Conference'
-    case 'super_bowl':
-      return 'Super Bowl'
-    default:
-      return round
-  }
-}
+// getRoundLabel is now imported from round-config.ts
 
 // Format quarter/period display
 function formatGameClock(period: number | null, clock: string | null): string | null {
@@ -496,6 +489,7 @@ export function PlayoffContent({
   rowNumbers,
   colNumbers,
   mode,
+  eventType = 'nfl_playoffs',
   poolStatus,
   squares: initialSquares,
   games,
@@ -574,13 +568,7 @@ export function PlayoffContent({
   } | null>(null)
 
   // Round hierarchy for playoff mode (higher number = higher tier)
-  const roundHierarchy: Record<string, number> = {
-    wild_card: 1,
-    divisional: 2,
-    conference: 3,
-    super_bowl_halftime: 4,
-    super_bowl: 5,
-  }
+  const { roundOrder, roundHierarchy } = getRoundConfig(eventType)
 
   // Build winning squares map (squareId -> round)
   const gameById = new Map(games.map((g) => [g.id, g]))
@@ -657,14 +645,10 @@ export function PlayoffContent({
   }
 
   // Calculate wins by participant name with round breakdown
-  // Track wins by round for NFL playoff pools
+  // Dynamic: works for both NFL and March Madness rounds
   interface RoundWins {
     total: number
-    wc: number // wild card
-    d: number // divisional
-    c: number // conference
-    sbh: number // super bowl halftime
-    sb: number // super bowl final
+    rounds: Record<string, number>
   }
   const winsByName = new Map<string, RoundWins>()
 
@@ -672,11 +656,7 @@ export function PlayoffContent({
     if (winner.winner_name) {
       const current = winsByName.get(winner.winner_name) ?? {
         total: 0,
-        wc: 0,
-        d: 0,
-        c: 0,
-        sbh: 0,
-        sb: 0,
+        rounds: {},
       }
 
       current.total++
@@ -685,21 +665,10 @@ export function PlayoffContent({
       const game = gameById.get(winner.sq_game_id)
       if (game) {
         const isHalftime = winner.win_type === 'halftime' || winner.win_type === 'halftime_reverse'
-        switch (game.round) {
-          case 'wild_card':
-            current.wc++
-            break
-          case 'divisional':
-            current.d++
-            break
-          case 'conference':
-            current.c++
-            break
-          case 'super_bowl':
-            if (isHalftime) current.sbh++
-            else current.sb++
-            break
-        }
+        const roundKey = game.round === 'super_bowl' && isHalftime
+          ? 'super_bowl_halftime'
+          : game.round
+        current.rounds[roundKey] = (current.rounds[roundKey] ?? 0) + 1
       }
 
       winsByName.set(winner.winner_name, current)
@@ -709,17 +678,6 @@ export function PlayoffContent({
   const leaderboardEntries = Array.from(winsByName.entries())
     .map(([name, stats]) => ({ name, ...stats }))
     .sort((a, b) => b.total - a.total)
-
-  // Helper to format round wins as compact string (e.g., "1WC, 2D, 1C")
-  const formatRoundWins = (entry: RoundWins): string => {
-    const parts: string[] = []
-    if (entry.wc > 0) parts.push(`${entry.wc}WC`)
-    if (entry.d > 0) parts.push(`${entry.d}D`)
-    if (entry.c > 0) parts.push(`${entry.c}C`)
-    if (entry.sbh > 0) parts.push(`${entry.sbh}SBH`)
-    if (entry.sb > 0) parts.push(`${entry.sb}SB`)
-    return parts.join(', ')
-  }
 
   // Group games by round
   const gamesByRound = games.reduce(
@@ -731,8 +689,6 @@ export function PlayoffContent({
     },
     {} as Record<string, SqGame[]>
   )
-
-  const roundOrder = ['wild_card', 'divisional', 'conference', 'super_bowl']
 
   const handleSquareClick = (rowIndex: number, colIndex: number, square: Square | null) => {
     if (!isCommissioner) return
@@ -776,7 +732,7 @@ export function PlayoffContent({
                 liveWinningSquareIds={liveWinningSquareIds}
                 homeTeamLabel="Home"
                 awayTeamLabel="Away"
-                legendMode="full_playoff"
+                legendMode={eventType === 'march_madness' ? 'march_madness' : 'full_playoff'}
                 onSquareClick={handleSquareClick}
               />
             </CardContent>
@@ -802,7 +758,7 @@ export function PlayoffContent({
                   return (
                     <div key={round}>
                       <div className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
-                        {getRoundLabel(round)}
+                        {getRoundLabelFromConfig(eventType, round)}
                       </div>
                       <div className="grid gap-3 sm:grid-cols-2">
                         {roundGames.map((game) => (
@@ -866,7 +822,7 @@ export function PlayoffContent({
                       >
                         <span className="truncate">{entry.name}</span>
                         <span className="text-xs text-muted-foreground ml-2 whitespace-nowrap">
-                          {formatRoundWins(entry)}
+                          {formatRoundWinsFromConfig(eventType, entry.rounds)}
                         </span>
                       </div>
                     ))}

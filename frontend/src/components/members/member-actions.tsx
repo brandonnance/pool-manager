@@ -89,7 +89,7 @@ export function MemberActions({
     // Build appropriate confirmation message based on pool type
     let confirmMessage = `Are you sure you want to remove ${userName} from this pool?`
 
-    const isSquaresPool = poolType === 'squares' || poolType === 'playoff_squares' || poolType === 'single_game_squares'
+    const isSquaresPool = poolType === 'squares'
 
     if (poolType === 'bowl_buster') {
       confirmMessage = `Are you sure you want to remove ${userName} from this pool?\n\nThis will permanently delete all their entries and picks.`

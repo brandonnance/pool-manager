@@ -11,13 +11,13 @@ import { Loader2 } from 'lucide-react'
 interface PoolTypesSettingsProps {
   initialPoolTypes: {
     bowl_buster: boolean
-    playoff_squares: boolean
+    squares: boolean
     golf: boolean
     march_madness: boolean
   }
 }
 
-type PoolTypeKey = 'bowl_buster' | 'playoff_squares' | 'golf' | 'march_madness'
+type PoolTypeKey = 'bowl_buster' | 'squares' | 'golf' | 'march_madness'
 
 export function PoolTypesSettings({ initialPoolTypes }: PoolTypesSettingsProps) {
   const router = useRouter()
@@ -30,7 +30,7 @@ export function PoolTypesSettings({ initialPoolTypes }: PoolTypesSettingsProps) 
       const updated = { ...prev, [key]: !prev[key] }
       setHasChanges(
         updated.bowl_buster !== initialPoolTypes.bowl_buster ||
-        updated.playoff_squares !== initialPoolTypes.playoff_squares ||
+        updated.squares !== initialPoolTypes.squares ||
         updated.golf !== initialPoolTypes.golf ||
         updated.march_madness !== initialPoolTypes.march_madness
       )
@@ -79,17 +79,17 @@ export function PoolTypesSettings({ initialPoolTypes }: PoolTypesSettingsProps) 
 
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
-            <Label htmlFor="playoff_squares" className="text-base font-medium">
-              Playoff Squares
+            <Label htmlFor="squares" className="text-base font-medium">
+              Squares
             </Label>
             <p className="text-sm text-muted-foreground">
-              NFL playoff squares pools with public grid links
+              Football squares pools with public grid links
             </p>
           </div>
           <Switch
-            id="playoff_squares"
-            checked={poolTypes.playoff_squares}
-            onCheckedChange={() => handleToggle('playoff_squares')}
+            id="squares"
+            checked={poolTypes.squares}
+            onCheckedChange={() => handleToggle('squares')}
           />
         </div>
 
