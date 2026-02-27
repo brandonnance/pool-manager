@@ -151,10 +151,8 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
         .insert({
           pool_id: pool.id,
           reverse_scoring: reverseScoring,
-          max_squares_per_player: null,
           mode: squaresMode,
           scoring_mode: squaresMode === 'single_game' ? scoringMode : null,
-          no_account_mode: true,
           public_slug: publicSlug || null,
         })
         .select()

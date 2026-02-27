@@ -970,8 +970,8 @@ export type Database = {
           current_team_id: string | null
           display_name: string | null
           eliminated: boolean
-          email: string | null
           eliminated_round: string | null
+          email: string | null
           id: string
           mm_pool_id: string
           original_team_id: string | null
@@ -986,8 +986,8 @@ export type Database = {
           current_team_id?: string | null
           display_name?: string | null
           eliminated?: boolean
-          email?: string | null
           eliminated_round?: string | null
+          email?: string | null
           id?: string
           mm_pool_id: string
           original_team_id?: string | null
@@ -1002,8 +1002,8 @@ export type Database = {
           current_team_id?: string | null
           display_name?: string | null
           eliminated?: boolean
-          email?: string | null
           eliminated_round?: string | null
+          email?: string | null
           id?: string
           mm_pool_id?: string
           original_team_id?: string | null
@@ -1630,9 +1630,7 @@ export type Database = {
           final_payout: number | null
           halftime_payout: number | null
           id: string
-          max_squares_per_player: number | null
           mode: string | null
-          no_account_mode: boolean
           numbers_locked: boolean | null
           per_change_payout: number | null
           pool_id: string
@@ -1650,9 +1648,7 @@ export type Database = {
           final_payout?: number | null
           halftime_payout?: number | null
           id?: string
-          max_squares_per_player?: number | null
           mode?: string | null
-          no_account_mode?: boolean
           numbers_locked?: boolean | null
           per_change_payout?: number | null
           pool_id: string
@@ -1670,9 +1666,7 @@ export type Database = {
           final_payout?: number | null
           halftime_payout?: number | null
           id?: string
-          max_squares_per_player?: number | null
           mode?: string | null
-          no_account_mode?: boolean
           numbers_locked?: boolean | null
           per_change_payout?: number | null
           pool_id?: string
@@ -1861,7 +1855,6 @@ export type Database = {
       }
       is_mm_pool_member: { Args: { p_mm_pool_id: string }; Returns: boolean }
       is_org_admin: { Args: { p_org_id: string }; Returns: boolean }
-      is_org_commissioner: { Args: { p_org_id: string }; Returns: boolean }
       is_pool_commissioner: { Args: { p_pool_id: string }; Returns: boolean }
       is_pool_member: { Args: { p_pool_id: string }; Returns: boolean }
       is_pool_member_any_status: {
@@ -2016,3 +2009,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
