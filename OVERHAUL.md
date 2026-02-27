@@ -23,8 +23,8 @@ The work is organized into 8 phases. Phases 0-2 are highest priority. The depend
 | **0A**: Centralized Permission Helpers | **DONE** | 2026-02-26 | Created `lib/permissions.ts`, updated 14 files to use shared helpers |
 | **0B**: Fix RLS Security Issues | **DONE** | 2026-02-26 | Fixes 1-4 applied. Fix 5 (consolidate policies) skipped — duplicates are intentional auth/public splits |
 | **0C**: Error Boundaries & Loading States | **DONE** | 2026-02-26 | Created `lib/errors.ts`, 4 loading.tsx, 2 error.tsx files |
-| **1A**: Blind Draw Improvements | Not started | | |
-| **1B**: Generic Squares + MM Squares | Not started | | |
+| **1A**: Blind Draw Improvements | **DONE** | 2026-02-27 | Cleaned up scores API (removed duplicate trigger logic), mobile bracket (round filters, collapsible sections), commissioner dashboard (current round badge, progress bar, next action card) |
+| **1B**: Generic Squares + MM Squares | **DONE** | 2026-02-27 | Renamed `playoff_squares` → `squares`, added `event_type` column, 63-game MM template, round-config utility, MM round colors, event type selector in create flow, pool completion button + archive view |
 | **2A**: Remove "No-Account" Naming | **DONE** | 2026-02-26 | Renamed types/variables across 12 files, removed dead code |
 | **2B**: DB Column Cleanup | **DONE** | 2026-02-26 | Dropped columns, rewrote 6 RLS policies, dropped FK, regenerated types |
 | **3A**: Commissioner Workflow Redesign | Not started | | |
