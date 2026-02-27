@@ -29,6 +29,7 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getPoolPermissions } from '@/lib/permissions'
 import { Card, CardContent } from '@/components/ui/card'
 import { BracketView } from '@/components/march-madness'
 
@@ -61,30 +62,7 @@ export default async function MarchMadnessBracketPage({ params }: PageProps) {
   }
 
   // Check membership
-  const { data: poolMembership } = await supabase
-    .from('pool_memberships')
-    .select('id, status, role')
-    .eq('pool_id', id)
-    .eq('user_id', user.id)
-    .single()
-
-  const { data: orgMembership } = await supabase
-    .from('org_memberships')
-    .select('role')
-    .eq('org_id', pool.org_id)
-    .eq('user_id', user.id)
-    .single()
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('is_super_admin')
-    .eq('id', user.id)
-    .single()
-
-  const isSuperAdmin = profile?.is_super_admin ?? false
-  const isOrgAdmin = orgMembership?.role === 'admin' || isSuperAdmin
-  const isPoolCommissioner = poolMembership?.role === 'commissioner' || isOrgAdmin
-  const isMember = poolMembership?.status === 'approved'
+  const { isPoolCommissioner, isMember } = await getPoolPermissions(supabase, user.id, id, pool.org_id)
 
   if (!isMember && !isPoolCommissioner) {
     redirect(`/pools/${id}`)

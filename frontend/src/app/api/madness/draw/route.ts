@@ -27,6 +27,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { shuffleArray, generateAllTournamentGames } from '@/lib/madness'
+import { checkSuperAdmin, checkOrgAdmin, checkPoolCommissioner } from '@/lib/permissions'
 
 /**
  * POST handler for executing the March Madness blind draw
@@ -91,29 +92,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify user is commissioner
-    const { data: poolMembership } = await supabase
-      .from('pool_memberships')
-      .select('role')
-      .eq('pool_id', mmPool.pool_id)
-      .eq('user_id', user.id)
-      .single()
+    const [{ data: profile }, { data: orgMembership }, { data: poolMembership }] = await Promise.all([
+      supabase.from('profiles').select('is_super_admin').eq('id', user.id).single(),
+      supabase.from('org_memberships').select('role').eq('org_id', mmPool.pools.org_id).eq('user_id', user.id).single(),
+      supabase.from('pool_memberships').select('role').eq('pool_id', mmPool.pool_id).eq('user_id', user.id).single(),
+    ])
 
-    const { data: orgMembership } = await supabase
-      .from('org_memberships')
-      .select('role')
-      .eq('org_id', mmPool.pools.org_id)
-      .eq('user_id', user.id)
-      .single()
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('is_super_admin')
-      .eq('id', user.id)
-      .single()
-
-    const isSuperAdmin = profile?.is_super_admin ?? false
-    const isOrgAdmin = orgMembership?.role === 'admin' || isSuperAdmin
-    const isPoolCommissioner = poolMembership?.role === 'commissioner' || isOrgAdmin
+    const isSuperAdmin = checkSuperAdmin(profile)
+    const isOrgAdmin = checkOrgAdmin(orgMembership, isSuperAdmin)
+    const isPoolCommissioner = checkPoolCommissioner(poolMembership, isOrgAdmin)
 
     if (!isPoolCommissioner) {
       return NextResponse.json(

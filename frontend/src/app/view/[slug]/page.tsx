@@ -5,7 +5,7 @@
  * @layout Standalone (custom header/footer)
  *
  * @description
- * Public view for NFL Playoff Squares pools in "no account mode".
+ * Public view for NFL Playoff Squares pools.
  * Allows anyone with the slug to view the grid, games, and winners
  * without needing an account. Uses realtime subscriptions for live updates.
  *
@@ -23,7 +23,7 @@
  * - PublicRealtimeGames: Realtime games list with scores and winners
  *
  * @data_fetching
- * - sq_pools: Pool settings by public_slug (no_account_mode must be true)
+ * - sq_pools: Pool settings by public_slug
  * - pools: Pool name and status
  * - sq_squares: Grid squares with participant names
  * - sq_games: Games with scores (if numbers locked)
@@ -64,7 +64,6 @@ export default async function PublicViewPage({ params }: PageProps) {
     .select(`
       id,
       pool_id,
-      no_account_mode,
       public_slug,
       numbers_locked,
       row_numbers,
@@ -74,7 +73,6 @@ export default async function PublicViewPage({ params }: PageProps) {
       reverse_scoring
     `)
     .eq('public_slug', slug)
-    .eq('no_account_mode', true)
     .single()
 
   if (!sqPool) {

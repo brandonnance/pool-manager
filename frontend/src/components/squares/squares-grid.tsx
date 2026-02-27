@@ -13,22 +13,19 @@ interface SelectedSquare {
   participantName: string
 }
 
-// Square type for squares pool (no-account mode uses participant_name instead of user_id)
+// Square type for public-facing squares pool (uses participant_name)
 export interface Square {
   id: string | null
   row_index: number
   col_index: number
   participant_name: string | null
   verified: boolean
-  user_id?: string | null // Optional for backwards compatibility, not used in no-account mode
+  user_id?: string | null // Legacy field, unused in current model
 }
 
-// Alias for backwards compatibility
-export type NoAccountSquare = Square
-
-export interface NoAccountSquaresGridProps {
+export interface SquaresGridProps {
   sqPoolId: string
-  squares: NoAccountSquare[]
+  squares: Square[]
   rowNumbers: number[] | null
   colNumbers: number[] | null
   numbersLocked: boolean
@@ -38,7 +35,7 @@ export interface NoAccountSquaresGridProps {
   homeTeamLabel?: string
   awayTeamLabel?: string
   legendMode?: LegendMode
-  onSquareClick?: (rowIndex: number, colIndex: number, square: NoAccountSquare | null) => void
+  onSquareClick?: (rowIndex: number, colIndex: number, square: Square | null) => void
   // Controlled selection for external participant list integration
   controlledParticipantName?: string | null
   onParticipantSelect?: (name: string | null) => void
@@ -61,7 +58,7 @@ export function SquaresGrid({
   controlledParticipantName,
   onParticipantSelect,
   className,
-}: NoAccountSquaresGridProps) {
+}: SquaresGridProps) {
   const [loadingCell, setLoadingCell] = useState<string | null>(null)
   const [internalSelectedSquare, setInternalSelectedSquare] = useState<SelectedSquare | null>(null)
 
@@ -74,7 +71,7 @@ export function SquaresGrid({
   const gridRef = useRef<HTMLDivElement>(null)
 
   // Create a map for quick lookup
-  const squareMap = new Map<string, NoAccountSquare>()
+  const squareMap = new Map<string, Square>()
   squares.forEach((sq) => {
     squareMap.set(`${sq.row_index}-${sq.col_index}`, sq)
   })

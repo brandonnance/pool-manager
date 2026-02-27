@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/types/database'
-import { SquaresGrid, type NoAccountSquare } from './squares-grid'
+import { SquaresGrid, type Square } from './squares-grid'
 import { PoolSettings } from './pool-settings'
 import { AssignNameDialog } from './assign-name-dialog'
 import { BulkAssignDialog } from './bulk-assign-dialog'
@@ -76,7 +76,7 @@ interface ScoreChange {
   quarter_marker?: string[] | null
 }
 
-interface NoAccountSingleGameContentProps {
+interface SingleGameContentProps {
   sqPoolId: string
   poolId: string
   publicSlug: string | null
@@ -87,7 +87,7 @@ interface NoAccountSingleGameContentProps {
   mode: string | null
   scoringMode: string | null
   poolStatus: string
-  squares: NoAccountSquare[]
+  squares: Square[]
   games: SqGame[]
   winners: SqWinner[]
   scoreChanges: ScoreChange[]
@@ -199,8 +199,8 @@ function SimpleGameScoreCard({
   )
 }
 
-// Simple Score Entry Component for No-Account Mode
-function NoAccountScoreEntry({
+// Score Entry Component
+function ScoreEntry({
   game,
   sqPoolId,
   scoringMode,
@@ -219,7 +219,7 @@ function NoAccountScoreEntry({
   sqPoolId: string
   scoringMode: string
   reverseScoring: boolean
-  squares: NoAccountSquare[]
+  squares: Square[]
   rowNumbers: number[]
   colNumbers: number[]
   scoreChanges: ScoreChange[]
@@ -1153,7 +1153,7 @@ function NoAccountScoreEntry({
   )
 }
 
-// Simple Score Change Log for No-Account Mode
+// Score Change Log
 function SimpleScoreChangeLog({
   scoreChanges,
   squares,
@@ -1166,7 +1166,7 @@ function SimpleScoreChangeLog({
   onDeleteScoreChange,
 }: {
   scoreChanges: ScoreChange[]
-  squares: NoAccountSquare[]
+  squares: Square[]
   rowNumbers: number[]
   colNumbers: number[]
   reverseScoring: boolean
@@ -1370,11 +1370,11 @@ export function SingleGameContent({
   scoreChanges: initialScoreChanges,
   isCommissioner,
   isSuperAdmin = false,
-}: NoAccountSingleGameContentProps) {
+}: SingleGameContentProps) {
   const router = useRouter()
 
   // Local state for squares with realtime updates
-  const [squares, setSquares] = useState<NoAccountSquare[]>(initialSquares)
+  const [squares, setSquares] = useState<Square[]>(initialSquares)
 
   // Local state for winners - enables instant UI updates
   const [winners, setWinners] = useState<SqWinner[]>(initialWinners)
@@ -1602,7 +1602,7 @@ export function SingleGameContent({
   const [selectedSquare, setSelectedSquare] = useState<{
     rowIndex: number
     colIndex: number
-    square: NoAccountSquare | null
+    square: Square | null
   } | null>(null)
 
   // Build winning squares map
@@ -1707,7 +1707,7 @@ export function SingleGameContent({
   const liveWinningSquareIds = new Set<string>()
   if (numbersLocked && rowNumbers && colNumbers && currentGame?.status !== 'final') {
     // Create a map of squares by position for quick lookup
-    const squaresByPosition = new Map<string, NoAccountSquare>()
+    const squaresByPosition = new Map<string, Square>()
     for (const sq of squares) {
       squaresByPosition.set(`${sq.row_index}-${sq.col_index}`, sq)
     }
@@ -1773,7 +1773,7 @@ export function SingleGameContent({
   // Both score_change and quarter modes use the same color scheme now
   const legendMode = 'score_change'
 
-  const handleSquareClick = (rowIndex: number, colIndex: number, square: NoAccountSquare | null) => {
+  const handleSquareClick = (rowIndex: number, colIndex: number, square: Square | null) => {
     if (!isCommissioner) return
     setSelectedSquare({ rowIndex, colIndex, square })
     setAssignDialogOpen(true)
@@ -1881,7 +1881,7 @@ export function SingleGameContent({
 
                 {/* Commissioner score entry */}
                 {isCommissioner && (
-                  <NoAccountScoreEntry
+                  <ScoreEntry
                     game={firstGame}
                     sqPoolId={sqPoolId}
                     scoringMode={scoringMode ?? 'quarter'}

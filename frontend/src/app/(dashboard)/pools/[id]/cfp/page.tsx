@@ -33,6 +33,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { EnableCfpButton } from '@/components/cfp/enable-cfp-button'
 import { CfpBracketSetup } from '@/components/cfp/cfp-bracket-setup'
+import { getOrgPermissions } from '@/lib/permissions'
 
 /** Page props with dynamic route parameters */
 interface PageProps {
@@ -80,22 +81,8 @@ export default async function PoolCfpPage({ params }: PageProps) {
     notFound()
   }
 
-  // Check if commissioner
-  const { data: orgMembership } = await supabase
-    .from('org_memberships')
-    .select('role')
-    .eq('org_id', pool.org_id)
-    .eq('user_id', user.id)
-    .single()
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('is_super_admin')
-    .eq('id', user.id)
-    .single()
-
-  const isSuperAdmin = profile?.is_super_admin ?? false
-  const isCommissioner = orgMembership?.role === 'admin' || isSuperAdmin
+  // Get user permissions for this org
+  const { isOrgAdmin: isCommissioner } = await getOrgPermissions(supabase, user.id, pool.org_id)
 
   if (!isCommissioner) {
     notFound()

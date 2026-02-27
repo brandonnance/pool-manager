@@ -141,7 +141,7 @@ const hybridHalftimeBothGradient = 'bg-gradient-to-br from-blue-100 from-50% to-
 const hybridQ3BothGradient = 'bg-gradient-to-br from-teal-100 from-50% to-green-100 to-50%'
 const hybridFinalBothGradient = 'bg-gradient-to-br from-purple-100 from-50% to-fuchsia-100 to-50%'
 
-export interface NoAccountSquareCellProps {
+export interface SquareCellProps {
   rowIndex: number
   colIndex: number
   participantName: string | null
@@ -167,7 +167,7 @@ export function SquareCell({
   isLoading = false,
   onClick,
   className,
-}: NoAccountSquareCellProps) {
+}: SquareCellProps) {
   const isWinning = winningRound !== null
   const isAssigned = participantName !== null
   const gridNumber = `${rowIndex}${colIndex}`

@@ -48,6 +48,7 @@ import { SingleGameContent } from '@/components/squares/single-game-content'
 import { PlayoffContent } from '@/components/squares/playoff-content'
 import { MmPublicUrlCard } from '@/components/march-madness/mm-public-url-card'
 import { GolfStandingsWrapper } from '@/components/golf/golf-standings-wrapper'
+import { getPoolPermissions } from '@/lib/permissions'
 import { GpPublicUrlDisplay } from '@/components/golf/gp-public-url-display'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -107,38 +108,19 @@ export default async function PoolDetailPage({ params }: PageProps) {
     notFound()
   }
 
-  // Check if user is pool member (including role)
-  const { data: poolMembership } = await supabase
-    .from('pool_memberships')
-    .select('id, status, role')
-    .eq('pool_id', id)
-    .eq('user_id', user.id)
-    .single()
+  // Get user permissions for this pool (runs 3 queries in parallel)
+  const {
+    profile,
+    orgMembership,
+    poolMembership,
+    isSuperAdmin,
+    isOrgAdmin,
+    isPoolCommissioner,
+    isMember,
+    isPending,
+  } = await getPoolPermissions(supabase, user.id, id, pool.org_id)
 
-  // Check if org admin
-  const { data: orgMembership } = await supabase
-    .from('org_memberships')
-    .select('role')
-    .eq('org_id', pool.org_id)
-    .eq('user_id', user.id)
-    .single()
-
-  // Check if super admin and get display name
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('is_super_admin, display_name')
-    .eq('id', user.id)
-    .single()
-
-  const isSuperAdmin = profile?.is_super_admin ?? false
-  const isOrgAdmin = orgMembership?.role === 'admin' || isSuperAdmin
-  // Pool commissioner = explicit pool role OR org admin (implicit commissioner rights)
-  const isPoolCommissioner = poolMembership?.role === 'commissioner' || isOrgAdmin
-  // Keep isCommissioner as alias for backward compatibility in this file
   const isCommissioner = isPoolCommissioner
-
-  const isMember = poolMembership?.status === 'approved'
-  const isPending = poolMembership?.status === 'pending'
 
   // Get pool games with status for completion tracking
   const { data: poolGamesData, count: gamesCount } = await supabase
@@ -239,7 +221,7 @@ export default async function PoolDetailPage({ params }: PageProps) {
     sqPoolData = sqPool
 
     if (sqPool) {
-      // Get all squares (including no-account fields)
+      // Get all squares
       const { data: squares } = await supabase
         .from('sq_squares')
         .select('id, row_index, col_index, user_id, participant_name, verified')
@@ -482,8 +464,8 @@ export default async function PoolDetailPage({ params }: PageProps) {
     }
   })
 
-  // Transform squares data for no-account mode
-  const noAccountSquares = sqSquaresData.map((sq) => ({
+  // Transform squares data for public-facing grid
+  const publicSquares = sqSquaresData.map((sq) => ({
     id: sq.id,
     row_index: sq.row_index,
     col_index: sq.col_index,
@@ -708,7 +690,7 @@ export default async function PoolDetailPage({ params }: PageProps) {
           mode={sqPoolData.mode}
           scoringMode={sqPoolData.scoring_mode}
           poolStatus={pool.status}
-          squares={noAccountSquares}
+          squares={publicSquares}
           games={sqGamesData}
           winners={sqWinnersData}
           scoreChanges={sqScoreChangesData}
@@ -727,7 +709,7 @@ export default async function PoolDetailPage({ params }: PageProps) {
           colNumbers={sqPoolData.col_numbers}
           mode={sqPoolData.mode}
           poolStatus={pool.status}
-          squares={noAccountSquares}
+          squares={publicSquares}
           games={sqGamesData}
           winners={sqWinnersData}
           isCommissioner={isCommissioner}

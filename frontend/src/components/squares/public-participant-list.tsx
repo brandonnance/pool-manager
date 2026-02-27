@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import { ChevronDown, ChevronUp, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { NoAccountSquare } from './squares-grid'
+import type { Square } from './squares-grid'
 
 interface Participant {
   name: string
@@ -11,7 +11,7 @@ interface Participant {
 }
 
 interface PublicParticipantListProps {
-  squares: NoAccountSquare[]
+  squares: Square[]
   selectedParticipantName: string | null
   onSelectParticipant: (name: string | null) => void
   className?: string

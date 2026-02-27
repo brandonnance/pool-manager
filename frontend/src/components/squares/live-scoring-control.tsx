@@ -36,7 +36,7 @@ async function getWinnerName(
 
   if (!square) return null
 
-  // For no-account mode, use participant_name
+  // Use participant_name for public-facing squares
   if (square.participant_name) {
     return { squareId: square.id, winnerName: square.participant_name }
   }

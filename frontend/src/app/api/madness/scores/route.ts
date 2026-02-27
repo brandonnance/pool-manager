@@ -24,6 +24,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { calculateSpreadCover } from '@/lib/madness'
+import { checkSuperAdmin, checkOrgAdmin, checkPoolCommissioner } from '@/lib/permissions'
 
 /**
  * POST handler for updating March Madness game scores
@@ -95,38 +96,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify user is commissioner
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('is_super_admin')
-      .eq('id', user.id)
-      .single()
+    const [{ data: profile }, { data: orgMembership }, { data: poolMembership }] = await Promise.all([
+      supabase.from('profiles').select('is_super_admin').eq('id', user.id).single(),
+      supabase.from('org_memberships').select('role').eq('org_id', game.mm_pools.pools.org_id).eq('user_id', user.id).single(),
+      supabase.from('pool_memberships').select('role').eq('pool_id', game.mm_pools.pool_id).eq('user_id', user.id).single(),
+    ])
 
-    const isSuperAdmin = profile?.is_super_admin ?? false
+    const isSuperAdmin = checkSuperAdmin(profile)
+    const isOrgAdmin = checkOrgAdmin(orgMembership, isSuperAdmin)
+    const isPoolCommissioner = checkPoolCommissioner(poolMembership, isOrgAdmin)
 
-    if (!isSuperAdmin) {
-      const { data: poolMembership } = await supabase
-        .from('pool_memberships')
-        .select('role')
-        .eq('pool_id', game.mm_pools.pool_id)
-        .eq('user_id', user.id)
-        .single()
-
-      const { data: orgMembership } = await supabase
-        .from('org_memberships')
-        .select('role')
-        .eq('org_id', game.mm_pools.pools.org_id)
-        .eq('user_id', user.id)
-        .single()
-
-      const isOrgAdmin = orgMembership?.role === 'admin'
-      const isPoolCommissioner = poolMembership?.role === 'commissioner' || isOrgAdmin
-
-      if (!isPoolCommissioner) {
-        return NextResponse.json(
-          { error: 'Only commissioners can enter scores' },
-          { status: 403 }
-        )
-      }
+    if (!isPoolCommissioner) {
+      return NextResponse.json(
+        { error: 'Only commissioners can enter scores' },
+        { status: 403 }
+      )
     }
 
     // Build update object

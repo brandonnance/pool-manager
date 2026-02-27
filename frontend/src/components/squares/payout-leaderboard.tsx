@@ -34,7 +34,7 @@ export function PayoutLeaderboard({ squares, winners, currentUserId }: PayoutLea
     if (sq.id) squareById.set(sq.id, sq)
   })
 
-  // Aggregate wins by participant name (no-account mode)
+  // Aggregate wins by participant name
   const winsByParticipant = new Map<string, LeaderboardEntry>()
 
   winners.forEach((winner) => {

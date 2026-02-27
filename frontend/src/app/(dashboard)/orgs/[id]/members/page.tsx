@@ -29,6 +29,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { OrgMemberActions } from '@/components/orgs/org-member-actions'
+import { getOrgPermissions } from '@/lib/permissions'
 
 /** Page props with dynamic route parameters */
 interface PageProps {
@@ -66,22 +67,8 @@ export default async function OrgMembersPage({ params }: PageProps) {
     notFound()
   }
 
-  // Check if commissioner
-  const { data: membership } = await supabase
-    .from('org_memberships')
-    .select('role')
-    .eq('org_id', id)
-    .eq('user_id', user.id)
-    .single()
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('is_super_admin')
-    .eq('id', user.id)
-    .single()
-
-  const isSuperAdmin = profile?.is_super_admin ?? false
-  const isOrgAdmin = membership?.role === 'admin' || isSuperAdmin
+  // Get user permissions for this org
+  const { isSuperAdmin, isOrgAdmin } = await getOrgPermissions(supabase, user.id, id)
 
   if (!isOrgAdmin) {
     notFound()

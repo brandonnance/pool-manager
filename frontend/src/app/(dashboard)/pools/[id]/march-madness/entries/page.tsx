@@ -36,6 +36,7 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getPoolPermissions } from '@/lib/permissions'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -79,29 +80,7 @@ export default async function MarchMadnessEntriesPage({ params }: PageProps) {
   }
 
   // Check commissioner access
-  const { data: poolMembership } = await supabase
-    .from('pool_memberships')
-    .select('role')
-    .eq('pool_id', id)
-    .eq('user_id', user.id)
-    .single()
-
-  const { data: orgMembership } = await supabase
-    .from('org_memberships')
-    .select('role')
-    .eq('org_id', pool.org_id)
-    .eq('user_id', user.id)
-    .single()
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('is_super_admin')
-    .eq('id', user.id)
-    .single()
-
-  const isSuperAdmin = profile?.is_super_admin ?? false
-  const isOrgAdmin = orgMembership?.role === 'admin' || isSuperAdmin
-  const isPoolCommissioner = poolMembership?.role === 'commissioner' || isOrgAdmin
+  const { isPoolCommissioner } = await getPoolPermissions(supabase, user.id, id, pool.org_id)
 
   if (!isPoolCommissioner) {
     redirect(`/pools/${id}/march-madness`)

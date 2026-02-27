@@ -6,8 +6,8 @@
  *
  * @description
  * Comprehensive member management for pool commissioners. Handles pending
- * approvals, member roles, invite links, and supports both account-based
- * and no-account modes for squares pools.
+ * approvals, member roles, invite links. Squares pools use the public-facing
+ * model (participant names, no user accounts) so only commissioners are shown.
  *
  * @features
  * - View pending membership requests with approve/reject
@@ -16,12 +16,7 @@
  * - Remove members from pool
  * - Generate and manage invite links
  * - Add existing org members directly to pool
- * - Squares-specific: show square counts per member
- * - No-account mode: shows only commissioners
- *
- * @modes
- * - Standard: Full member management with invite links
- * - No-account (squares): Commissioners only, no invite links
+ * - Squares pools: shows only commissioners (participants don't need accounts)
  *
  * @components
  * - MemberActions: Approve/reject/remove/promote buttons
@@ -38,6 +33,7 @@ import { GenerateLinkButton } from '@/components/members/generate-link-button'
 import { CopyLinkButton } from '@/components/members/copy-link-button'
 import { DeleteLinkButton } from '@/components/members/delete-link-button'
 import { AddOrgMemberButton } from '@/components/members/add-org-member-button'
+import { getPoolPermissions } from '@/lib/permissions'
 
 /** Page props with dynamic route parameters */
 interface PageProps {
@@ -52,7 +48,7 @@ interface PageProps {
  *
  * @data_fetching
  * - pools: Pool details with org info
- * - sq_pools: Squares config (for lock status, no-account mode)
+ * - sq_pools: Squares config (for lock status)
  * - pool_memberships: All memberships for this pool
  * - profiles: Display names for all members
  * - join_links: Active invite links
@@ -85,64 +81,25 @@ export default async function PoolMembersPage({ params }: PageProps) {
     notFound()
   }
 
-  // For squares pools (any type), get the lock status and square counts
+  // For squares pools (any type), get the lock status
   const isSquaresPool = pool.type === 'squares' || pool.type === 'playoff_squares' || pool.type === 'single_game_squares'
   let isSquaresLocked = false
-  const squareCountsByUser = new Map<string, number>()
-  let isNoAccountMode = false
 
   if (isSquaresPool) {
     const { data: sqPool } = await supabase
       .from('sq_pools')
-      .select('id, numbers_locked, no_account_mode')
+      .select('id, numbers_locked')
       .eq('pool_id', id)
       .single()
     isSquaresLocked = sqPool?.numbers_locked ?? false
-    isNoAccountMode = sqPool?.no_account_mode ?? false
-
-    // Get square counts per user (only for non-no-account mode)
-    if (sqPool && !isNoAccountMode) {
-      const { data: squares } = await supabase
-        .from('sq_squares')
-        .select('user_id')
-        .eq('sq_pool_id', sqPool.id)
-        .not('user_id', 'is', null)
-
-      if (squares) {
-        for (const sq of squares) {
-          if (sq.user_id) {
-            squareCountsByUser.set(sq.user_id, (squareCountsByUser.get(sq.user_id) ?? 0) + 1)
-          }
-        }
-      }
-    }
   }
 
-  // Check if org admin
-  const { data: orgMembership } = await supabase
-    .from('org_memberships')
-    .select('role')
-    .eq('org_id', pool.org_id)
-    .eq('user_id', user.id)
-    .single()
-
-  // Check if pool commissioner
-  const { data: poolMembership } = await supabase
-    .from('pool_memberships')
-    .select('role')
-    .eq('pool_id', id)
-    .eq('user_id', user.id)
-    .single()
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('is_super_admin')
-    .eq('id', user.id)
-    .single()
-
-  const isSuperAdmin = profile?.is_super_admin ?? false
-  const isOrgAdmin = orgMembership?.role === 'admin' || isSuperAdmin
-  const isPoolCommissioner = poolMembership?.role === 'commissioner' || isOrgAdmin
+  // Get user permissions for this pool
+  const {
+    isSuperAdmin,
+    isOrgAdmin,
+    isPoolCommissioner,
+  } = await getPoolPermissions(supabase, user.id, id, pool.org_id)
 
   if (!isPoolCommissioner) {
     notFound()
@@ -167,8 +124,8 @@ export default async function PoolMembersPage({ params }: PageProps) {
 
   const profileMap = new Map(profiles?.map(p => [p.id, p]) ?? [])
 
-  // For no-account mode, only show commissioners
-  const filteredMemberships = isNoAccountMode
+  // Squares pools use public-facing model — only show commissioners
+  const filteredMemberships = isSquaresPool
     ? memberships?.filter(m => m.role === 'commissioner')
     : memberships
 
@@ -177,7 +134,7 @@ export default async function PoolMembersPage({ params }: PageProps) {
   const approvedCount = filteredMemberships?.filter(m => m.status === 'approved').length ?? 0
   const commissionerCount = memberships?.filter(m => m.role === 'commissioner' && m.status === 'approved').length ?? 0
 
-  // Get join links (skip for no-account mode)
+  // Get join links
   const { data: joinLinks } = await supabase
     .from('join_links')
     .select('id, token, expires_at, max_uses, uses, created_at')
@@ -246,14 +203,14 @@ export default async function PoolMembersPage({ params }: PageProps) {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            {isNoAccountMode ? 'Manage Commissioners' : 'Manage Members'}
+            {isSquaresPool ? 'Manage Commissioners' : 'Manage Members'}
           </h1>
           <p className="text-gray-600 mt-1">
-            {isNoAccountMode ? (
+            {isSquaresPool ? (
               <>
                 {commissionerCount} commissioner{commissionerCount !== 1 ? 's' : ''}
                 <span className="text-muted-foreground ml-2">
-                  (No-account mode - participants don&apos;t need accounts)
+                  (Participants don&apos;t need accounts)
                 </span>
               </>
             ) : (
@@ -268,13 +225,13 @@ export default async function PoolMembersPage({ params }: PageProps) {
             )}
           </p>
         </div>
-        {!isNoAccountMode && (
+        {!isSquaresPool && (
           <AddOrgMemberButton poolId={id} orgMembers={addableOrgMembers} />
         )}
       </div>
 
-      {/* Pending Requests Section - hide for no-account mode */}
-      {!isNoAccountMode && pendingCount > 0 && (
+      {/* Pending Requests Section - squares pools use public-facing model */}
+      {!isSquaresPool && pendingCount > 0 && (
         <div className="mb-8">
           <h2 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
             Pending Requests
@@ -374,18 +331,18 @@ export default async function PoolMembersPage({ params }: PageProps) {
         </div>
       )}
 
-      {/* Approved Members Section (Commissioners for no-account mode) */}
+      {/* Approved Members Section (Commissioners for squares pools) */}
       <div>
         <h2 className="text-lg font-semibold text-gray-900 mb-3">
-          {isNoAccountMode ? 'Commissioners' : 'Approved Members'}
+          {isSquaresPool ? 'Commissioners' : 'Approved Members'}
         </h2>
         {approvedCount === 0 ? (
           <div className="text-center py-12 bg-white rounded-lg shadow">
             <h3 className="text-lg font-medium text-gray-900 mb-2">
-              {isNoAccountMode ? 'No commissioners yet' : 'No members yet'}
+              {isSquaresPool ? 'No commissioners yet' : 'No members yet'}
             </h3>
             <p className="text-gray-600">
-              {isNoAccountMode
+              {isSquaresPool
                 ? 'Add org members as commissioners to help manage this pool.'
                 : 'Share a join link to invite people to this pool.'}
             </p>
@@ -414,9 +371,6 @@ export default async function PoolMembersPage({ params }: PageProps) {
                       )}
                     </div>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                      {isSquaresPool && !isNoAccountMode && (
-                        <span>{squareCountsByUser.get(membership.user_id) ?? 0} squares</span>
-                      )}
                       <span>
                         Joined {membership.approved_at
                           ? new Date(membership.approved_at).toLocaleDateString()
@@ -460,11 +414,6 @@ export default async function PoolMembersPage({ params }: PageProps) {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Role
                     </th>
-                    {isSquaresPool && !isNoAccountMode && (
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Squares
-                      </th>
-                    )}
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Joined
                     </th>
@@ -498,13 +447,6 @@ export default async function PoolMembersPage({ params }: PageProps) {
                             <span className="text-sm text-gray-500">Member</span>
                           )}
                         </td>
-                        {isSquaresPool && !isNoAccountMode && (
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-sm font-medium text-gray-900">
-                              {squareCountsByUser.get(membership.user_id) ?? 0}
-                            </span>
-                          </td>
-                        )}
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {membership.approved_at
                             ? new Date(membership.approved_at).toLocaleDateString()
@@ -541,8 +483,8 @@ export default async function PoolMembersPage({ params }: PageProps) {
         )}
       </div>
 
-      {/* Invite Links Section - hide for no-account mode */}
-      {!isNoAccountMode && (
+      {/* Invite Links Section - not needed for squares pools */}
+      {!isSquaresPool && (
         <div className="mt-8">
           <div className="flex justify-between items-center mb-3">
             <h2 className="text-lg font-semibold text-gray-900">Invite Links</h2>

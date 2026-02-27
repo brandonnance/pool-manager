@@ -39,6 +39,7 @@ import { SuperAdminJoinOrgButton } from '@/components/orgs/super-admin-join-org-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { getOrgPermissions } from '@/lib/permissions'
 
 /** Page props with dynamic route parameters */
 interface PageProps {
@@ -77,23 +78,8 @@ export default async function OrgDetailPage({ params }: PageProps) {
     notFound()
   }
 
-  // Get user's membership in this org
-  const { data: membership } = await supabase
-    .from('org_memberships')
-    .select('role')
-    .eq('org_id', id)
-    .eq('user_id', user.id)
-    .single()
-
-  // Check if super admin
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('is_super_admin')
-    .eq('id', user.id)
-    .single()
-
-  const isSuperAdmin = profile?.is_super_admin ?? false
-  const isOrgAdmin = membership?.role === 'admin' || isSuperAdmin
+  // Get user permissions for this org
+  const { isSuperAdmin, isOrgAdmin, orgMembership: membership } = await getOrgPermissions(supabase, user.id, id)
 
   // Get pools in this org
   const { data: allPools } = await supabase

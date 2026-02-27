@@ -29,6 +29,7 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getPoolPermissions } from '@/lib/permissions'
 import { BowlPicksForm } from '@/components/picks/bowl-picks-form'
 import { CfpBracketPicker } from '@/components/picks/cfp-bracket-picker'
 
@@ -80,31 +81,9 @@ export default async function PoolPicksPage({ params }: PageProps) {
   }
 
   // Check if commissioner or member
-  const { data: orgMembership } = await supabase
-    .from('org_memberships')
-    .select('role')
-    .eq('org_id', pool.org_id)
-    .eq('user_id', user.id)
-    .single()
+  const { isPoolCommissioner, isMember } = await getPoolPermissions(supabase, user.id, id, pool.org_id)
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('is_super_admin')
-    .eq('id', user.id)
-    .single()
-
-  const { data: poolMembership } = await supabase
-    .from('pool_memberships')
-    .select('status')
-    .eq('pool_id', id)
-    .eq('user_id', user.id)
-    .single()
-
-  const isSuperAdmin = profile?.is_super_admin ?? false
-  const isCommissioner = orgMembership?.role === 'admin' || isSuperAdmin
-  const isMember = poolMembership?.status === 'approved'
-
-  if (!isMember && !isCommissioner) {
+  if (!isMember && !isPoolCommissioner) {
     notFound()
   }
 

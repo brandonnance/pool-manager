@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/types/database'
-import { SquaresGrid, type NoAccountSquare } from './squares-grid'
+import { SquaresGrid, type Square } from './squares-grid'
 import { PoolSettings } from './pool-settings'
 import { AssignNameDialog } from './assign-name-dialog'
 import { BulkAssignDialog } from './bulk-assign-dialog'
@@ -55,7 +55,7 @@ interface SqWinner {
   winner_name: string | null
 }
 
-interface NoAccountPlayoffContentProps {
+interface PlayoffContentProps {
   sqPoolId: string
   poolId: string
   publicSlug: string | null
@@ -65,7 +65,7 @@ interface NoAccountPlayoffContentProps {
   colNumbers: number[] | null
   mode: string | null
   poolStatus: string
-  squares: NoAccountSquare[]
+  squares: Square[]
   games: SqGame[]
   winners: SqWinner[]
   isCommissioner: boolean
@@ -107,7 +107,7 @@ function PlayoffScoreEntry({
   game: SqGame
   sqPoolId: string
   reverseScoring: boolean
-  squares: NoAccountSquare[]
+  squares: Square[]
   rowNumbers: number[]
   colNumbers: number[]
 }) {
@@ -408,7 +408,7 @@ function SimplePlayoffGameCard({
   isCommissioner: boolean
   sqPoolId: string
   reverseScoring: boolean
-  squares: NoAccountSquare[]
+  squares: Square[]
   rowNumbers: number[]
   colNumbers: number[]
 }) {
@@ -502,9 +502,9 @@ export function PlayoffContent({
   winners,
   isCommissioner,
   isSuperAdmin = false,
-}: NoAccountPlayoffContentProps) {
+}: PlayoffContentProps) {
   // Local state for squares with realtime updates
-  const [squares, setSquares] = useState<NoAccountSquare[]>(initialSquares)
+  const [squares, setSquares] = useState<Square[]>(initialSquares)
 
   // Realtime subscription for instant updates
   useEffect(() => {
@@ -570,7 +570,7 @@ export function PlayoffContent({
   const [selectedSquare, setSelectedSquare] = useState<{
     rowIndex: number
     colIndex: number
-    square: NoAccountSquare | null
+    square: Square | null
   } | null>(null)
 
   // Round hierarchy for playoff mode (higher number = higher tier)
@@ -617,7 +617,7 @@ export function PlayoffContent({
   const liveWinningSquareIds = new Set<string>()
   if (numbersLocked && rowNumbers && colNumbers) {
     // Create a map of squares by position for quick lookup
-    const squaresByPosition = new Map<string, NoAccountSquare>()
+    const squaresByPosition = new Map<string, Square>()
     for (const sq of squares) {
       squaresByPosition.set(`${sq.row_index}-${sq.col_index}`, sq)
     }
@@ -734,7 +734,7 @@ export function PlayoffContent({
 
   const roundOrder = ['wild_card', 'divisional', 'conference', 'super_bowl']
 
-  const handleSquareClick = (rowIndex: number, colIndex: number, square: NoAccountSquare | null) => {
+  const handleSquareClick = (rowIndex: number, colIndex: number, square: Square | null) => {
     if (!isCommissioner) return
     setSelectedSquare({ rowIndex, colIndex, square })
     setAssignDialogOpen(true)

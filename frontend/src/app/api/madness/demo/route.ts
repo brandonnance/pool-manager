@@ -26,6 +26,7 @@ import {
   simulateRound,
   shuffleArray,
 } from '@/lib/madness'
+import { checkSuperAdmin, checkOrgAdmin, checkPoolCommissioner } from '@/lib/permissions'
 
 /** Valid demo action types */
 type DemoAction = 'seed' | 'seed_teams' | 'seed_entries' | 'simulate_round' | 'reset'
@@ -81,39 +82,21 @@ export async function POST(request: NextRequest) {
     // }
 
     // Verify user is commissioner
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('is_super_admin')
-      .eq('id', user.id)
-      .single()
+    const [{ data: profile }, { data: orgMembership }, { data: poolMembership }] = await Promise.all([
+      supabase.from('profiles').select('is_super_admin').eq('id', user.id).single(),
+      supabase.from('org_memberships').select('role').eq('org_id', mmPool.pools.org_id).eq('user_id', user.id).single(),
+      supabase.from('pool_memberships').select('role').eq('pool_id', mmPool.pool_id).eq('user_id', user.id).single(),
+    ])
 
-    const isSuperAdmin = profile?.is_super_admin ?? false
+    const isSuperAdmin = checkSuperAdmin(profile)
+    const isOrgAdmin = checkOrgAdmin(orgMembership, isSuperAdmin)
+    const isPoolCommissioner = checkPoolCommissioner(poolMembership, isOrgAdmin)
 
-    if (!isSuperAdmin) {
-      // Check pool/org membership for non-super admins
-      const { data: poolMembership } = await supabase
-        .from('pool_memberships')
-        .select('role')
-        .eq('pool_id', mmPool.pool_id)
-        .eq('user_id', user.id)
-        .single()
-
-      const { data: orgMembership } = await supabase
-        .from('org_memberships')
-        .select('role')
-        .eq('org_id', mmPool.pools.org_id)
-        .eq('user_id', user.id)
-        .single()
-
-      const isOrgAdmin = orgMembership?.role === 'admin'
-      const isPoolCommissioner = poolMembership?.role === 'commissioner' || isOrgAdmin
-
-      if (!isPoolCommissioner) {
-        return NextResponse.json(
-          { error: 'Only commissioners can run demo actions' },
-          { status: 403 }
-        )
-      }
+    if (!isPoolCommissioner) {
+      return NextResponse.json(
+        { error: 'Only commissioners can run demo actions' },
+        { status: 403 }
+      )
     }
 
     switch (action) {

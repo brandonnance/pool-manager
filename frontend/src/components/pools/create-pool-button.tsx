@@ -47,7 +47,7 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
   const [homeTeam, setHomeTeam] = useState('')
   const [awayTeam, setAwayTeam] = useState('')
 
-  // Public slug (always enabled for squares - no-account mode only)
+  // Public slug (always enabled for squares)
   const [publicSlug, setPublicSlug] = useState('')
   const [slugError, setSlugError] = useState<string | null>(null)
   const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null)
@@ -129,7 +129,7 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
 
     // Note: pool_commissioner_trigger automatically creates commissioner membership
 
-    // For Playoff Squares, create sq_pool and games (always no-account mode)
+    // For Playoff Squares, create sq_pool and games
     if (poolType === 'playoff_squares') {
       // Validate slug format
       if (publicSlug) {
@@ -145,16 +145,16 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
         }
       }
 
-      // Create sq_pools record - always no_account_mode: true
+      // Create sq_pools record
       const { data: sqPool, error: sqPoolError } = await supabase
         .from('sq_pools')
         .insert({
           pool_id: pool.id,
           reverse_scoring: reverseScoring,
-          max_squares_per_player: null, // No limit in no-account mode
+          max_squares_per_player: null,
           mode: squaresMode,
           scoring_mode: squaresMode === 'single_game' ? scoringMode : null,
-          no_account_mode: true, // Always no-account mode
+          no_account_mode: true,
           public_slug: publicSlug || null,
         })
         .select()

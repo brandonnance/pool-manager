@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { SquaresGrid, type NoAccountSquare } from './squares-grid'
+import { SquaresGrid, type Square } from './squares-grid'
 import { PublicParticipantList } from './public-participant-list'
 import type { WinningRound } from './square-cell'
 
@@ -17,7 +17,7 @@ interface Game {
 
 interface PublicRealtimeGridProps {
   sqPoolId: string
-  initialSquares: NoAccountSquare[]
+  initialSquares: Square[]
   initialGames: Game[]
   rowNumbers: number[] | null
   colNumbers: number[] | null
@@ -52,7 +52,7 @@ export function PublicRealtimeGrid({
   legendMode,
 }: PublicRealtimeGridProps) {
   const router = useRouter()
-  const [squares, setSquares] = useState<NoAccountSquare[]>(initialSquares)
+  const [squares, setSquares] = useState<Square[]>(initialSquares)
   const [games, setGames] = useState<Game[]>(initialGames ?? [])
   const [selectedParticipantName, setSelectedParticipantName] = useState<string | null>(null)
 
@@ -69,7 +69,7 @@ export function PublicRealtimeGrid({
     const liveIds = new Set<string>()
 
     // Create a map of squares by position for quick lookup
-    const squaresByPosition = new Map<string, NoAccountSquare>()
+    const squaresByPosition = new Map<string, Square>()
     for (const sq of squares) {
       squaresByPosition.set(`${sq.row_index}-${sq.col_index}`, sq)
     }

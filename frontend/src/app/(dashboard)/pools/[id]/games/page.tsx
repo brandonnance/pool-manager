@@ -31,6 +31,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getPoolPermissions } from '@/lib/permissions'
 import { AddGameButton } from '@/components/games/add-game-button'
 import { RemoveGameButton } from '@/components/games/remove-game-button'
 import { EditSpreadButton } from '@/components/games/edit-spread-button'
@@ -101,23 +102,9 @@ export default async function PoolGamesPage({ params }: PageProps) {
   }
 
   // Check if commissioner
-  const { data: orgMembership } = await supabase
-    .from('org_memberships')
-    .select('role')
-    .eq('org_id', pool.org_id)
-    .eq('user_id', user.id)
-    .single()
+  const { isPoolCommissioner } = await getPoolPermissions(supabase, user.id, id, pool.org_id)
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('is_super_admin')
-    .eq('id', user.id)
-    .single()
-
-  const isSuperAdmin = profile?.is_super_admin ?? false
-  const isCommissioner = orgMembership?.role === 'admin' || isSuperAdmin
-
-  if (!isCommissioner) {
+  if (!isPoolCommissioner) {
     notFound()
   }
 

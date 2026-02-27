@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Copy, ExternalLink, Lock, Edit2, Check, X } from 'lucide-react'
 
-interface NoAccountPoolSettingsProps {
+interface PoolSettingsProps {
   sqPoolId: string
   poolId: string
   publicSlug: string | null
@@ -45,7 +45,7 @@ export function PoolSettings({
   poolStatus,
   onBulkAssignClick,
   isSuperAdmin = false,
-}: NoAccountPoolSettingsProps) {
+}: PoolSettingsProps) {
   const router = useRouter()
   const [isLocking, setIsLocking] = useState(false)
   const [isUpdatingSlug, setIsUpdatingSlug] = useState(false)
