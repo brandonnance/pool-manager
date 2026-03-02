@@ -1428,7 +1428,6 @@ export type Database = {
         Row: {
           created_at: string | null
           created_by: string | null
-          demo_mode: boolean
           id: string
           name: string
           org_id: string
@@ -1441,7 +1440,6 @@ export type Database = {
         Insert: {
           created_at?: string | null
           created_by?: string | null
-          demo_mode?: boolean
           id?: string
           name: string
           org_id: string
@@ -1454,7 +1452,6 @@ export type Database = {
         Update: {
           created_at?: string | null
           created_by?: string | null
-          demo_mode?: boolean
           id?: string
           name?: string
           org_id?: string
@@ -1833,24 +1830,7 @@ export type Database = {
         }
         Returns: number
       }
-      calculate_pick_score: {
-        Args: {
-          p_away_score: number
-          p_away_team_id: string
-          p_home_score: number
-          p_home_team_id: string
-          p_picked_team_id: string
-          p_status: string
-        }
-        Returns: number
-      }
       get_enabled_pool_types: { Args: never; Returns: Json }
-      get_game_winner: { Args: { p_game_id: string }; Returns: string }
-      is_bowl_pick_locked: {
-        Args: { p_pool_game_id: string }
-        Returns: boolean
-      }
-      is_cfp_locked: { Args: { p_pool_id: string }; Returns: boolean }
       is_golf_picks_locked: { Args: { p_pool_id: string }; Returns: boolean }
       is_mm_pool_commissioner: {
         Args: { p_mm_pool_id: string }
@@ -1865,10 +1845,6 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: never; Returns: boolean }
-      pool_lock_time_for_bowl: {
-        Args: { p_pool_game_id: string }
-        Returns: string
-      }
       request_join_pool: { Args: { p_token: string }; Returns: Json }
       update_quarter_marker: {
         Args: {

@@ -27,13 +27,15 @@ The work is organized into 8 phases. Phases 0-2 are highest priority. The depend
 | **1B**: Generic Squares + MM Squares | **DONE** | 2026-02-27 | Renamed `playoff_squares` → `squares`, added `event_type` column, 63-game MM template, round-config utility, MM round colors, event type selector in create flow, pool completion button + archive view |
 | **2A**: Remove "No-Account" Naming | **DONE** | 2026-02-26 | Renamed types/variables across 12 files, removed dead code |
 | **2B**: DB Column Cleanup | **DONE** | 2026-02-26 | Dropped columns, rewrote 6 RLS policies, dropped FK, regenerated types |
-| **3A**: Commissioner Workflow Redesign | Not started | | |
-| **4A**: Form Library | Not started | | |
-| **4B**: Data Fetching Helpers | Not started | | |
-| **4C**: Expanded shadcn Usage | Not started | | |
-| **4D**: Slug Validation Utility | Not started | | |
-| **5A-F**: DB Simplification | Not started | | |
-| **6A-C**: Bowl Buster Removal | Not started | | |
+| **3A**: Commissioner Workflow Redesign | **DONE** | 2026-03-02 | Reusable wizard component, 4 step components via shared context. Setup page reduced from 902 → 175 lines. Auto-step logic based on setup completion state. |
+| **4A**: Form Library | **DONE** | 2026-03-02 | Installed RHF + Zod + shadcn Form. Created Zod schemas. Converted 3 settings forms (profile, email, password). |
+| **4B**: Data Fetching Helpers | **DONE** | 2026-03-02 | Extracted pool detail page into 5 modules under `lib/data/`. Page reduced from 1193 → 756 lines. |
+| **4C**: Expanded shadcn Usage | **DONE** | 2026-03-02 | Breadcrumb (11 replacements), Sonner (0C), Accordion (golf-standings + golf-public-leaderboard), Command (installed), DataTable (generic component + admin users + golf scores refactors). |
+| **4D**: Slug Validation Utility | **DONE** | 2026-03-02 | Created `lib/slug.ts` (5 functions) + `hooks/use-slug.ts` (debounced hook). Updated 4 consuming files. |
+| **5A-F**: DB Simplification | **DONE** | 2026-03-02 | Dropped 1 trigger, 6 BB functions, ~30 RLS policies, 10 zero-scan indexes. Migrated `demo_mode` from `pools` to `gp_pools`. Added read-only super admin policies on BB tables. |
+| **6A**: Bowl Buster Tech Spec | **DONE** | 2026-03-02 | Created `BOWL_BUSTER_TECH_SPEC.md` with scoring, CFP, locking, lifecycle, DB tables |
+| **6B**: Bowl Buster Code Deletion | **DONE** | 2026-03-02 | Deleted ~20 files/directories (components, pages, data). Removed BB conditionals from 12+ files. Zero `bowl_buster` references remain outside `database.ts`. |
+| **6C**: Disable Bowl Buster in Settings | **DONE** | 2026-03-02 | Already disabled in `enabled_pool_types`. Fixed default poolType in create dialog. |
 | **7A-C**: Dev Environment | Not started | | |
 
 ---
@@ -44,7 +46,7 @@ The work is organized into 8 phases. Phases 0-2 are highest priority. The depend
 - **209** TypeScript files across `frontend/src/`
 - **2.1 MB** total source
 - **45** database tables, **18** database functions
-- **22** shadcn/ui components, **116** custom components
+- **25** shadcn/ui components, **116** custom components
 - **41** page components, **14** API routes
 - **4** pool types: Bowl Buster, Squares, Golf, March Madness Blind Draw
 
@@ -566,7 +568,7 @@ The work app has two wizard systems. For golf setup, use the **client-side Wizar
 - `frontend/src/lib/form-schemas.ts` — Zod schemas for all major forms
 - `frontend/src/lib/form-utils.ts` — `focusOnFirstInvalidField()`, shared validators, submit helpers
 
-### 4B: Data Fetching Helpers
+### 4B: Data Fetching Helpers — DONE (2026-03-02)
 
 **Problem**: `pools/[id]/page.tsx` is 1200 lines because it fetches data for ALL pool types inline with inline type declarations per pool type.
 
@@ -591,7 +593,9 @@ Each module exports a typed async function that returns everything a pool type s
 - **Optimistic updates** via React Query's `onMutate`/`onError`/`onSettled` — save previous state, update cache immediately, revert on failure, refetch on settle
 - **Shell + Tabs + Shared State** for pool detail: layout loads base pool data into React Context, type-specific tabs fetch their own additional data. This prevents the 1200-line monolith.
 
-### 4C: Expanded shadcn Usage
+**Completion notes**: Extracted pool detail page into 5 modules under `lib/data/`: `pool.ts` (base pool + permissions), `squares.ts`, `golf.ts`, `march-madness.ts`, `bowl-buster.ts`. Each exports a typed async function returning everything its pool type section needs. Pool detail page reduced from 1193 → 756 lines. Inline type declarations moved into their respective modules.
+
+### 4C: Expanded shadcn Usage — DONE (2026-03-02)
 
 Currently installed but underused patterns. Add:
 - **Accordion** — Collapsible sections in golf standings (golfer details), pool settings
@@ -610,6 +614,8 @@ The work app's `GridComponent<T>` is its most reused component. Build the React 
 - Built-in states: shimmer skeletons while loading (row count = page size), "No records found" when empty, actual data rows
 - Custom cell renderers for: status badges, action buttons (edit/delete), formatted dates, user avatars
 - **Where to use**: Members list, standings tables, entries lists, games lists — currently each builds its own table markup
+
+**Completion notes**: Installed Breadcrumb (replaced 11 custom implementations across pool pages), Accordion, Command (shadcn CLI), and `@tanstack/react-table`. **Accordion**: Refactored `golf-standings.tsx` (`type="multiple"` — multiple entries expand) and `golf-public-leaderboard.tsx` (`type="single" collapsible` — one at a time). Removed manual expand/collapse state and chevron icons; AccordionTrigger provides built-in animated chevron. **Command**: Installed only — all autocomplete targets touch live pools (MM team-selector, squares edit-game-teams) or are being removed (Bowl Buster team-autocomplete). Available for Phase 3A golf work. **DataTable**: Created generic `components/ui/data-table.tsx` with TanStack Table (sorting, search, pagination, mobile card view via `mobileCard` prop, empty state, row click, row className). Refactored admin users page — extracted `components/admin/users-table.tsx` Client Component wrapper, eliminated ~100 lines of duplicated mobile/desktop markup. Refactored golf scores page — replaced inline table + search with DataTable column defs. **Blocked items**: Form (4A), Stepper (Phase 3). Skeleton already done in 0C, Sonner already done in 0C.
 
 ### 4D: Slug Validation Utility
 
@@ -672,7 +678,7 @@ Copy output to `frontend/src/types/database.ts`.
 **Dependencies**: Phase 4B (data fetching helpers extracted first)
 **Priority**: Low — football is 7+ months away
 
-### 6A: Create Tech Spec Before Deletion
+### 6A: Create Tech Spec Before Deletion — DONE (2026-03-02)
 
 Write `BOWL_BUSTER_TECH_SPEC.md` capturing:
 - **Scoring**: Margin-of-victory (correct pick = +margin, wrong = -margin, tie = 0)
@@ -687,6 +693,8 @@ Write `BOWL_BUSTER_TECH_SPEC.md` capturing:
 - **DB Tables**: Summary of all `bb_*` tables and their relationships
 
 Keep this HIGH-LEVEL. Don't specify exact component structures or API signatures. AI models will be significantly better by August 2026 and should design the implementation fresh.
+
+**Completion notes**: Created `BOWL_BUSTER_TECH_SPEC.md` covering scoring (margin-of-victory), CFP bracket mechanics (12-team, byes, seeding, auto-population trigger), pick locking (5 min before kickoff for bowls, configurable for CFP), game management, pool lifecycle (draft → open → locked → completed), standings, onboarding wizard, what worked/what to improve, and all `bb_*` DB table relationships.
 
 ### 6B: Delete Code
 
@@ -707,10 +715,12 @@ Remove from codebase (all stays in git history):
 - Any `bb_*` database tables — Keep data for historical reference, just unused by app
 - Any RLS policies on `bb_*` tables — Leave in place, no harm
 
-### 6C: Disable in Site Settings
+### 6C: Disable in Site Settings — DONE (2026-03-02)
 
 Set `bowl_buster: false` in `site_settings` via `get_enabled_pool_types()`.
 Remove `'bowl_buster'` from the pool type selector in `create-pool-button.tsx`.
+
+**Completion notes**: Bowl Buster was already disabled in `get_enabled_pool_types()`. Fixed `create-pool-button.tsx` default `poolType` which still defaulted to `'bowl_buster'` — changed to first enabled pool type.
 
 **Spec file**: `BOWL_BUSTER_TECH_SPEC.md`
 

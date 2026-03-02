@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useSlug } from '@/hooks/use-slug'
+import { validateSlugFormat, getPublicUrl } from '@/lib/slug'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Copy, Check, ExternalLink, Edit2, X } from 'lucide-react'
@@ -18,21 +19,22 @@ interface MmPublicUrlCardProps {
 export function MmPublicUrlCard({ mmPoolId, publicSlug }: MmPublicUrlCardProps) {
   const router = useRouter()
   const [isEditing, setIsEditing] = useState(false)
-  const [slugInput, setSlugInput] = useState(publicSlug ?? '')
   const [isUpdating, setIsUpdating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [origin, setOrigin] = useState('')
-  const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null)
-  const [checkingSlug, setCheckingSlug] = useState(false)
 
-  // Set origin on client-side only to avoid hydration mismatch
+  const { slugInput, setSlugInput, handleSlugChange, slugAvailable, checkingSlug } = useSlug({
+    table: 'mm_pools',
+    initialSlug: publicSlug,
+  })
+
   useEffect(() => {
     setOrigin(window.location.origin)
   }, [])
 
-  const publicUrl = publicSlug && origin
-    ? `${origin}/view/mm/${publicSlug}`
+  const publicUrl = publicSlug
+    ? `${origin}${getPublicUrl(publicSlug, 'mm_pools').replace(/^.*?\/view/, '/view')}`
     : null
 
   const copyToClipboard = async () => {
@@ -46,72 +48,11 @@ export function MmPublicUrlCard({ mmPoolId, publicSlug }: MmPublicUrlCardProps) 
     }
   }
 
-  // Check if slug is available
-  const checkSlugAvailability = useCallback(async (slug: string) => {
-    if (!slug || slug.length < 3) {
-      setSlugAvailable(null)
-      return
-    }
-
-    // Don't check if it's the current slug
-    if (slug === publicSlug) {
-      setSlugAvailable(true)
-      return
-    }
-
-    setCheckingSlug(true)
-    const supabase = createClient()
-
-    const { data, error: checkError } = await supabase
-      .from('mm_pools')
-      .select('id')
-      .eq('public_slug', slug)
-      .maybeSingle()
-
-    setCheckingSlug(false)
-
-    if (checkError) {
-      setSlugAvailable(null)
-      return
-    }
-
-    setSlugAvailable(data === null)
-  }, [publicSlug])
-
-  // Debounced slug availability check
-  useEffect(() => {
-    if (!isEditing || !slugInput || slugInput.length < 3) {
-      setSlugAvailable(null)
-      return
-    }
-
-    const timeoutId = setTimeout(() => {
-      checkSlugAvailability(slugInput)
-    }, 500)
-
-    return () => clearTimeout(timeoutId)
-  }, [slugInput, isEditing, checkSlugAvailability])
-
-  const handleSlugChange = (value: string) => {
-    const formatted = value.toLowerCase().replace(/[^a-z0-9-]/g, '')
-    setSlugInput(formatted)
-    setError(null)
-  }
-
   const handleUpdateSlug = async () => {
     const trimmedSlug = slugInput.trim().toLowerCase()
-    if (!trimmedSlug) {
-      setError('Please enter a valid slug')
-      return
-    }
-
-    // Validate format
-    if (!/^[a-z0-9-]+$/.test(trimmedSlug)) {
-      setError('Slug can only contain lowercase letters, numbers, and hyphens')
-      return
-    }
-    if (trimmedSlug.length < 3 || trimmedSlug.length > 50) {
-      setError('Slug must be between 3 and 50 characters')
+    const validationError = validateSlugFormat(trimmedSlug)
+    if (validationError) {
+      setError(validationError)
       return
     }
 
@@ -156,7 +97,7 @@ export function MmPublicUrlCard({ mmPoolId, publicSlug }: MmPublicUrlCardProps) 
               <span className="text-sm text-muted-foreground whitespace-nowrap">{origin}/view/mm/</span>
               <Input
                 value={slugInput}
-                onChange={(e) => handleSlugChange(e.target.value)}
+                onChange={(e) => { handleSlugChange(e.target.value); setError(null) }}
                 placeholder="your-pool-name"
                 disabled={isUpdating}
                 className={`flex-1 font-mono text-sm ${
@@ -191,7 +132,6 @@ export function MmPublicUrlCard({ mmPoolId, publicSlug }: MmPublicUrlCardProps) 
                   setIsEditing(false)
                   setSlugInput(publicSlug ?? '')
                   setError(null)
-                  setSlugAvailable(null)
                 }}
                 disabled={isUpdating}
                 className="flex-1"
@@ -203,13 +143,11 @@ export function MmPublicUrlCard({ mmPoolId, publicSlug }: MmPublicUrlCardProps) 
           </div>
         ) : publicUrl ? (
           <div className="space-y-3">
-            {/* URL Display */}
             <div className="p-3 bg-muted rounded-md border">
               <p className="text-sm font-mono break-all text-foreground">
                 {publicUrl}
               </p>
             </div>
-            {/* Action buttons */}
             <div className="flex gap-2">
               <Button
                 size="sm"
@@ -250,7 +188,7 @@ export function MmPublicUrlCard({ mmPoolId, publicSlug }: MmPublicUrlCardProps) 
               <span className="text-sm text-muted-foreground whitespace-nowrap">{origin}/view/mm/</span>
               <Input
                 value={slugInput}
-                onChange={(e) => handleSlugChange(e.target.value)}
+                onChange={(e) => { handleSlugChange(e.target.value); setError(null) }}
                 placeholder="your-pool-name"
                 disabled={isUpdating}
                 className={`flex-1 font-mono text-sm ${

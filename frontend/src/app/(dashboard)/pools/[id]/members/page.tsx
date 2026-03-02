@@ -28,6 +28,14 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb'
 import { MemberActions } from '@/components/members/member-actions'
 import { GenerateLinkButton } from '@/components/members/generate-link-button'
 import { CopyLinkButton } from '@/components/members/copy-link-button'
@@ -174,30 +182,31 @@ export default async function PoolMembersPage({ params }: PageProps) {
 
   return (
     <div>
-      {/* Breadcrumb */}
-      <nav className="mb-4">
-        <ol className="flex items-center space-x-2 text-sm text-gray-500">
-          <li>
-            <Link href="/orgs" className="hover:text-gray-700">
-              Organizations
-            </Link>
-          </li>
-          <li>/</li>
-          <li>
-            <Link href={`/orgs/${pool.org_id}`} className="hover:text-gray-700">
-              {pool.organizations?.name}
-            </Link>
-          </li>
-          <li>/</li>
-          <li>
-            <Link href={`/pools/${id}`} className="hover:text-gray-700">
-              {pool.name}
-            </Link>
-          </li>
-          <li>/</li>
-          <li className="text-gray-900 font-medium">Members</li>
-        </ol>
-      </nav>
+      <Breadcrumb className="mb-4">
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link href="/orgs">Organizations</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link href={`/orgs/${pool.org_id}`}>{pool.organizations?.name}</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link href={`/pools/${id}`}>{pool.name}</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>Members</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
 
       {/* Header */}
       <div className="flex justify-between items-center mb-6">

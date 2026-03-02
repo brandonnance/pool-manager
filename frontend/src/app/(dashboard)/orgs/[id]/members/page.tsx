@@ -28,6 +28,14 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb'
 import { OrgMemberActions } from '@/components/orgs/org-member-actions'
 import { getOrgPermissions } from '@/lib/permissions'
 
@@ -97,24 +105,25 @@ export default async function OrgMembersPage({ params }: PageProps) {
 
   return (
     <div>
-      {/* Breadcrumb */}
-      <nav className="mb-4">
-        <ol className="flex items-center space-x-2 text-sm text-gray-500">
-          <li>
-            <Link href="/orgs" className="hover:text-gray-700">
-              Organizations
-            </Link>
-          </li>
-          <li>/</li>
-          <li>
-            <Link href={`/orgs/${id}`} className="hover:text-gray-700">
-              {org.name}
-            </Link>
-          </li>
-          <li>/</li>
-          <li className="text-gray-900 font-medium">Members</li>
-        </ol>
-      </nav>
+      <Breadcrumb className="mb-4">
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link href="/orgs">Organizations</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link href={`/orgs/${id}`}>{org.name}</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>Members</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
 
       {/* Header */}
       <div className="flex justify-between items-center mb-6">

@@ -1,97 +1,112 @@
 'use client'
 
 import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { createClient } from '@/lib/supabase/client'
+import { updatePasswordSchema, type UpdatePasswordValues } from '@/lib/form-schemas'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
 
 export function UpdatePasswordForm() {
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
-  const [loading, setLoading] = useState(false)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const form = useForm<UpdatePasswordValues>({
+    resolver: zodResolver(updatePasswordSchema),
+    defaultValues: { newPassword: '', confirmPassword: '' },
+  })
+
+  const onSubmit = async (values: UpdatePasswordValues) => {
     setError(null)
     setSuccess(false)
 
-    if (newPassword.length < 6) {
-      setError('Password must be at least 6 characters')
-      return
-    }
-
-    if (newPassword !== confirmPassword) {
-      setError('Passwords do not match')
-      return
-    }
-
-    setLoading(true)
-
     const supabase = createClient()
 
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword,
+    const { error: updateError } = await supabase.auth.updateUser({
+      password: values.newPassword,
     })
 
-    if (error) {
-      setError(error.message)
-      setLoading(false)
+    if (updateError) {
+      setError(updateError.message)
       return
     }
 
     setSuccess(true)
-    setLoading(false)
-    setNewPassword('')
-    setConfirmPassword('')
+    form.reset()
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-      {success && (
-        <Alert>
-          <AlertDescription>Your password has been updated successfully.</AlertDescription>
-        </Alert>
-      )}
+        {success && (
+          <Alert>
+            <AlertDescription>Your password has been updated successfully.</AlertDescription>
+          </Alert>
+        )}
 
-      <div className="space-y-2">
-        <Label htmlFor="newPassword">New password</Label>
-        <Input
-          id="newPassword"
-          type="password"
-          value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
-          placeholder="••••••••"
-          autoComplete="new-password"
-          className="max-w-md"
+        <FormField
+          control={form.control}
+          name="newPassword"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>New password</FormLabel>
+              <FormControl>
+                <Input
+                  {...field}
+                  type="password"
+                  placeholder="••••••••"
+                  autoComplete="new-password"
+                  className="max-w-md"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
-      </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="confirmPassword">Confirm new password</Label>
-        <Input
-          id="confirmPassword"
-          type="password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          placeholder="••••••••"
-          autoComplete="new-password"
-          className="max-w-md"
+        <FormField
+          control={form.control}
+          name="confirmPassword"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Confirm new password</FormLabel>
+              <FormControl>
+                <Input
+                  {...field}
+                  type="password"
+                  placeholder="••••••••"
+                  autoComplete="new-password"
+                  className="max-w-md"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
-      </div>
 
-      <Button type="submit" disabled={loading || !newPassword || !confirmPassword}>
-        {loading ? 'Updating...' : 'Update password'}
-      </Button>
-    </form>
+        <Button
+          type="submit"
+          disabled={form.formState.isSubmitting || !form.watch('newPassword') || !form.watch('confirmPassword')}
+        >
+          {form.formState.isSubmitting ? 'Updating...' : 'Update password'}
+        </Button>
+      </form>
+    </Form>
   )
 }

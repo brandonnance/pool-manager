@@ -61,9 +61,7 @@ export default async function DashboardPage() {
     `)
     .eq('user_id', user!.id)
 
-  // Note: We no longer auto-redirect to onboarding here.
-  // Users can click "Create Organization" from the empty state below,
-  // or manually go to /onboarding if they prefer the wizard.
+  // Users can click "Create Organization" from the empty state below.
 
   // Get user's pool memberships with org info and role
   const { data: poolMemberships } = await supabase

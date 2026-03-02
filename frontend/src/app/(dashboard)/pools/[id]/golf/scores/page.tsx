@@ -1,13 +1,15 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { ColumnDef } from '@tanstack/react-table'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, Loader2, RefreshCw, Search, Save, X, Check, AlertCircle, UserX } from 'lucide-react'
+import { DataTable } from '@/components/ui/data-table'
+import { ArrowLeft, Loader2, RefreshCw, Save, Check, AlertCircle, UserX } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import {
@@ -58,7 +60,6 @@ export default function GolfScoresPage() {
   const [pool, setPool] = useState<{ name: string } | null>(null)
   const [tournament, setTournament] = useState<Tournament | null>(null)
   const [golferResults, setGolferResults] = useState<GolferResult[]>([])
-  const [searchQuery, setSearchQuery] = useState('')
   const [isCommissioner, setIsCommissioner] = useState(false)
 
   // Sync cooldown state
@@ -429,10 +430,143 @@ export default function GolfScoresPage() {
     setWithdrawalProcessing(false)
   }
 
-  // Filter golfers by search query
-  const filteredGolfers = golferResults.filter(g =>
-    g.golfer_name.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  // Column definitions for the golfer scores table
+  const columns = useMemo<ColumnDef<GolferResult>[]>(() => [
+    {
+      accessorKey: 'position',
+      header: 'Pos',
+      enableSorting: false,
+      cell: ({ row }) => (
+        <span className="font-medium">
+          {row.original.status === 'withdrawn' ? 'WD' : (row.original.position || '-')}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'golfer_name',
+      header: 'Golfer',
+      cell: ({ row }) => (
+        <span className={cn(row.original.status === 'withdrawn' && 'line-through')}>
+          {row.original.golfer_name}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'round_1',
+      header: 'R1',
+      enableSorting: false,
+      cell: ({ row }) => <span className="text-center block">{row.original.round_1 ?? '-'}</span>,
+      meta: { className: 'text-center' },
+    },
+    {
+      accessorKey: 'round_2',
+      header: 'R2',
+      enableSorting: false,
+      cell: ({ row }) => <span className="text-center block">{row.original.round_2 ?? '-'}</span>,
+      meta: { className: 'text-center' },
+    },
+    {
+      accessorKey: 'round_3',
+      header: 'R3',
+      enableSorting: false,
+      cell: ({ row }) => <span className="text-center block">{row.original.round_3 ?? '-'}</span>,
+      meta: { className: 'text-center' },
+    },
+    {
+      accessorKey: 'round_4',
+      header: 'R4',
+      enableSorting: false,
+      cell: ({ row }) => <span className="text-center block">{row.original.round_4 ?? '-'}</span>,
+      meta: { className: 'text-center' },
+    },
+    {
+      accessorKey: 'total_score',
+      header: 'Total',
+      cell: ({ row }) => (
+        <span className="text-center block font-medium">{row.original.total_score ?? '-'}</span>
+      ),
+      meta: { className: 'text-center' },
+    },
+    {
+      accessorKey: 'to_par',
+      header: 'To Par',
+      cell: ({ row }) => {
+        const toPar = row.original.to_par
+        return (
+          <span className={cn(
+            'text-center block font-medium',
+            (toPar ?? 0) < 0 && 'text-red-600',
+            (toPar ?? 0) > 0 && 'text-blue-600'
+          )}>
+            {toPar !== null
+              ? (toPar > 0 ? `+${toPar}` : toPar === 0 ? 'E' : toPar)
+              : '-'}
+          </span>
+        )
+      },
+      meta: { className: 'text-center' },
+    },
+    {
+      id: 'cut',
+      header: 'Cut',
+      enableSorting: false,
+      cell: ({ row }) => (
+        <span className="text-center block">
+          {row.original.made_cut === false ? (
+            <span className="text-red-600 text-xs font-medium">MC</span>
+          ) : row.original.made_cut === true ? (
+            <Check className="h-4 w-4 text-green-600 mx-auto" />
+          ) : (
+            '-'
+          )}
+        </span>
+      ),
+      meta: { className: 'text-center' },
+    },
+    {
+      id: 'wd',
+      header: 'WD',
+      enableSorting: false,
+      cell: ({ row }) => (
+        <span className="text-center block">
+          {row.original.status === 'withdrawn' ? (
+            <span className="text-amber-600 text-xs font-medium">WD</span>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs text-muted-foreground hover:text-amber-600"
+              onClick={(e) => {
+                e.stopPropagation()
+                setWithdrawingGolfer(row.original)
+                setWithdrawalResult(null)
+              }}
+            >
+              <UserX className="h-3 w-3" />
+            </Button>
+          )}
+        </span>
+      ),
+      meta: { className: 'text-center' },
+    },
+    {
+      id: 'actions',
+      header: '',
+      enableSorting: false,
+      cell: ({ row }) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation()
+            openEditDialog(row.original)
+          }}
+        >
+          Edit
+        </Button>
+      ),
+    },
+  ], [])
 
   if (loading) {
     return (
@@ -537,135 +671,19 @@ export default function GolfScoresPage() {
             Click on a golfer to manually edit their scores
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Search */}
-          <div className="relative max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search golfers..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-
-          {/* Golfers Table */}
-          <div className="border rounded-lg overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="text-left px-3 py-2 font-medium">Pos</th>
-                    <th className="text-left px-3 py-2 font-medium">Golfer</th>
-                    <th className="text-center px-3 py-2 font-medium">R1</th>
-                    <th className="text-center px-3 py-2 font-medium">R2</th>
-                    <th className="text-center px-3 py-2 font-medium">R3</th>
-                    <th className="text-center px-3 py-2 font-medium">R4</th>
-                    <th className="text-center px-3 py-2 font-medium">Total</th>
-                    <th className="text-center px-3 py-2 font-medium">To Par</th>
-                    <th className="text-center px-3 py-2 font-medium">Cut</th>
-                    <th className="text-center px-3 py-2 font-medium">WD</th>
-                    <th className="px-3 py-2"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {filteredGolfers.length === 0 ? (
-                    <tr>
-                      <td colSpan={11} className="px-3 py-8 text-center text-muted-foreground">
-                        {searchQuery ? 'No golfers match your search' : 'No golfers in field'}
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredGolfers.map((golfer) => (
-                      <tr
-                        key={golfer.golfer_id}
-                        className={cn(
-                          'hover:bg-muted/30 cursor-pointer',
-                          golfer.made_cut === false && 'bg-red-50/50',
-                          golfer.status === 'withdrawn' && 'bg-amber-50/50 opacity-60'
-                        )}
-                        onClick={() => openEditDialog(golfer)}
-                      >
-                        <td className="px-3 py-2 font-medium">
-                          {golfer.status === 'withdrawn' ? 'WD' : (golfer.position || '-')}
-                        </td>
-                        <td className={cn('px-3 py-2', golfer.status === 'withdrawn' && 'line-through')}>
-                          {golfer.golfer_name}
-                        </td>
-                        <td className="px-3 py-2 text-center">
-                          {golfer.round_1 ?? '-'}
-                        </td>
-                        <td className="px-3 py-2 text-center">
-                          {golfer.round_2 ?? '-'}
-                        </td>
-                        <td className="px-3 py-2 text-center">
-                          {golfer.round_3 ?? '-'}
-                        </td>
-                        <td className="px-3 py-2 text-center">
-                          {golfer.round_4 ?? '-'}
-                        </td>
-                        <td className="px-3 py-2 text-center font-medium">
-                          {golfer.total_score ?? '-'}
-                        </td>
-                        <td className={cn(
-                          'px-3 py-2 text-center font-medium',
-                          (golfer.to_par ?? 0) < 0 && 'text-red-600',
-                          (golfer.to_par ?? 0) > 0 && 'text-blue-600'
-                        )}>
-                          {golfer.to_par !== null
-                            ? (golfer.to_par > 0 ? `+${golfer.to_par}` : golfer.to_par === 0 ? 'E' : golfer.to_par)
-                            : '-'}
-                        </td>
-                        <td className="px-3 py-2 text-center">
-                          {golfer.made_cut === false ? (
-                            <span className="text-red-600 text-xs font-medium">MC</span>
-                          ) : golfer.made_cut === true ? (
-                            <Check className="h-4 w-4 text-green-600 mx-auto" />
-                          ) : (
-                            '-'
-                          )}
-                        </td>
-                        <td className="px-3 py-2 text-center">
-                          {golfer.status === 'withdrawn' ? (
-                            <span className="text-amber-600 text-xs font-medium">WD</span>
-                          ) : (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 px-2 text-xs text-muted-foreground hover:text-amber-600"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setWithdrawingGolfer(golfer)
-                                setWithdrawalResult(null)
-                              }}
-                            >
-                              <UserX className="h-3 w-3" />
-                            </Button>
-                          )}
-                        </td>
-                        <td className="px-3 py-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              openEditDialog(golfer)
-                            }}
-                          >
-                            Edit
-                          </Button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <p className="text-xs text-muted-foreground">
-            Showing {filteredGolfers.length} of {golferResults.length} golfers
-          </p>
+        <CardContent>
+          <DataTable
+            columns={columns}
+            data={golferResults}
+            searchPlaceholder="Search golfers..."
+            searchColumn="golfer_name"
+            emptyMessage="No golfers in field"
+            onRowClick={openEditDialog}
+            getRowClassName={(golfer) => cn(
+              golfer.made_cut === false && 'bg-red-50/50',
+              golfer.status === 'withdrawn' && 'bg-amber-50/50 opacity-60'
+            )}
+          />
         </CardContent>
       </Card>
 

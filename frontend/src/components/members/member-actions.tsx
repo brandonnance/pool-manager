@@ -91,9 +91,7 @@ export function MemberActions({
 
     const isSquaresPool = poolType === 'squares'
 
-    if (poolType === 'bowl_buster') {
-      confirmMessage = `Are you sure you want to remove ${userName} from this pool?\n\nThis will permanently delete all their entries and picks.`
-    } else if (isSquaresPool) {
+    if (isSquaresPool) {
       if (isSquaresLocked) {
         confirmMessage = `Are you sure you want to remove ${userName} from this pool?\n\nTheir squares will be marked as "Abandoned" and can be reassigned by a commissioner. Past winners will retain the original owner's name.`
       } else {
@@ -111,37 +109,7 @@ export function MemberActions({
 
     try {
       // Pool-type-specific removal logic
-      if (poolType === 'bowl_buster') {
-        // Bowl Buster: Cascade delete entries -> picks -> membership
-        // 1. Get all entries for this user in this pool
-        const { data: entries } = await supabase
-          .from('bb_entries')
-          .select('id')
-          .eq('pool_id', poolId)
-          .eq('user_id', memberId)
-
-        if (entries && entries.length > 0) {
-          const entryIds = entries.map(e => e.id)
-
-          // 2. Delete CFP picks
-          await supabase
-            .from('bb_cfp_entry_picks')
-            .delete()
-            .in('entry_id', entryIds)
-
-          // 3. Delete bowl picks
-          await supabase
-            .from('bb_bowl_picks')
-            .delete()
-            .in('entry_id', entryIds)
-
-          // 4. Delete entries
-          await supabase
-            .from('bb_entries')
-            .delete()
-            .in('id', entryIds)
-        }
-      } else if (isSquaresPool) {
+      if (isSquaresPool) {
         // Get the sq_pool_id
         const { data: sqPool } = await supabase
           .from('sq_pools')

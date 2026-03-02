@@ -2,11 +2,21 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { createClient } from '@/lib/supabase/client'
+import { updateProfileSchema, type UpdateProfileValues } from '@/lib/form-schemas'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
 
 interface UpdateProfileFormProps {
   currentDisplayName: string
@@ -14,78 +24,76 @@ interface UpdateProfileFormProps {
 
 export function UpdateProfileForm({ currentDisplayName }: UpdateProfileFormProps) {
   const router = useRouter()
-  const [displayName, setDisplayName] = useState(currentDisplayName)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
-  const [loading, setLoading] = useState(false)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const form = useForm<UpdateProfileValues>({
+    resolver: zodResolver(updateProfileSchema),
+    defaultValues: { displayName: currentDisplayName },
+  })
+
+  const onSubmit = async (values: UpdateProfileValues) => {
     setError(null)
     setSuccess(false)
 
-    if (!displayName.trim()) {
-      setError('Display name cannot be empty')
-      return
-    }
-
-    setLoading(true)
-
     const supabase = createClient()
-
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
       setError('You must be logged in to update your profile')
-      setLoading(false)
       return
     }
 
-    const { error } = await supabase
+    const { error: updateError } = await supabase
       .from('profiles')
-      .update({ display_name: displayName.trim() })
+      .update({ display_name: values.displayName.trim() })
       .eq('id', user.id)
 
-    if (error) {
-      setError(error.message)
-      setLoading(false)
+    if (updateError) {
+      setError(updateError.message)
       return
     }
 
     setSuccess(true)
-    setLoading(false)
     router.refresh()
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-      {success && (
-        <Alert>
-          <AlertDescription>Your display name has been updated.</AlertDescription>
-        </Alert>
-      )}
+        {success && (
+          <Alert>
+            <AlertDescription>Your display name has been updated.</AlertDescription>
+          </Alert>
+        )}
 
-      <div className="space-y-2">
-        <Label htmlFor="displayName">Display name</Label>
-        <Input
-          id="displayName"
-          type="text"
-          value={displayName}
-          onChange={(e) => setDisplayName(e.target.value)}
-          placeholder="Your name"
-          className="max-w-md"
+        <FormField
+          control={form.control}
+          name="displayName"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Display name</FormLabel>
+              <FormControl>
+                <Input {...field} placeholder="Your name" className="max-w-md" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
-      </div>
 
-      <Button type="submit" disabled={loading || displayName === currentDisplayName}>
-        {loading ? 'Saving...' : 'Save changes'}
-      </Button>
-    </form>
+        <Button
+          type="submit"
+          disabled={form.formState.isSubmitting || !form.formState.isDirty}
+        >
+          {form.formState.isSubmitting ? 'Saving...' : 'Save changes'}
+        </Button>
+      </form>
+    </Form>
   )
 }

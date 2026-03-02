@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { getEnabledPoolTypes, getGamesTemplateForEventType, type PoolTypes } from '@/lib/site-settings'
+import { formatSlugInput, validateSlugFormat, generateSlugFromName, checkSlugAvailability as checkSlugAvail } from '@/lib/slug'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -23,7 +24,7 @@ interface CreatePoolButtonProps {
   orgId: string
 }
 
-type PoolType = 'bowl_buster' | 'squares' | 'golf' | 'march_madness'
+type PoolType = 'squares' | 'golf' | 'march_madness'
 type SquaresEventType = 'nfl_playoffs' | 'march_madness' | 'single_game'
 type ScoringMode = 'quarter' | 'score_change' | 'hybrid'
 
@@ -31,7 +32,7 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [name, setName] = useState('')
   const [seasonLabel, setSeasonLabel] = useState('')
-  const [poolType, setPoolType] = useState<PoolType>('bowl_buster')
+  const [poolType, setPoolType] = useState<PoolType>('squares')
 
   // Enabled pool types from site settings
   const [enabledPoolTypes, setEnabledPoolTypes] = useState<PoolTypes | null>(null)
@@ -65,14 +66,12 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
   useEffect(() => {
     if (enabledPoolTypes) {
       // Set to first enabled pool type
-      if (enabledPoolTypes.bowl_buster) {
-        setPoolType('bowl_buster')
-      } else if (enabledPoolTypes.squares) {
+      if (enabledPoolTypes.squares) {
         setPoolType('squares')
-      } else if (enabledPoolTypes.golf) {
-        setPoolType('golf')
       } else if (enabledPoolTypes.march_madness) {
         setPoolType('march_madness')
+      } else if (enabledPoolTypes.golf) {
+        setPoolType('golf')
       }
     }
   }, [enabledPoolTypes])
@@ -80,7 +79,7 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
   // Auto-generate slug from pool name for squares and march madness pools
   useEffect(() => {
     if ((poolType === 'squares' || poolType === 'march_madness') && name) {
-      const slug = generateSlug(name)
+      const slug = generateSlugFromName(name)
       setPublicSlug(slug)
       // Clear slug error when auto-generating
       if (slug.length >= 3) {
@@ -127,15 +126,10 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
 
     // For Squares, create sq_pool and games
     if (poolType === 'squares') {
-      // Validate slug format
       if (publicSlug) {
-        if (!/^[a-z0-9-]+$/.test(publicSlug)) {
-          setError('Slug can only contain lowercase letters, numbers, and hyphens')
-          setIsLoading(false)
-          return
-        }
-        if (publicSlug.length < 3 || publicSlug.length > 50) {
-          setError('Slug must be between 3 and 50 characters')
+        const slugValidation = validateSlugFormat(publicSlug)
+        if (slugValidation) {
+          setError(slugValidation)
           setIsLoading(false)
           return
         }
@@ -227,15 +221,10 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
 
     // For March Madness pools, create mm_pools record
     if (poolType === 'march_madness') {
-      // Validate slug format
       if (publicSlug) {
-        if (!/^[a-z0-9-]+$/.test(publicSlug)) {
-          setError('Slug can only contain lowercase letters, numbers, and hyphens')
-          setIsLoading(false)
-          return
-        }
-        if (publicSlug.length < 3 || publicSlug.length > 50) {
-          setError('Slug must be between 3 and 50 characters')
+        const slugValidation = validateSlugFormat(publicSlug)
+        if (slugValidation) {
+          setError(slugValidation)
           setIsLoading(false)
           return
         }
@@ -265,7 +254,7 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
   const resetForm = () => {
     setName('')
     setSeasonLabel('')
-    setPoolType('bowl_buster')
+    setPoolType('squares')
     setReverseScoring(true)
     setSquaresEventType('nfl_playoffs')
     setScoringMode('quarter')
@@ -287,24 +276,10 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
     }
 
     setCheckingSlug(true)
-    const supabase = createClient()
-
-    // Check appropriate table based on pool type
-    const table = type === 'march_madness' ? 'mm_pools' : 'sq_pools'
-    const { data, error } = await supabase
-      .from(table)
-      .select('id')
-      .eq('public_slug', slug)
-      .maybeSingle()
-
+    const table = type === 'march_madness' ? 'mm_pools' as const : 'sq_pools' as const
+    const available = await checkSlugAvail(slug, table)
+    setSlugAvailable(available)
     setCheckingSlug(false)
-
-    if (error) {
-      setSlugAvailable(null)
-      return
-    }
-
-    setSlugAvailable(data === null)
   }, [])
 
   // Debounced slug availability check
@@ -321,26 +296,10 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
     return () => clearTimeout(timeoutId)
   }, [publicSlug, poolType, slugError, checkSlugAvailability])
 
-  // Generate slug from name
-  const generateSlug = (name: string) => {
-    return name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-      .slice(0, 50)
-  }
-
   const handleSlugChange = (value: string) => {
-    const formatted = value.toLowerCase().replace(/[^a-z0-9-]/g, '')
+    const formatted = formatSlugInput(value)
     setPublicSlug(formatted)
-
-    if (formatted && formatted.length < 3) {
-      setSlugError('Slug must be at least 3 characters')
-    } else if (formatted && formatted.length > 50) {
-      setSlugError('Slug must be 50 characters or less')
-    } else {
-      setSlugError(null)
-    }
+    setSlugError(formatted.length > 0 ? validateSlugFormat(formatted) : null)
   }
 
   const handleOpenChange = (open: boolean) => {
@@ -352,11 +311,10 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
 
   // Count enabled pool types
   const enabledCount = enabledPoolTypes
-    ? (enabledPoolTypes.bowl_buster ? 1 : 0) +
-      (enabledPoolTypes.squares ? 1 : 0) +
+    ? (enabledPoolTypes.squares ? 1 : 0) +
       (enabledPoolTypes.golf ? 1 : 0) +
       (enabledPoolTypes.march_madness ? 1 : 0)
-    : 4
+    : 3
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
@@ -378,20 +336,6 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
               <div className="space-y-2">
                 <Label>Pool Type</Label>
                 <div className="grid grid-cols-2 gap-2">
-                  {enabledPoolTypes?.bowl_buster && (
-                    <button
-                      type="button"
-                      onClick={() => setPoolType('bowl_buster')}
-                      className={`p-3 rounded-lg border text-left transition-all ${
-                        poolType === 'bowl_buster'
-                          ? 'border-primary bg-primary/10'
-                          : 'border-border hover:border-muted-foreground'
-                      }`}
-                    >
-                      <div className="font-medium">Bowl Buster</div>
-                      <div className="text-xs text-muted-foreground">Pick bowl game winners</div>
-                    </button>
-                  )}
                   {enabledPoolTypes?.squares && (
                     <button
                       type="button"
@@ -441,7 +385,7 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
             {/* Show single pool type header if only one is enabled */}
             {enabledCount === 1 && enabledPoolTypes && (
               <div className="text-sm text-muted-foreground">
-                Creating a {enabledPoolTypes.bowl_buster ? 'Bowl Buster' : enabledPoolTypes.squares ? 'Squares' : enabledPoolTypes.golf ? 'Golf Pool' : 'March Madness'} pool
+                Creating a {enabledPoolTypes.squares ? 'Squares' : enabledPoolTypes.golf ? 'Golf Pool' : 'March Madness'} pool
               </div>
             )}
 
@@ -452,7 +396,6 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder={
-                  poolType === 'bowl_buster' ? 'My Bowl Pool' :
                   poolType === 'squares' ? 'Super Bowl Squares 2025' :
                   poolType === 'golf' ? 'Masters 2025 Pool' :
                   'March Madness 2025'

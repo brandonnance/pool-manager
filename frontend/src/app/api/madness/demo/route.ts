@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     // Get mm_pool
     const { data: mmPool, error: poolError } = await supabase
       .from('mm_pools')
-      .select('*, pools!inner(org_id, demo_mode)')
+      .select('*, pools!inner(org_id)')
       .eq('id', mmPoolId)
       .single()
 
@@ -71,15 +71,6 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       )
     }
-
-    // Only allow demo actions on demo pools (optional safety check)
-    // Commented out for now - allow on any pool for testing
-    // if (!mmPool.pools.demo_mode) {
-    //   return NextResponse.json(
-    //     { error: 'Demo actions only allowed on demo pools' },
-    //     { status: 403 }
-    //   )
-    // }
 
     // Verify user is commissioner
     const [{ data: profile }, { data: orgMembership }, { data: poolMembership }] = await Promise.all([

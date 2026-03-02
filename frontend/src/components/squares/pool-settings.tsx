@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { formatSlugInput, validateSlugFormat } from '@/lib/slug'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -144,18 +145,9 @@ export function PoolSettings({
 
   const handleUpdateSlug = async () => {
     const trimmedSlug = slugInput.trim().toLowerCase()
-    if (!trimmedSlug) {
-      setError('Please enter a valid slug')
-      return
-    }
-
-    // Validate format
-    if (!/^[a-z0-9-]+$/.test(trimmedSlug)) {
-      setError('Slug can only contain lowercase letters, numbers, and hyphens')
-      return
-    }
-    if (trimmedSlug.length < 3 || trimmedSlug.length > 50) {
-      setError('Slug must be between 3 and 50 characters')
+    const slugValidation = validateSlugFormat(trimmedSlug)
+    if (slugValidation) {
+      setError(slugValidation)
       return
     }
 
@@ -379,7 +371,7 @@ export function PoolSettings({
               <div className="flex gap-2">
                 <Input
                   value={slugInput}
-                  onChange={(e) => setSlugInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                  onChange={(e) => setSlugInput(formatSlugInput(e.target.value))}
                   placeholder="your-pool-name"
                   disabled={isUpdatingSlug}
                   className="flex-1"
@@ -461,7 +453,7 @@ export function PoolSettings({
             <div className="space-y-2">
               <Input
                 value={slugInput}
-                onChange={(e) => setSlugInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                onChange={(e) => setSlugInput(formatSlugInput(e.target.value))}
                 placeholder="your-pool-name"
                 disabled={isUpdatingSlug}
               />

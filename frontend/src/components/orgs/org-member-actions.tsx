@@ -88,9 +88,8 @@ export function OrgMemberActions({
 
     if (!confirm(
       `Are you sure you want to remove ${userName} from this organization?\n\n` +
-      `This will remove them from all pools in this organization:\n` +
-      `• Bowl Buster pools: Their entries and picks will be deleted\n` +
-      `• Squares pools: Their squares will be abandoned or deleted`
+      `This will remove them from all pools in this organization.\n` +
+      `Their squares will be abandoned or deleted.`
     )) {
       return
     }
@@ -122,36 +121,7 @@ export function OrgMemberActions({
       if (pools && pools.length > 0) {
         // Process each pool based on its type
         for (const pool of pools) {
-          if (pool.type === 'bowl_buster') {
-            // Bowl Buster: Cascade delete entries -> picks -> membership
-            const { data: entries } = await supabase
-              .from('bb_entries')
-              .select('id')
-              .eq('pool_id', pool.id)
-              .eq('user_id', userId)
-
-            if (entries && entries.length > 0) {
-              const entryIds = entries.map(e => e.id)
-
-              // Delete CFP picks
-              await supabase
-                .from('bb_cfp_entry_picks')
-                .delete()
-                .in('entry_id', entryIds)
-
-              // Delete bowl picks
-              await supabase
-                .from('bb_bowl_picks')
-                .delete()
-                .in('entry_id', entryIds)
-
-              // Delete entries
-              await supabase
-                .from('bb_entries')
-                .delete()
-                .in('id', entryIds)
-            }
-          } else if (pool.type === 'squares') {
+          if (pool.type === 'squares') {
             // Get the sq_pool and check lock status
             const { data: sqPool } = await supabase
               .from('sq_pools')

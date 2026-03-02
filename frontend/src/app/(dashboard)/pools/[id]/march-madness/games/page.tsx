@@ -37,6 +37,14 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { EnterScoreDialog, EnterSpreadDialog } from '@/components/march-madness'
@@ -128,30 +136,31 @@ export default async function MarchMadnessGamesPage({ params }: PageProps) {
 
   return (
     <div>
-      {/* Breadcrumb */}
-      <nav className="mb-4">
-        <ol className="flex items-center space-x-2 text-sm text-muted-foreground">
-          <li>
-            <Link href="/dashboard" className="hover:text-foreground transition-colors">
-              Dashboard
-            </Link>
-          </li>
-          <li>/</li>
-          <li>
-            <Link href={`/pools/${id}`} className="hover:text-foreground transition-colors">
-              {pool.name}
-            </Link>
-          </li>
-          <li>/</li>
-          <li>
-            <Link href={`/pools/${id}/march-madness`} className="hover:text-foreground transition-colors">
-              March Madness
-            </Link>
-          </li>
-          <li>/</li>
-          <li className="text-foreground font-medium">Games</li>
-        </ol>
-      </nav>
+      <Breadcrumb className="mb-4">
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link href="/dashboard">Dashboard</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link href={`/pools/${id}`}>{pool.name}</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link href={`/pools/${id}/march-madness`}>March Madness</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>Games</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
 
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

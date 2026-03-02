@@ -208,10 +208,12 @@ export default async function OrgDetailPage({ params }: PageProps) {
               // Pool commissioner = explicit pool role OR org admin (implicit rights)
               const isPoolCommissioner = myMembership?.role === 'commissioner' || isOrgAdmin
 
-              const poolTypeLabel = pool.type === 'bowl_buster'
-                ? 'Bowl Buster'
-                : pool.type === 'squares'
+              const poolTypeLabel = pool.type === 'squares'
                 ? 'Squares'
+                : pool.type === 'golf'
+                ? 'Golf'
+                : pool.type === 'march_madness'
+                ? 'March Madness'
                 : pool.type
 
               return (

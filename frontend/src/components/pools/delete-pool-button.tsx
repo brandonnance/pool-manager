@@ -120,52 +120,6 @@ export function DeletePoolButton({ poolId, poolName, poolType, orgId }: DeletePo
             .delete()
             .eq('id', sqPool.id)
         }
-      } else if (poolType === 'bowl_buster') {
-        // Get all entry ids for this pool
-        const { data: entries } = await supabase
-          .from('bb_entries')
-          .select('id')
-          .eq('pool_id', poolId)
-
-        const entryIds = entries?.map(e => e.id) ?? []
-
-        if (entryIds.length > 0) {
-          // Delete CFP picks
-          await supabase
-            .from('bb_cfp_entry_picks')
-            .delete()
-            .in('entry_id', entryIds)
-
-          // Delete bowl picks
-          await supabase
-            .from('bb_bowl_picks')
-            .delete()
-            .in('entry_id', entryIds)
-        }
-
-        // Delete entries
-        await supabase
-          .from('bb_entries')
-          .delete()
-          .eq('pool_id', poolId)
-
-        // Delete CFP byes
-        await supabase
-          .from('bb_cfp_pool_byes')
-          .delete()
-          .eq('pool_id', poolId)
-
-        // Delete CFP round 1
-        await supabase
-          .from('bb_cfp_pool_round1')
-          .delete()
-          .eq('pool_id', poolId)
-
-        // Delete pool games
-        await supabase
-          .from('bb_pool_games')
-          .delete()
-          .eq('pool_id', poolId)
       } else if (poolType === 'golf') {
         // Get gp_pool id first
         const { data: gpPool } = await supabase
@@ -306,13 +260,6 @@ export function DeletePoolButton({ poolId, poolName, poolType, orgId }: DeletePo
                     <li>All squares and ownership data</li>
                     <li>All games and scores</li>
                     <li>All winners</li>
-                  </>
-                )}
-                {poolType === 'bowl_buster' && (
-                  <>
-                    <li>All bowl picks</li>
-                    <li>All CFP bracket picks</li>
-                    <li>All game configurations</li>
                   </>
                 )}
                 {poolType === 'golf' && (

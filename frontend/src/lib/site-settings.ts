@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/client'
 
 export interface PoolTypes {
-  bowl_buster: boolean
   squares: boolean
   golf: boolean
   march_madness: boolean
@@ -28,7 +27,7 @@ export async function getEnabledPoolTypes(): Promise<PoolTypes> {
   if (error || !data) {
     console.error('Error fetching pool types:', error)
     // Default to all enabled
-    return { bowl_buster: true, squares: true, golf: true, march_madness: true }
+    return { squares: true, golf: true, march_madness: true }
   }
 
   return data as unknown as PoolTypes

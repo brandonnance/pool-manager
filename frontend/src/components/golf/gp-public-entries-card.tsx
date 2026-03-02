@@ -1,8 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useSlug } from '@/hooks/use-slug'
+import { validateSlugFormat } from '@/lib/slug'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
@@ -35,23 +37,23 @@ export function GpPublicEntriesCard({
 }: GpPublicEntriesCardProps) {
   const router = useRouter()
   const [isEditingSlug, setIsEditingSlug] = useState(false)
-  const [slugInput, setSlugInput] = useState(publicSlug ?? '')
   const [isUpdating, setIsUpdating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [origin, setOrigin] = useState('')
-  const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null)
-  const [checkingSlug, setCheckingSlug] = useState(false)
   const [validation, setValidation] = useState<ValidationResult | null>(null)
   const [checkingValidation, setCheckingValidation] = useState(false)
   const [enabled, setEnabled] = useState(publicEntriesEnabled)
 
-  // Set origin on client-side only
+  const { slugInput, setSlugInput, handleSlugChange, slugAvailable, checkingSlug } = useSlug({
+    table: 'gp_pools',
+    initialSlug: publicSlug,
+  })
+
   useEffect(() => {
     setOrigin(window.location.origin)
   }, [])
 
-  // Check validation when component mounts or dependencies change
   useEffect(() => {
     checkReadyForPublicEntries()
   }, [gpPoolId, tournamentId, picksLockAt])
@@ -71,23 +73,19 @@ export function GpPublicEntriesCard({
     }
   }
 
-  // Check if pool is ready for public entries
   async function checkReadyForPublicEntries() {
     setCheckingValidation(true)
     const supabase = createClient()
     const errors: string[] = []
 
-    // Check tournament is linked
     if (!tournamentId) {
       errors.push('No tournament linked')
     }
 
-    // Check picks lock time is set
     if (!picksLockAt) {
       errors.push('Picks lock time not set')
     }
 
-    // Check all golfers have tier assignments
     if (tournamentId) {
       const { count: fieldCount } = await supabase
         .from('gp_tournament_field')
@@ -114,70 +112,11 @@ export function GpPublicEntriesCard({
     setCheckingValidation(false)
   }
 
-  // Check if slug is available
-  const checkSlugAvailability = useCallback(async (slug: string) => {
-    if (!slug || slug.length < 3) {
-      setSlugAvailable(null)
-      return
-    }
-
-    if (slug === publicSlug) {
-      setSlugAvailable(true)
-      return
-    }
-
-    setCheckingSlug(true)
-    const supabase = createClient()
-
-    const { data, error: checkError } = await supabase
-      .from('gp_pools')
-      .select('id')
-      .eq('public_slug', slug)
-      .maybeSingle()
-
-    setCheckingSlug(false)
-
-    if (checkError) {
-      setSlugAvailable(null)
-      return
-    }
-
-    setSlugAvailable(data === null)
-  }, [publicSlug])
-
-  // Debounced slug availability check
-  useEffect(() => {
-    if (!isEditingSlug || !slugInput || slugInput.length < 3) {
-      setSlugAvailable(null)
-      return
-    }
-
-    const timeoutId = setTimeout(() => {
-      checkSlugAvailability(slugInput)
-    }, 500)
-
-    return () => clearTimeout(timeoutId)
-  }, [slugInput, isEditingSlug, checkSlugAvailability])
-
-  const handleSlugChange = (value: string) => {
-    const formatted = value.toLowerCase().replace(/[^a-z0-9-]/g, '')
-    setSlugInput(formatted)
-    setError(null)
-  }
-
   const handleUpdateSlug = async () => {
     const trimmedSlug = slugInput.trim().toLowerCase()
-    if (!trimmedSlug) {
-      setError('Please enter a valid slug')
-      return
-    }
-
-    if (!/^[a-z0-9-]+$/.test(trimmedSlug)) {
-      setError('Slug can only contain lowercase letters, numbers, and hyphens')
-      return
-    }
-    if (trimmedSlug.length < 3 || trimmedSlug.length > 50) {
-      setError('Slug must be between 3 and 50 characters')
+    const validationError = validateSlugFormat(trimmedSlug)
+    if (validationError) {
+      setError(validationError)
       return
     }
 
@@ -207,13 +146,11 @@ export function GpPublicEntriesCard({
   }
 
   const handleToggleEnabled = async (newEnabled: boolean) => {
-    // Don't allow enabling if validation fails
     if (newEnabled && validation && !validation.valid) {
       setError('Cannot enable public entries. Please fix the issues below.')
       return
     }
 
-    // Don't allow enabling without a slug
     if (newEnabled && !publicSlug) {
       setError('Please set a public URL first.')
       return
@@ -235,7 +172,6 @@ export function GpPublicEntriesCard({
       return
     }
 
-    // Sync pool status after toggling public entries
     try {
       await fetch('/api/golf/sync-status', {
         method: 'POST',
@@ -273,7 +209,7 @@ export function GpPublicEntriesCard({
                 <span className="text-sm text-muted-foreground whitespace-nowrap">{origin}/pools/golf/</span>
                 <Input
                   value={slugInput}
-                  onChange={(e) => handleSlugChange(e.target.value)}
+                  onChange={(e) => { handleSlugChange(e.target.value); setError(null) }}
                   placeholder="your-pool-name"
                   disabled={isUpdating}
                   className={`flex-1 font-mono text-sm ${
@@ -308,7 +244,6 @@ export function GpPublicEntriesCard({
                     setIsEditingSlug(false)
                     setSlugInput(publicSlug ?? '')
                     setError(null)
-                    setSlugAvailable(null)
                   }}
                   disabled={isUpdating}
                   className="flex-1"
@@ -351,7 +286,7 @@ export function GpPublicEntriesCard({
                 <span className="text-sm text-muted-foreground whitespace-nowrap">{origin}/pools/golf/</span>
                 <Input
                   value={slugInput}
-                  onChange={(e) => handleSlugChange(e.target.value)}
+                  onChange={(e) => { handleSlugChange(e.target.value); setError(null) }}
                   placeholder="your-pool-name"
                   disabled={isUpdating}
                   className={`flex-1 font-mono text-sm ${
@@ -402,7 +337,6 @@ export function GpPublicEntriesCard({
               />
             </div>
 
-            {/* Validation Errors */}
             {validation && !validation.valid && (
               <div className="bg-amber-50 border border-amber-200 rounded-md p-3 space-y-2">
                 <div className="flex items-center gap-2 text-amber-700 font-medium text-sm">
@@ -417,7 +351,6 @@ export function GpPublicEntriesCard({
               </div>
             )}
 
-            {/* Success indicator */}
             {enabled && validation?.valid && (
               <div className="bg-green-50 border border-green-200 rounded-md p-3 text-sm text-green-700 flex items-center gap-2">
                 <Check className="h-4 w-4" />

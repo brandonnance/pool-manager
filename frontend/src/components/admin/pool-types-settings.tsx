@@ -10,14 +10,13 @@ import { Loader2 } from 'lucide-react'
 
 interface PoolTypesSettingsProps {
   initialPoolTypes: {
-    bowl_buster: boolean
     squares: boolean
     golf: boolean
     march_madness: boolean
   }
 }
 
-type PoolTypeKey = 'bowl_buster' | 'squares' | 'golf' | 'march_madness'
+type PoolTypeKey = 'squares' | 'golf' | 'march_madness'
 
 export function PoolTypesSettings({ initialPoolTypes }: PoolTypesSettingsProps) {
   const router = useRouter()
@@ -29,7 +28,6 @@ export function PoolTypesSettings({ initialPoolTypes }: PoolTypesSettingsProps) 
     setPoolTypes(prev => {
       const updated = { ...prev, [key]: !prev[key] }
       setHasChanges(
-        updated.bowl_buster !== initialPoolTypes.bowl_buster ||
         updated.squares !== initialPoolTypes.squares ||
         updated.golf !== initialPoolTypes.golf ||
         updated.march_madness !== initialPoolTypes.march_madness
@@ -61,22 +59,6 @@ export function PoolTypesSettings({ initialPoolTypes }: PoolTypesSettingsProps) 
   return (
     <div className="space-y-6">
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <Label htmlFor="bowl_buster" className="text-base font-medium">
-              Bowl Buster
-            </Label>
-            <p className="text-sm text-muted-foreground">
-              College football bowl pick pools with margin-of-victory scoring
-            </p>
-          </div>
-          <Switch
-            id="bowl_buster"
-            checked={poolTypes.bowl_buster}
-            onCheckedChange={() => handleToggle('bowl_buster')}
-          />
-        </div>
-
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label htmlFor="squares" className="text-base font-medium">

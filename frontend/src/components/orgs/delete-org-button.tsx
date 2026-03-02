@@ -113,64 +113,6 @@ export function DeleteOrgButton({ orgId, orgName }: DeleteOrgButtonProps) {
               .delete()
               .eq('id', sqPool.id)
           }
-        } else if (pool.type === 'bowl_buster') {
-          // Get all entry ids for this pool
-          const { data: entries } = await supabase
-            .from('bb_entries')
-            .select('id')
-            .eq('pool_id', pool.id)
-
-          const entryIds = entries?.map(e => e.id) ?? []
-
-          if (entryIds.length > 0) {
-            // Delete CFP picks
-            await supabase
-              .from('bb_cfp_entry_picks')
-              .delete()
-              .in('entry_id', entryIds)
-
-            // Delete bowl picks
-            await supabase
-              .from('bb_bowl_picks')
-              .delete()
-              .in('entry_id', entryIds)
-          }
-
-          // Delete entries
-          await supabase
-            .from('bb_entries')
-            .delete()
-            .eq('pool_id', pool.id)
-
-          // Delete CFP byes
-          await supabase
-            .from('bb_cfp_pool_byes')
-            .delete()
-            .eq('pool_id', pool.id)
-
-          // Delete CFP slot games
-          await supabase
-            .from('bb_cfp_pool_slot_games')
-            .delete()
-            .eq('pool_id', pool.id)
-
-          // Delete CFP round 1
-          await supabase
-            .from('bb_cfp_pool_round1')
-            .delete()
-            .eq('pool_id', pool.id)
-
-          // Delete CFP config
-          await supabase
-            .from('bb_cfp_pool_config')
-            .delete()
-            .eq('pool_id', pool.id)
-
-          // Delete pool games
-          await supabase
-            .from('bb_pool_games')
-            .delete()
-            .eq('pool_id', pool.id)
         }
 
         // Common deletions for all pool types
