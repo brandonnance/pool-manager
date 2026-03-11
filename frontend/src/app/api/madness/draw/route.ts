@@ -141,8 +141,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Shuffle teams and assign to entries
-    const shuffledTeams = shuffleArray(teams)
     const assignments: Array<{
       entry_id: string
       team_id: string
@@ -152,11 +150,52 @@ export async function POST(request: NextRequest) {
       region: string
     }> = []
 
-    // Update each entry with their assigned team
-    for (let i = 0; i < entries.length; i++) {
-      const entry = entries[i]
-      const team = shuffledTeams[i]
+    // Group teams by region and shuffle within each region
+    const teamsByRegion: Record<string, typeof teams> = {}
+    for (const team of teams) {
+      if (!teamsByRegion[team.region]) teamsByRegion[team.region] = []
+      teamsByRegion[team.region].push(team)
+    }
+    const regions = Object.keys(teamsByRegion)
+    for (const region of regions) {
+      teamsByRegion[region] = shuffleArray(teamsByRegion[region])
+    }
 
+    // Group entries by display_name (case-insensitive) to detect multi-entry participants
+    const entriesByName: Record<string, typeof entries> = {}
+    for (const entry of entries) {
+      const key = (entry.display_name ?? entry.id).toLowerCase().trim()
+      if (!entriesByName[key]) entriesByName[key] = []
+      entriesByName[key].push(entry)
+    }
+
+    // Process multi-entry groups first (most entries first), then single-entry
+    const multiGroups = Object.values(entriesByName)
+      .filter(g => g.length > 1)
+      .sort((a, b) => b.length - a.length)
+    const singleGroups = Object.values(entriesByName).filter(g => g.length === 1)
+
+    // Build ordered list: multi-entry assignments with distinct regions, then singles
+    const orderedPairs: Array<{ entry: (typeof entries)[number]; team: (typeof teams)[number] }> = []
+
+    for (const group of multiGroups) {
+      // Pick group.length distinct regions randomly, assign one team per region
+      const shuffledRegions = shuffleArray([...regions])
+      for (let i = 0; i < group.length; i++) {
+        const region = shuffledRegions[i]
+        const team = teamsByRegion[region].pop()!
+        orderedPairs.push({ entry: group[i], team })
+      }
+    }
+
+    // Remaining teams go to single-entry participants in random order
+    const remainingTeams = shuffleArray(regions.flatMap(r => teamsByRegion[r]))
+    for (let i = 0; i < singleGroups.length; i++) {
+      orderedPairs.push({ entry: singleGroups[i][0], team: remainingTeams[i] })
+    }
+
+    // Update each entry with their assigned team
+    for (const { entry, team } of orderedPairs) {
       const { error: updateError } = await supabase
         .from('mm_entries')
         .update({
