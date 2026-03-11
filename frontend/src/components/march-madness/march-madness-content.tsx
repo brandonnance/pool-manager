@@ -312,7 +312,7 @@ export function MarchMadnessContent({
   const drawReady = mmPool.draw_completed
 
   // Check if setup is incomplete
-  const needsSetup = !teamsReady || (!drawReady && !entriesReady)
+  const needsSetup = !teamsReady || !entriesReady || !drawReady
 
   if (needsSetup && isCommissioner) {
     return (

@@ -263,17 +263,23 @@ export async function POST(request: NextRequest) {
 
     const r64Count = allGames.filter(g => g.round === 'R64').length
 
-    // Mark draw as completed
-    const { error: completeError } = await supabase
-      .from('mm_pools')
-      .update({
-        draw_completed: true,
-        draw_completed_at: new Date().toISOString(),
-      })
-      .eq('id', mmPoolId)
+    // Mark draw as completed and transition pool to open
+    const [{ error: completeError }, { error: poolStatusError }] = await Promise.all([
+      supabase
+        .from('mm_pools')
+        .update({
+          draw_completed: true,
+          draw_completed_at: new Date().toISOString(),
+        })
+        .eq('id', mmPoolId),
+      supabase
+        .from('pools')
+        .update({ status: 'open' })
+        .eq('id', mmPool.pool_id),
+    ])
 
-    if (completeError) {
-      console.error('Error marking draw complete:', completeError)
+    if (completeError || poolStatusError) {
+      console.error('Error marking draw complete:', completeError ?? poolStatusError)
       return NextResponse.json(
         { error: 'Draw completed but failed to update status' },
         { status: 500 }
