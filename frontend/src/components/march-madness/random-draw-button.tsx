@@ -20,6 +20,7 @@ interface RandomDrawButtonProps {
   entryCount: number
   teamCount: number
   drawCompleted: boolean
+  className?: string
 }
 
 export function RandomDrawButton({
@@ -27,6 +28,7 @@ export function RandomDrawButton({
   entryCount,
   teamCount,
   drawCompleted,
+  className,
 }: RandomDrawButtonProps) {
   const [isDrawing, setIsDrawing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -62,7 +64,7 @@ export function RandomDrawButton({
 
   if (drawCompleted) {
     return (
-      <Button variant="outline" disabled>
+      <Button variant="outline" disabled className={className}>
         Draw Completed
       </Button>
     )
@@ -70,7 +72,7 @@ export function RandomDrawButton({
 
   if (!canDraw) {
     return (
-      <Button variant="outline" disabled>
+      <Button variant="outline" disabled className={className}>
         {entryCount !== 64
           ? `Need 64 entries (have ${entryCount})`
           : `Need 0 or 64 teams (have ${teamCount})`}
@@ -79,26 +81,32 @@ export function RandomDrawButton({
   }
 
   return (
-    <AlertDialog>
+    <AlertDialog open={isDrawing ? true : undefined}>
       <AlertDialogTrigger asChild>
-        <Button>{isPreDraw ? 'Run Position Draw' : 'Run Random Draw'}</Button>
+        <Button disabled={isDrawing} className={className}>
+          {isDrawing ? 'Drawing...' : isPreDraw ? 'Run Position Draw' : 'Run Random Draw'}
+        </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>
-            {isPreDraw ? 'Run Position Draw?' : 'Run Team Draw?'}
+            {isDrawing
+              ? (isPreDraw ? 'Running Position Draw...' : 'Running Draw...')
+              : (isPreDraw ? 'Run Position Draw?' : 'Run Team Draw?')}
           </AlertDialogTitle>
           <AlertDialogDescription>
-            {isPreDraw
-              ? 'This will randomly assign bracket positions (region + seed) to each of the 64 entries. Actual teams can be linked later once the bracket is announced. This action cannot be undone.'
-              : 'This will randomly assign one of the 64 teams to each of the 64 entries. This action cannot be undone.'}
+            {isDrawing
+              ? 'Please wait while positions are being assigned. This may take a moment.'
+              : isPreDraw
+                ? 'This will randomly assign bracket positions (region + seed) to each of the 64 entries. Actual teams can be linked later once the bracket is announced. This action cannot be undone.'
+                : 'This will randomly assign one of the 64 teams to each of the 64 entries. This action cannot be undone.'}
           </AlertDialogDescription>
         </AlertDialogHeader>
         {error && (
           <p className="text-sm text-destructive">{error}</p>
         )}
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={isDrawing}>Cancel</AlertDialogCancel>
           <AlertDialogAction onClick={handleDraw} disabled={isDrawing}>
             {isDrawing ? 'Drawing...' : isPreDraw ? 'Run Position Draw' : 'Run Draw'}
           </AlertDialogAction>

@@ -401,6 +401,7 @@ export default async function PoolDetailPage({ params }: PageProps) {
                       entryCount={mmEntriesData.length}
                       teamCount={mmPoolTeamsData.length}
                       drawCompleted={mmPoolData.draw_completed}
+                      className="w-full"
                     />
                   )}
                   {/* Link Teams button: show when pre-draw done, teams loaded, not yet linked */}
@@ -409,6 +410,7 @@ export default async function PoolDetailPage({ params }: PageProps) {
                       mmPoolId={mmPoolData.id}
                       teamCount={mmPoolTeamsData.length}
                       teamsLinked={mmPoolData.teams_linked}
+                      className="w-full"
                     />
                   )}
                   {mmPoolData.teams_linked && (

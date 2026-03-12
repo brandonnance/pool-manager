@@ -19,12 +19,14 @@ interface LinkTeamsButtonProps {
   mmPoolId: string
   teamCount: number
   teamsLinked: boolean
+  className?: string
 }
 
 export function LinkTeamsButton({
   mmPoolId,
   teamCount,
   teamsLinked,
+  className,
 }: LinkTeamsButtonProps) {
   const [isLinking, setIsLinking] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -58,7 +60,7 @@ export function LinkTeamsButton({
 
   if (teamsLinked) {
     return (
-      <Button variant="outline" disabled>
+      <Button variant="outline" disabled className={className}>
         Teams Linked
       </Button>
     )
@@ -66,7 +68,7 @@ export function LinkTeamsButton({
 
   if (!canLink) {
     return (
-      <Button variant="outline" disabled>
+      <Button variant="outline" disabled className={className}>
         Need 64 teams (have {teamCount})
       </Button>
     )
@@ -75,7 +77,7 @@ export function LinkTeamsButton({
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button>Link Teams to Entries</Button>
+        <Button className={className}>Link Teams to Entries</Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
