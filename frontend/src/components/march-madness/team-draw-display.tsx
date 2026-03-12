@@ -9,6 +9,7 @@ interface TeamDrawDisplayProps {
   poolTeams: MmPoolTeam[]
   currentUserId: string | null
   drawCompleted: boolean
+  teamsLinked?: boolean
 }
 
 const REGIONS = ['East', 'West', 'South', 'Midwest'] as const
@@ -18,6 +19,7 @@ export function TeamDrawDisplay({
   poolTeams,
   currentUserId,
   drawCompleted,
+  teamsLinked = true,
 }: TeamDrawDisplayProps) {
   if (!drawCompleted) {
     return (
@@ -39,35 +41,80 @@ export function TeamDrawDisplay({
     )
   }
 
-  // Create lookups
+  // Pre-draw mode: positions assigned but no teams linked yet
+  if (!teamsLinked) {
+    // Group entries by assigned_region
+    const entriesByRegion = new Map<string, MmEntry[]>()
+    REGIONS.forEach(region => {
+      const regionEntries = entries
+        .filter(e => e.assigned_region === region)
+        .sort((a, b) => (a.assigned_seed ?? 99) - (b.assigned_seed ?? 99))
+      entriesByRegion.set(region, regionEntries)
+    })
+
+    return (
+      <div className="space-y-4">
+        <div className="grid gap-4 md:grid-cols-2">
+          {REGIONS.map(region => {
+            const regionEntries = entriesByRegion.get(region) || []
+
+            return (
+              <Card key={region}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">{region} Region</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-1">
+                    {regionEntries.map(entry => (
+                      <div
+                        key={entry.id}
+                        className="flex items-center justify-between p-2 rounded-md text-sm bg-muted/50"
+                      >
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className="font-bold w-6 text-center text-muted-foreground">
+                            {entry.assigned_seed}
+                          </span>
+                          <span className="text-muted-foreground">
+                            #{entry.assigned_seed} Seed
+                          </span>
+                        </div>
+                        <span className="text-xs truncate max-w-32 text-foreground font-medium">
+                          {entry.display_name || 'Unknown'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+  // Full view: teams linked, show team names and owners
   const teamById = new Map(poolTeams.map(t => [t.id, t]))
 
-  // Map current_team_id to entry (the entry currently riding this team)
-  // Only include non-eliminated entries - they are the actual current owners
-  // (Eliminated entries may still have current_team_id set from before elimination)
   const entryByCurrentTeamId = new Map(
     entries
       .filter(e => e.current_team_id && !e.eliminated)
       .map(e => [e.current_team_id!, e])
   )
 
-  // Group teams by region, sorted by: active teams first (by seed), then eliminated teams (by seed)
   const teamsByRegion = new Map<string, MmPoolTeam[]>()
   REGIONS.forEach(region => {
     const regionTeams = poolTeams
       .filter(t => t.region === region)
       .sort((a, b) => {
-        // First sort by eliminated status (active first)
         if (a.eliminated !== b.eliminated) {
           return a.eliminated ? 1 : -1
         }
-        // Then sort by seed
         return a.seed - b.seed
       })
     teamsByRegion.set(region, regionTeams)
   })
 
-  // Find current user's entry (only if currentUserId is not null to avoid null === null matching)
   const userEntry = currentUserId !== null
     ? entries.find(e => e.user_id === currentUserId)
     : undefined
@@ -127,7 +174,6 @@ export function TeamDrawDisplay({
               <CardContent>
                 <div className="space-y-1">
                   {regionTeams.map(team => {
-                    // Get the entry currently riding this team (if any)
                     const currentEntry = entryByCurrentTeamId.get(team.id)
                     const isUserTeam = team.id === userCurrentTeam?.id
                     const isTeamEliminated = team.eliminated
@@ -156,7 +202,6 @@ export function TeamDrawDisplay({
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
-                          {/* Show current owner for active teams, blank for eliminated teams */}
                           {!isTeamEliminated && currentEntry && (
                             <span className={`text-xs truncate max-w-24 ${
                               isUserTeam ? 'font-semibold text-sky-700' : 'text-muted-foreground'

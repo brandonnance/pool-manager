@@ -44,6 +44,8 @@ export interface MmEntry {
   eliminated_round: string | null
   display_name: string | null
   total_payout: number
+  assigned_region: string | null
+  assigned_seed: number | null
 }
 
 interface GameCardProps {

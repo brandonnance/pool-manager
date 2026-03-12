@@ -15,33 +15,29 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 
-interface RandomDrawButtonProps {
+interface LinkTeamsButtonProps {
   mmPoolId: string
-  entryCount: number
   teamCount: number
-  drawCompleted: boolean
+  teamsLinked: boolean
 }
 
-export function RandomDrawButton({
+export function LinkTeamsButton({
   mmPoolId,
-  entryCount,
   teamCount,
-  drawCompleted,
-}: RandomDrawButtonProps) {
-  const [isDrawing, setIsDrawing] = useState(false)
+  teamsLinked,
+}: LinkTeamsButtonProps) {
+  const [isLinking, setIsLinking] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
-  const isPreDraw = teamCount === 0 && entryCount === 64
-  const isTraditional = teamCount === 64 && entryCount === 64
-  const canDraw = (isPreDraw || isTraditional) && !drawCompleted
+  const canLink = teamCount === 64 && !teamsLinked
 
-  const handleDraw = async () => {
+  const handleLink = async () => {
     setError(null)
-    setIsDrawing(true)
+    setIsLinking(true)
 
     try {
-      const response = await fetch('/api/madness/draw', {
+      const response = await fetch('/api/madness/link-teams', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mmPoolId }),
@@ -49,31 +45,29 @@ export function RandomDrawButton({
 
       if (!response.ok) {
         const data = await response.json()
-        throw new Error(data.error || 'Failed to run draw')
+        throw new Error(data.error || 'Failed to link teams')
       }
 
       router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
-      setIsDrawing(false)
+      setIsLinking(false)
     }
   }
 
-  if (drawCompleted) {
+  if (teamsLinked) {
     return (
       <Button variant="outline" disabled>
-        Draw Completed
+        Teams Linked
       </Button>
     )
   }
 
-  if (!canDraw) {
+  if (!canLink) {
     return (
       <Button variant="outline" disabled>
-        {entryCount !== 64
-          ? `Need 64 entries (have ${entryCount})`
-          : `Need 0 or 64 teams (have ${teamCount})`}
+        Need 64 teams (have {teamCount})
       </Button>
     )
   }
@@ -81,17 +75,15 @@ export function RandomDrawButton({
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button>{isPreDraw ? 'Run Position Draw' : 'Run Random Draw'}</Button>
+        <Button>Link Teams to Entries</Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>
-            {isPreDraw ? 'Run Position Draw?' : 'Run Team Draw?'}
-          </AlertDialogTitle>
+          <AlertDialogTitle>Link Teams to Entries?</AlertDialogTitle>
           <AlertDialogDescription>
-            {isPreDraw
-              ? 'This will randomly assign bracket positions (region + seed) to each of the 64 entries. Actual teams can be linked later once the bracket is announced. This action cannot be undone.'
-              : 'This will randomly assign one of the 64 teams to each of the 64 entries. This action cannot be undone.'}
+            This will link the 64 loaded teams to the existing position assignments
+            and generate all 63 tournament games. The pool will be locked for play.
+            This action cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
         {error && (
@@ -99,8 +91,8 @@ export function RandomDrawButton({
         )}
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handleDraw} disabled={isDrawing}>
-            {isDrawing ? 'Drawing...' : isPreDraw ? 'Run Position Draw' : 'Run Draw'}
+          <AlertDialogAction onClick={handleLink} disabled={isLinking}>
+            {isLinking ? 'Linking...' : 'Link Teams'}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

@@ -251,19 +251,30 @@ export default async function MarchMadnessEntriesPage({ params }: PageProps) {
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>Random Draw</span>
-            <Badge variant={mmPool.draw_completed ? 'default' : 'secondary'}>
-              {mmPool.draw_completed ? 'Completed' : 'Pending'}
+            <Badge variant={mmPool.teams_linked ? 'default' : mmPool.draw_completed ? 'outline' : 'secondary'}
+              className={mmPool.draw_completed && !mmPool.teams_linked ? 'border-amber-500 text-amber-600' : ''}
+            >
+              {mmPool.teams_linked ? 'Completed' : mmPool.draw_completed ? 'Positions Drawn' : 'Pending'}
             </Badge>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {mmPool.draw_completed ? (
+          {mmPool.draw_completed && mmPool.teams_linked ? (
             <div>
               <p className="text-muted-foreground mb-2">
                 Draw completed on {new Date(mmPool.draw_completed_at!).toLocaleDateString()}
               </p>
               <p className="text-sm text-muted-foreground">
                 All 64 teams have been randomly assigned to entries.
+              </p>
+            </div>
+          ) : mmPool.draw_completed && !mmPool.teams_linked ? (
+            <div>
+              <p className="text-muted-foreground mb-2">
+                Position draw completed on {new Date(mmPool.draw_completed_at!).toLocaleDateString()}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Bracket positions assigned. Load 64 teams and link them to complete setup.
               </p>
             </div>
           ) : (
@@ -315,8 +326,8 @@ export default async function MarchMadnessEntriesPage({ params }: PageProps) {
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Verified</TableHead>
-                    {mmPool.draw_completed && <TableHead>Assigned Team</TableHead>}
-                    {mmPool.draw_completed && <TableHead>Status</TableHead>}
+                    {mmPool.draw_completed && <TableHead>{mmPool.teams_linked ? 'Assigned Team' : 'Assigned Position'}</TableHead>}
+                    {mmPool.teams_linked && <TableHead>Status</TableHead>}
                     {!mmPool.draw_completed && (
                       <TableHead className="w-16"></TableHead>
                     )}
@@ -337,19 +348,23 @@ export default async function MarchMadnessEntriesPage({ params }: PageProps) {
                         </TableCell>
                         {mmPool.draw_completed && (
                           <TableCell>
-                            {team ? (
+                            {mmPool.teams_linked && team ? (
                               <div className="flex items-center gap-1.5">
                                 <span className="text-xs font-bold text-muted-foreground bg-muted px-1 py-0.5 rounded">
                                   #{team.seed}
                                 </span>
                                 <span>{team.bb_teams?.name || 'Unknown'}</span>
                               </div>
+                            ) : entry.assigned_region && entry.assigned_seed ? (
+                              <span className="text-sm">
+                                {entry.assigned_region} #{entry.assigned_seed} Seed
+                              </span>
                             ) : (
                               <span className="text-muted-foreground">—</span>
                             )}
                           </TableCell>
                         )}
-                        {mmPool.draw_completed && (
+                        {mmPool.teams_linked && (
                           <TableCell>
                             <Badge
                               variant={entry.eliminated ? 'secondary' : 'default'}

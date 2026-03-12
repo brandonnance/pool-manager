@@ -33,6 +33,7 @@ interface PoolData {
   id: string
   pool_id: string
   draw_completed: boolean
+  teams_linked: boolean
   pools: {
     name: string
   }
@@ -51,7 +52,7 @@ export default function PublicEntryListPage({ params }: { params: Promise<{ slug
 
       const { data: poolData, error: poolError } = await supabase
         .from('mm_pools')
-        .select('id, pool_id, draw_completed, pools(name)')
+        .select('id, pool_id, draw_completed, teams_linked, pools(name)')
         .eq('public_slug', slug)
         .single()
 
@@ -126,9 +127,13 @@ export default function PublicEntryListPage({ params }: { params: Promise<{ slug
               <div className="px-3 py-1 rounded-full bg-primary/10 text-primary font-medium">
                 {approvedCount}/64 entries
               </div>
-              {pool.draw_completed ? (
+              {pool.draw_completed && pool.teams_linked ? (
                 <div className="px-3 py-1 rounded-full bg-green-100 text-green-700 font-medium">
                   Draw Complete
+                </div>
+              ) : pool.draw_completed ? (
+                <div className="px-3 py-1 rounded-full bg-amber-100 text-amber-700 font-medium">
+                  Positions Drawn
                 </div>
               ) : isFull ? (
                 <div className="px-3 py-1 rounded-full bg-amber-100 text-amber-700 font-medium">

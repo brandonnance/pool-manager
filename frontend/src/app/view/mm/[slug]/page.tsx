@@ -77,6 +77,7 @@ export default async function PublicMarchMadnessPage({ params }: PageProps) {
       pool_id,
       tournament_year,
       draw_completed,
+      teams_linked,
       public_slug
     `)
     .eq('public_slug', slug)
@@ -100,7 +101,7 @@ export default async function PublicMarchMadnessPage({ params }: PageProps) {
   // Get entries (public data only)
   const { data: entriesData } = await supabase
     .from('mm_entries')
-    .select('id, mm_pool_id, user_id, current_team_id, original_team_id, eliminated, eliminated_round, display_name, total_payout')
+    .select('id, mm_pool_id, user_id, current_team_id, original_team_id, eliminated, eliminated_round, display_name, total_payout, assigned_region, assigned_seed')
     .eq('mm_pool_id', mmPool.id)
 
   // Get pool teams
@@ -122,6 +123,8 @@ export default async function PublicMarchMadnessPage({ params }: PageProps) {
   const entries: MmEntry[] = (entriesData ?? []).map(e => ({
     ...e,
     total_payout: Number(e.total_payout) || 0,
+    assigned_region: e.assigned_region ?? null,
+    assigned_seed: e.assigned_seed ?? null,
   }))
 
   const poolTeams: MmPoolTeam[] = (poolTeamsData ?? []).map(t => ({
@@ -157,7 +160,9 @@ export default async function PublicMarchMadnessPage({ params }: PageProps) {
   // Check setup status
   const teamsReady = poolTeams.length === 64
   const drawReady = mmPool.draw_completed
-  const needsSetup = !teamsReady || !drawReady
+  const teamsLinked = mmPool.teams_linked
+  const isPreDrawDone = drawReady && !teamsLinked
+  const needsSetup = !drawReady || !teamsLinked
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -172,8 +177,10 @@ export default async function PublicMarchMadnessPage({ params }: PageProps) {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              {drawReady ? (
+              {teamsLinked ? (
                 <Badge variant="default">Draw Complete</Badge>
+              ) : isPreDrawDone ? (
+                <Badge variant="outline" className="border-amber-500 text-amber-600">Positions Drawn</Badge>
               ) : (
                 <Badge variant="secondary">Setup in Progress</Badge>
               )}
@@ -183,8 +190,35 @@ export default async function PublicMarchMadnessPage({ params }: PageProps) {
       </header>
 
       <main className="max-w-7xl mx-auto p-4 space-y-6">
-        {/* Setup in progress message */}
+        {/* Setup in progress or pre-draw view */}
         {needsSetup ? (
+          isPreDrawDone ? (
+          <>
+            <Card>
+              <CardContent className="py-6 text-center">
+                <h3 className="text-lg font-semibold mb-2">Position Draw Complete</h3>
+                <p className="text-muted-foreground mb-4">
+                  Bracket positions have been drawn. Waiting for tournament teams to be announced and linked.
+                </p>
+                <div className="flex justify-center gap-4">
+                  <Badge variant="outline">
+                    {poolTeams.length}/64 Teams Loaded
+                  </Badge>
+                  <Badge variant="default">
+                    64/64 Entries
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
+            <TeamDrawDisplay
+              entries={entries}
+              poolTeams={poolTeams}
+              currentUserId={null}
+              drawCompleted={mmPool.draw_completed}
+              teamsLinked={false}
+            />
+          </>
+          ) : (
           <Card>
             <CardContent className="py-8 text-center">
               <h3 className="text-lg font-semibold mb-2">Pool Setup in Progress</h3>
@@ -201,6 +235,7 @@ export default async function PublicMarchMadnessPage({ params }: PageProps) {
               </div>
             </CardContent>
           </Card>
+          )
         ) : (
           <>
             {/* Stats bar */}
@@ -262,6 +297,7 @@ export default async function PublicMarchMadnessPage({ params }: PageProps) {
                   poolTeams={poolTeams}
                   currentUserId={null}
                   drawCompleted={mmPool.draw_completed}
+                  teamsLinked={mmPool.teams_linked}
                 />
               </TabsContent>
             </Tabs>

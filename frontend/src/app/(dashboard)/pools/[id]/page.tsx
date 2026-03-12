@@ -37,6 +37,7 @@ import { SingleGameContent } from '@/components/squares/single-game-content'
 import { PlayoffContent } from '@/components/squares/playoff-content'
 import { MmPublicUrlCard } from '@/components/march-madness/mm-public-url-card'
 import { RandomDrawButton } from '@/components/march-madness/random-draw-button'
+import { LinkTeamsButton } from '@/components/march-madness/link-teams-button'
 import { GolfStandingsWrapper } from '@/components/golf/golf-standings-wrapper'
 import { getPoolPermissions } from '@/lib/permissions'
 import { getPoolBaseData } from '@/lib/data/pool'
@@ -307,15 +308,19 @@ export default async function PoolDetailPage({ params }: PageProps) {
                   {/* Draw Status */}
                   <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                     <div>
-                      <p className="text-sm font-medium">Team Draw</p>
+                      <p className="text-sm font-medium">Draw Status</p>
                       <p className="text-sm text-muted-foreground">
-                        {mmPoolData.draw_completed
+                        {mmPoolData.draw_completed && mmPoolData.teams_linked
                           ? `Completed ${mmPoolData.draw_completed_at ? new Date(mmPoolData.draw_completed_at).toLocaleDateString() : ''}`
-                          : 'Not yet drawn'}
+                          : mmPoolData.draw_completed
+                            ? 'Positions drawn, awaiting team linking'
+                            : 'Not yet drawn'}
                       </p>
                     </div>
-                    <Badge variant={mmPoolData.draw_completed ? 'default' : 'secondary'}>
-                      {mmPoolData.draw_completed ? 'Drawn' : 'Pending'}
+                    <Badge variant={mmPoolData.teams_linked ? 'default' : mmPoolData.draw_completed ? 'outline' : 'secondary'}
+                      className={mmPoolData.draw_completed && !mmPoolData.teams_linked ? 'border-amber-500 text-amber-600' : ''}
+                    >
+                      {mmPoolData.teams_linked ? 'Complete' : mmPoolData.draw_completed ? 'Positions Drawn' : 'Pending'}
                     </Badge>
                   </div>
 
@@ -344,8 +349,8 @@ export default async function PoolDetailPage({ params }: PageProps) {
               </CardContent>
             </Card>
 
-            {/* Quick Stats */}
-            {mmPoolData.draw_completed && (
+            {/* Quick Stats - only show when teams linked (games exist) */}
+            {mmPoolData.teams_linked && (
               <Card>
                 <CardHeader>
                   <CardTitle>Tournament Progress</CardTitle>
@@ -389,7 +394,8 @@ export default async function PoolDetailPage({ params }: PageProps) {
                       Manage Entries
                     </Link>
                   </Button>
-                  {mmPoolTeamsData.length === 64 && mmEntriesData.length === 64 && !mmPoolData.draw_completed && (
+                  {/* Draw button: show when entries=64 and draw not done (works with 0 or 64 teams) */}
+                  {mmEntriesData.length === 64 && !mmPoolData.draw_completed && (mmPoolTeamsData.length === 0 || mmPoolTeamsData.length === 64) && (
                     <RandomDrawButton
                       mmPoolId={mmPoolData.id}
                       entryCount={mmEntriesData.length}
@@ -397,7 +403,15 @@ export default async function PoolDetailPage({ params }: PageProps) {
                       drawCompleted={mmPoolData.draw_completed}
                     />
                   )}
-                  {mmPoolData.draw_completed && (
+                  {/* Link Teams button: show when pre-draw done, teams loaded, not yet linked */}
+                  {mmPoolData.draw_completed && !mmPoolData.teams_linked && mmPoolTeamsData.length === 64 && (
+                    <LinkTeamsButton
+                      mmPoolId={mmPoolData.id}
+                      teamCount={mmPoolTeamsData.length}
+                      teamsLinked={mmPoolData.teams_linked}
+                    />
+                  )}
+                  {mmPoolData.teams_linked && (
                     <Button variant="outline" className="w-full" asChild>
                       <Link href={`/pools/${id}/march-madness/games`}>
                         Enter Scores
