@@ -17,6 +17,7 @@ import {
 
 interface RandomDrawButtonProps {
   mmPoolId: string
+  poolId?: string
   entryCount: number
   teamCount: number
   drawCompleted: boolean
@@ -25,6 +26,7 @@ interface RandomDrawButtonProps {
 
 export function RandomDrawButton({
   mmPoolId,
+  poolId,
   entryCount,
   teamCount,
   drawCompleted,
@@ -54,7 +56,11 @@ export function RandomDrawButton({
         throw new Error(data.error || 'Failed to run draw')
       }
 
-      router.refresh()
+      if (poolId) {
+        router.push(`/pools/${poolId}/march-madness`)
+      } else {
+        router.refresh()
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {

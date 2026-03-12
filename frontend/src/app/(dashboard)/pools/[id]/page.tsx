@@ -398,6 +398,7 @@ export default async function PoolDetailPage({ params }: PageProps) {
                   {mmEntriesData.length === 64 && !mmPoolData.draw_completed && (mmPoolTeamsData.length === 0 || mmPoolTeamsData.length === 64) && (
                     <RandomDrawButton
                       mmPoolId={mmPoolData.id}
+                      poolId={id}
                       entryCount={mmEntriesData.length}
                       teamCount={mmPoolTeamsData.length}
                       drawCompleted={mmPoolData.draw_completed}
