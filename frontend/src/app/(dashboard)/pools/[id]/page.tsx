@@ -36,6 +36,7 @@ import { SuperAdminJoinPoolButton } from '@/components/pools/super-admin-join-po
 import { SingleGameContent } from '@/components/squares/single-game-content'
 import { PlayoffContent } from '@/components/squares/playoff-content'
 import { MmPublicUrlCard } from '@/components/march-madness/mm-public-url-card'
+import { RandomDrawButton } from '@/components/march-madness/random-draw-button'
 import { GolfStandingsWrapper } from '@/components/golf/golf-standings-wrapper'
 import { getPoolPermissions } from '@/lib/permissions'
 import { getPoolBaseData } from '@/lib/data/pool'
@@ -388,6 +389,14 @@ export default async function PoolDetailPage({ params }: PageProps) {
                       Manage Entries
                     </Link>
                   </Button>
+                  {mmPoolTeamsData.length === 64 && mmEntriesData.length === 64 && !mmPoolData.draw_completed && (
+                    <RandomDrawButton
+                      mmPoolId={mmPoolData.id}
+                      entryCount={mmEntriesData.length}
+                      teamCount={mmPoolTeamsData.length}
+                      drawCompleted={mmPoolData.draw_completed}
+                    />
+                  )}
                   {mmPoolData.draw_completed && (
                     <Button variant="outline" className="w-full" asChild>
                       <Link href={`/pools/${id}/march-madness/games`}>

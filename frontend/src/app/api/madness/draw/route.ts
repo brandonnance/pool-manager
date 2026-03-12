@@ -274,7 +274,7 @@ export async function POST(request: NextRequest) {
         .eq('id', mmPoolId),
       supabase
         .from('pools')
-        .update({ status: 'open' })
+        .update({ status: 'locked' })
         .eq('id', mmPool.pool_id),
     ])
 
