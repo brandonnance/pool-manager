@@ -38,6 +38,7 @@ import { PlayoffContent } from '@/components/squares/playoff-content'
 import { MmPublicUrlCard } from '@/components/march-madness/mm-public-url-card'
 import { RandomDrawButton } from '@/components/march-madness/random-draw-button'
 import { LinkTeamsButton } from '@/components/march-madness/link-teams-button'
+import { DemoSeedButton } from '@/components/march-madness/demo-seed-button'
 import { GolfStandingsWrapper } from '@/components/golf/golf-standings-wrapper'
 import { getPoolPermissions } from '@/lib/permissions'
 import { getPoolBaseData } from '@/lib/data/pool'
@@ -420,6 +421,10 @@ export default async function PoolDetailPage({ params }: PageProps) {
                         Enter Scores
                       </Link>
                     </Button>
+                  )}
+                  {/* Super admin: seed mock teams for testing */}
+                  {isSuperAdmin && mmPoolTeamsData.length < 64 && (
+                    <DemoSeedButton mmPoolId={mmPoolData.id} variant="teams" className="w-full" />
                   )}
                 </CardContent>
               </Card>

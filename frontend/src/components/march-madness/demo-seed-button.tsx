@@ -14,9 +14,10 @@ import { Beaker, Users, Trophy, RotateCcw } from 'lucide-react'
 interface DemoSeedButtonProps {
   mmPoolId: string
   variant?: 'teams' | 'entries' | 'full'
+  className?: string
 }
 
-export function DemoSeedButton({ mmPoolId, variant = 'full' }: DemoSeedButtonProps) {
+export function DemoSeedButton({ mmPoolId, variant = 'full', className }: DemoSeedButtonProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const router = useRouter()
@@ -56,7 +57,7 @@ export function DemoSeedButton({ mmPoolId, variant = 'full' }: DemoSeedButtonPro
           size="sm"
           onClick={() => runAction('seed_teams')}
           disabled={isLoading}
-          className="gap-2"
+          className={`gap-2 ${className ?? ''}`}
         >
           <Beaker className="h-4 w-4" />
           {isLoading ? 'Seeding...' : 'Seed Demo Bracket'}
