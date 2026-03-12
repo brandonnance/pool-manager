@@ -17,6 +17,7 @@ import {
 
 interface LinkTeamsButtonProps {
   mmPoolId: string
+  poolId?: string
   teamCount: number
   teamsLinked: boolean
   className?: string
@@ -24,6 +25,7 @@ interface LinkTeamsButtonProps {
 
 export function LinkTeamsButton({
   mmPoolId,
+  poolId,
   teamCount,
   teamsLinked,
   className,
@@ -50,7 +52,11 @@ export function LinkTeamsButton({
         throw new Error(data.error || 'Failed to link teams')
       }
 
-      router.refresh()
+      if (poolId) {
+        router.push(`/pools/${poolId}/march-madness`)
+      } else {
+        router.refresh()
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
@@ -75,24 +81,28 @@ export function LinkTeamsButton({
   }
 
   return (
-    <AlertDialog>
+    <AlertDialog open={isLinking ? true : undefined}>
       <AlertDialogTrigger asChild>
-        <Button className={className}>Link Teams to Entries</Button>
+        <Button disabled={isLinking} className={className}>
+          {isLinking ? 'Linking...' : 'Link Teams to Entries'}
+        </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Link Teams to Entries?</AlertDialogTitle>
+          <AlertDialogTitle>
+            {isLinking ? 'Linking Teams...' : 'Link Teams to Entries?'}
+          </AlertDialogTitle>
           <AlertDialogDescription>
-            This will link the 64 loaded teams to the existing position assignments
-            and generate all 63 tournament games. The pool will be locked for play.
-            This action cannot be undone.
+            {isLinking
+              ? 'Please wait while teams are being linked and games are generated. This may take a moment.'
+              : 'This will link the 64 loaded teams to the existing position assignments and generate all 63 tournament games. The pool will be locked for play. This action cannot be undone.'}
           </AlertDialogDescription>
         </AlertDialogHeader>
         {error && (
           <p className="text-sm text-destructive">{error}</p>
         )}
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={isLinking}>Cancel</AlertDialogCancel>
           <AlertDialogAction onClick={handleLink} disabled={isLinking}>
             {isLinking ? 'Linking...' : 'Link Teams'}
           </AlertDialogAction>

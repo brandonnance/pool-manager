@@ -410,6 +410,7 @@ export default async function PoolDetailPage({ params }: PageProps) {
                   {mmPoolData.draw_completed && !mmPoolData.teams_linked && mmPoolTeamsData.length === 64 && (
                     <LinkTeamsButton
                       mmPoolId={mmPoolData.id}
+                      poolId={id}
                       teamCount={mmPoolTeamsData.length}
                       teamsLinked={mmPoolData.teams_linked}
                       className="w-full"
