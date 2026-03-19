@@ -94,7 +94,7 @@ function parseRegionFromNotes(notes?: ESPNNote[]): string | null {
   if (!notes) return null
   for (const note of notes) {
     if (note.headline) {
-      const match = note.headline.match(/^(East|West|South|Midwest)\s+Region/i)
+      const match = note.headline.match(/(East|West|South|Midwest)\s+Region/i)
       if (match) return match[1]
     }
   }
