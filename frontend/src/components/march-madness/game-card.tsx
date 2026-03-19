@@ -2,6 +2,7 @@
 
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
+import { OverrideAdvancementDialog } from './override-advancement-dialog'
 
 export interface MmGame {
   id: string
@@ -50,6 +51,7 @@ export interface MmEntry {
 
 interface GameCardProps {
   game: MmGame
+  poolId: string
   poolTeams: MmPoolTeam[]
   entries: MmEntry[]
   currentUserId: string | null
@@ -90,6 +92,7 @@ function getStatusBadge(status: string) {
 
 export function GameCard({
   game,
+  poolId,
   poolTeams,
   entries,
   currentUserId,
@@ -313,6 +316,19 @@ export function GameCard({
               >
                 {hasScores ? 'Edit Score' : 'Enter Score'}
               </button>
+            )}
+            {isFinal && advancingEntry && (
+              <OverrideAdvancementDialog
+                game={game}
+                poolId={poolId}
+                poolTeams={poolTeams}
+                entries={entries}
+                trigger={
+                  <button className="text-xs px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-md transition-colors">
+                    Override
+                  </button>
+                }
+              />
             )}
           </div>
         )}

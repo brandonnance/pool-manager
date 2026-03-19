@@ -48,6 +48,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { EnterScoreDialog, EnterSpreadDialog } from '@/components/march-madness'
+import { OverrideAdvancementDialog } from '@/components/march-madness/override-advancement-dialog'
 import { getPoolPermissions } from '@/lib/permissions'
 
 interface PageProps {
@@ -120,7 +121,14 @@ export default async function MarchMadnessGamesPage({ params }: PageProps) {
     .select('*, bb_teams (id, name, abbrev)')
     .eq('mm_pool_id', mmPool.id)
 
+  // Get entries for override dialog
+  const { data: entries } = await supabase
+    .from('mm_entries')
+    .select('id, mm_pool_id, user_id, display_name, current_team_id, original_team_id, eliminated, eliminated_round, total_payout, assigned_region, assigned_seed')
+    .eq('mm_pool_id', mmPool.id)
+
   const teamById = new Map(poolTeams?.map(t => [t.id, t]) ?? [])
+  const entryById = new Map(entries?.map(e => [e.id, e]) ?? [])
 
   // Group games by round
   const gamesByRound = ROUND_ORDER.map(round => ({
@@ -217,6 +225,8 @@ export default async function MarchMadnessGamesPage({ params }: PageProps) {
                   {roundGames.map((game) => {
                     const higherTeam = game.higher_seed_team_id ? teamById.get(game.higher_seed_team_id) : undefined
                     const lowerTeam = game.lower_seed_team_id ? teamById.get(game.lower_seed_team_id) : undefined
+                    const higherEntry = game.higher_seed_entry_id ? entryById.get(game.higher_seed_entry_id) : undefined
+                    const lowerEntry = game.lower_seed_entry_id ? entryById.get(game.lower_seed_entry_id) : undefined
 
                     const isFinal = game.status === 'final'
                     const isLive = game.status === 'in_progress'
@@ -252,42 +262,66 @@ export default async function MarchMadnessGamesPage({ params }: PageProps) {
                         {/* Teams */}
                         <div className="space-y-2 mb-3">
                           {/* Higher seed (favorite) */}
-                          <div className={`flex items-center justify-between ${
+                          <div className={`${
                             higherWins && isFinal ? 'font-semibold text-emerald-700' : ''
                           }`}>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground w-4">
-                                {higherTeam?.seed}
-                              </span>
-                              <span className="truncate text-sm">
-                                {higherTeam?.bb_teams?.abbrev || higherTeam?.bb_teams?.name || 'TBD'}
-                              </span>
-                              {game.spread !== null && (
-                                <span className="text-xs text-muted-foreground">
-                                  ({game.spread > 0 ? '+' : ''}{game.spread})
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground w-4">
+                                  {higherTeam?.seed}
                                 </span>
-                              )}
+                                <span className="truncate text-sm">
+                                  {higherTeam?.bb_teams?.abbrev || higherTeam?.bb_teams?.name || 'TBD'}
+                                </span>
+                                {game.spread !== null && (
+                                  <span className="text-xs text-muted-foreground">
+                                    ({game.spread > 0 ? '+' : ''}{game.spread})
+                                  </span>
+                                )}
+                              </div>
+                              <span className="font-mono font-bold">
+                                {game.higher_seed_score ?? '-'}
+                              </span>
                             </div>
-                            <span className="font-mono font-bold">
-                              {game.higher_seed_score ?? '-'}
-                            </span>
+                            {higherEntry && (
+                              <div className={`text-xs ml-6 ${
+                                isFinal && game.advancing_entry_id === higherEntry.id
+                                  ? 'text-emerald-600 font-medium'
+                                  : isFinal ? 'text-muted-foreground line-through' : 'text-muted-foreground'
+                              }`}>
+                                {higherEntry.display_name}
+                                {isFinal && game.advancing_entry_id === higherEntry.id && ' ✓'}
+                              </div>
+                            )}
                           </div>
 
                           {/* Lower seed */}
-                          <div className={`flex items-center justify-between ${
+                          <div className={`${
                             lowerWins && isFinal ? 'font-semibold text-emerald-700' : ''
                           }`}>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground w-4">
-                                {lowerTeam?.seed}
-                              </span>
-                              <span className="truncate text-sm">
-                                {lowerTeam?.bb_teams?.abbrev || lowerTeam?.bb_teams?.name || 'TBD'}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground w-4">
+                                  {lowerTeam?.seed}
+                                </span>
+                                <span className="truncate text-sm">
+                                  {lowerTeam?.bb_teams?.abbrev || lowerTeam?.bb_teams?.name || 'TBD'}
+                                </span>
+                              </div>
+                              <span className="font-mono font-bold">
+                                {game.lower_seed_score ?? '-'}
                               </span>
                             </div>
-                            <span className="font-mono font-bold">
-                              {game.lower_seed_score ?? '-'}
-                            </span>
+                            {lowerEntry && (
+                              <div className={`text-xs ml-6 ${
+                                isFinal && game.advancing_entry_id === lowerEntry.id
+                                  ? 'text-emerald-600 font-medium'
+                                  : isFinal ? 'text-muted-foreground line-through' : 'text-muted-foreground'
+                              }`}>
+                                {lowerEntry.display_name}
+                                {isFinal && game.advancing_entry_id === lowerEntry.id && ' ✓'}
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -312,6 +346,19 @@ export default async function MarchMadnessGamesPage({ params }: PageProps) {
                             currentStatus={game.status}
                             spread={game.spread}
                           />
+                          {isFinal && game.advancing_entry_id && (
+                            <OverrideAdvancementDialog
+                              game={game}
+                              poolId={id}
+                              poolTeams={poolTeams ?? []}
+                              entries={entries ?? []}
+                              trigger={
+                                <button className="text-xs px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-md transition-colors">
+                                  Override
+                                </button>
+                              }
+                            />
+                          )}
                         </div>
                       </div>
                     )
