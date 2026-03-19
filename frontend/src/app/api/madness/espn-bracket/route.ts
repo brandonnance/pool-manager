@@ -56,6 +56,7 @@ interface ESPNEvent {
   date: string
   name: string
   competitions: ESPNCompetition[]
+  notes?: ESPNNote[]
 }
 
 interface ESPNScoreboardResponse {
@@ -156,19 +157,25 @@ async function fetchR64BracketFromESPN(): Promise<{ games: ParsedR64Game[]; erro
       // R64 seeds are 1-16
       if (homeSeed > 16 || awaySeed > 16) continue
 
-      // Parse region from competition notes or event-level notes
+      // Parse region from competition notes, then event-level notes
       let region = parseRegionFromNotes(competition.notes)
       if (!region) {
-        // Try event-level notes if competition notes don't have it
-        const eventWithNotes = event as ESPNEvent & { competitions: Array<ESPNCompetition & { notes?: ESPNNote[] }> }
-        region = parseRegionFromNotes(eventWithNotes.competitions[0]?.notes)
+        region = parseRegionFromNotes(event.notes)
+      }
+      // Last resort: try parsing from the event name itself (e.g. "East Regional")
+      if (!region) {
+        const nameMatch = event.name.match(/\b(East|West|South|Midwest)\b/i)
+        if (nameMatch) region = nameMatch[1]
       }
 
       if (!region) {
-        errors.push(`Could not determine region for ${event.name} (ESPN ID: ${event.id})`)
-        // Still include the game, we'll try to derive region later
-        region = 'Unknown'
+        errors.push(`Could not determine region for ${event.name} (ESPN ID: ${event.id}). Skipping.`)
+        continue
       }
+
+      // Normalize region capitalization
+      region = region.charAt(0).toUpperCase() + region.slice(1).toLowerCase()
+      if (region === 'Midwest') region = 'Midwest' // preserve full word
 
       const spread = parseSpread(competition.odds)
 
