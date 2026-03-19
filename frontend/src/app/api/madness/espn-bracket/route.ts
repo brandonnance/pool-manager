@@ -86,7 +86,7 @@ interface ParsedR64Game {
   }
 }
 
-type EspnAction = 'load_teams' | 'sync_games' | 'load_squares'
+type EspnAction = 'load_teams' | 'sync_games' | 'load_squares' | 'preview'
 
 // ─── ESPN Fetch + Parse ────────────────────────────────────────────────────────
 
@@ -255,6 +255,9 @@ export async function POST(request: NextRequest) {
     }
 
     switch (action) {
+      case 'preview':
+        return await previewESPNData()
+
       case 'load_teams':
         if (!mmPoolId) return NextResponse.json({ error: 'Missing mmPoolId' }, { status: 400 })
         return await loadTeamsFromESPN(supabase, mmPoolId)
@@ -274,6 +277,74 @@ export async function POST(request: NextRequest) {
     console.error('ESPN bracket error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
+}
+
+// ─── Action: preview (diagnostic) ──────────────────────────────────────────────
+
+async function previewESPNData() {
+  const dates = ['20260319', '20260320']
+  const diagnostics: Array<{
+    date: string
+    eventCount: number
+    events: Array<{
+      id: string
+      name: string
+      homeTeam: string
+      homeSeed: number | undefined
+      awayTeam: string
+      awaySeed: number | undefined
+      hasNotes: boolean
+      region: string | null
+      hasOdds: boolean
+    }>
+  }> = []
+
+  for (const date of dates) {
+    const url = `https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?groups=100&dates=${date}&limit=100`
+    const response = await fetch(url, { headers: { 'Accept': 'application/json' }, cache: 'no-store' })
+
+    if (!response.ok) {
+      diagnostics.push({ date, eventCount: -1, events: [] })
+      continue
+    }
+
+    const data: ESPNScoreboardResponse = await response.json()
+    const events = (data.events || []).map(event => {
+      const comp = event.competitions[0]
+      const home = comp?.competitors?.find(c => c.homeAway === 'home')
+      const away = comp?.competitors?.find(c => c.homeAway === 'away')
+      return {
+        id: event.id,
+        name: event.name,
+        homeTeam: home?.team?.displayName || 'N/A',
+        homeSeed: home?.curatedRank?.current,
+        awayTeam: away?.team?.displayName || 'N/A',
+        awaySeed: away?.curatedRank?.current,
+        hasNotes: !!(comp?.notes && comp.notes.length > 0) || !!(event.notes && event.notes.length > 0),
+        region: parseRegionFromNotes(comp?.notes) || parseRegionFromNotes(event.notes),
+        hasOdds: !!(comp?.odds && comp.odds.length > 0),
+      }
+    })
+
+    diagnostics.push({ date, eventCount: events.length, events })
+  }
+
+  // Also run the full parse to compare
+  const { games, errors } = await fetchR64BracketFromESPN()
+
+  return NextResponse.json({
+    rawDiagnostics: diagnostics,
+    parsedGameCount: games.length,
+    parseErrors: errors,
+    parsedGames: games.map(g => ({
+      espnGameId: g.espnGameId,
+      region: g.region,
+      home: `(${g.homeTeam.seed}) ${g.homeTeam.shortName}`,
+      away: `(${g.awayTeam.seed}) ${g.awayTeam.shortName}`,
+      spread: g.spread,
+      gameTime: g.gameTime,
+    })),
+  })
 }
 
 // ─── Action: load_teams ────────────────────────────────────────────────────────
