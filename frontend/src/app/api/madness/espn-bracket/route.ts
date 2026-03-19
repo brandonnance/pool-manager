@@ -546,20 +546,17 @@ async function syncGamesFromESPN(
       continue
     }
 
-    // Determine spread: ESPN spread is typically from the home team's perspective
-    // We want it from the higher seed's perspective (negative = higher seed favored)
+    // ESPN spread: negative = home team favored
+    // App convention: negative = higher seed favored
+    // Convert from home perspective to higher-seed perspective
     let spread = espnGame.spread
     if (spread !== null) {
-      // ESPN spread: negative means home team is favored
-      // If higher seed is the away team, flip the sign
       const higherSeedIsHome = espnGame.homeTeam.seed === higherInfo.seed
       if (!higherSeedIsHome) {
+        // Higher seed is away, flip ESPN's home-based spread
         spread = -spread
       }
-      // Make spread always represent higher seed (negative = favored)
-      // Actually, keep it simple: store the absolute spread as a positive number
-      // since the higher seed is always expected to be favored
-      spread = Math.abs(spread)
+      // No abs() — keep sign: negative = higher seed favored, positive = underdog
     }
 
     const { error: updateError } = await supabase
@@ -643,9 +640,9 @@ async function loadSquaresFromESPN(
       ? espnGame.homeTeam
       : espnGame.awayTeam
 
-    // Build rich game name with region
+    // Build game name matching "away @ home" display order
     const regionPrefix = espnGame.region !== 'Unknown' ? `${espnGame.region}: ` : ''
-    const gameName = `${regionPrefix}(${higherSeedTeam.seed}) ${higherSeedTeam.shortName} vs (${lowerSeedTeam.seed}) ${lowerSeedTeam.shortName}`
+    const gameName = `${regionPrefix}(${lowerSeedTeam.seed}) ${lowerSeedTeam.shortName} @ (${higherSeedTeam.seed}) ${higherSeedTeam.shortName}`
 
     // Use ESPN home/away designation for squares grid
     const { error: updateError } = await supabase
