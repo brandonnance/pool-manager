@@ -119,7 +119,7 @@ function EntrySearch({ entries, selectedEntryId, onSelect }: EntrySearchProps) {
 
 type Region = "East" | "West" | "South" | "Midwest";
 
-const REGIONS: Region[] = ["East", "West", "South", "Midwest"];
+const REGIONS: Region[] = ["East", "West", "Midwest", "South"];
 
 // Matchup slot component - shows one team in a matchup
 interface TeamSlotProps {
@@ -645,7 +645,7 @@ export function BracketView({
       {/* Desktop bracket view - true bracket layout */}
       <div className="hidden xl:block overflow-x-auto">
         <div className="min-w-[1200px] px-2">
-          {/* Top half: East (left→) and South (←right) */}
+          {/* Top half: East (left→) and West (←right) */}
           <div className="flex justify-center gap-4 items-start mb-4">
             <RegionColumn
               region="East"
@@ -657,8 +657,8 @@ export function BracketView({
               flowDirection="right"
             />
             <RegionColumn
-              region="South"
-              games={gamesByRegion.get("South") || []}
+              region="West"
+              games={gamesByRegion.get("West") || []}
               poolTeams={poolTeams}
               entries={entries}
               currentUserId={currentUserId}
@@ -678,11 +678,11 @@ export function BracketView({
             />
           </div>
 
-          {/* Bottom half: West (left→) and Midwest (←right) */}
+          {/* Bottom half: South (left→) and Midwest (←right) */}
           <div className="flex justify-center gap-4 items-end mt-4">
             <RegionColumn
-              region="West"
-              games={gamesByRegion.get("West") || []}
+              region="South"
+              games={gamesByRegion.get("South") || []}
               poolTeams={poolTeams}
               entries={entries}
               currentUserId={currentUserId}
@@ -927,7 +927,7 @@ function MobileRoundView({
     .filter((g) => g.round === round)
     .sort((a, b) => {
       // Sort by region, then game number
-      const regionOrder = ["East", "West", "South", "Midwest"];
+      const regionOrder = ["East", "West", "Midwest", "South"];
       const aRegion = regionOrder.indexOf(a.region || "");
       const bRegion = regionOrder.indexOf(b.region || "");
       if (aRegion !== bRegion) return aRegion - bRegion;
