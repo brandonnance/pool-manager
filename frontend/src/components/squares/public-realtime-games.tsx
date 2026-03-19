@@ -320,9 +320,9 @@ export function PublicRealtimeGames({
   const isPlayoffPool = games.some((g) => g.round !== 'single_game')
 
   return (
-    <div className="grid gap-6 lg:grid-cols-3">
+    <div className={cn("grid gap-6", isPlayoffPool ? "lg:grid-cols-4" : "lg:grid-cols-3")}>
       {/* Games Column */}
-      <div className="lg:col-span-2 space-y-4">
+      <div className={cn(isPlayoffPool ? "lg:col-span-3" : "lg:col-span-2", "space-y-4")}>
         <h2 className="text-lg font-semibold">Games</h2>
 
         <div className="grid gap-4 sm:grid-cols-2">
