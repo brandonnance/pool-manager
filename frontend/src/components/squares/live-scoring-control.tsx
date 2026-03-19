@@ -17,6 +17,7 @@ interface LiveScoringControlProps {
   reverseScoring: boolean
   rowNumbers: number[] | null
   colNumbers: number[] | null
+  sport?: string
 }
 
 // Helper function to get winner name from square
@@ -67,6 +68,7 @@ export function LiveScoringControl({
   reverseScoring,
   rowNumbers,
   colNumbers,
+  sport,
 }: LiveScoringControlProps) {
   const router = useRouter()
   const [isPolling, setIsPolling] = useState(false)
@@ -85,7 +87,8 @@ export function LiveScoringControl({
     setError(null)
 
     try {
-      const response = await fetch(`/api/squares/sync-score?espnGameId=${espnGameId}`)
+      const sportParam = sport ? `&sport=${sport}` : ''
+      const response = await fetch(`/api/squares/sync-score?espnGameId=${espnGameId}${sportParam}`)
 
       if (!response.ok) {
         const data = await response.json()

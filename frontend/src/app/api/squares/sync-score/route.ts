@@ -99,9 +99,14 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Fetch the NFL scoreboard from ESPN
-    // Using seasontype=3 for playoffs
-    const espnUrl = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=3'
+    // Determine which ESPN scoreboard to fetch based on sport param
+    const sport = searchParams.get('sport') || 'nfl'
+    let espnUrl: string
+    if (sport === 'ncaab' || sport === 'march_madness') {
+      espnUrl = 'https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?groups=100&limit=100'
+    } else {
+      espnUrl = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=3'
+    }
 
     const espnResponse = await fetch(espnUrl, {
       headers: {

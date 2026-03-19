@@ -397,6 +397,7 @@ function SimplePlayoffGameCard({
   squares,
   rowNumbers,
   colNumbers,
+  eventType,
 }: {
   game: SqGame
   isCommissioner: boolean
@@ -405,6 +406,7 @@ function SimplePlayoffGameCard({
   squares: Square[]
   rowNumbers: number[]
   colNumbers: number[]
+  eventType?: string
 }) {
   const hasScores = game.home_score !== null && game.away_score !== null
   const isFinal = game.status === 'final'
@@ -474,6 +476,7 @@ function SimplePlayoffGameCard({
             reverseScoring={reverseScoring}
             rowNumbers={rowNumbers}
             colNumbers={colNumbers}
+            sport={eventType === 'march_madness' ? 'ncaab' : undefined}
           />
         </div>
       )}
@@ -782,6 +785,7 @@ export function PlayoffContent({
                             squares={squares}
                             rowNumbers={rowNumbers ?? []}
                             colNumbers={colNumbers ?? []}
+                            eventType={eventType}
                           />
                         ))}
                       </div>
