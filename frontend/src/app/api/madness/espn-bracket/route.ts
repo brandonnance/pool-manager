@@ -477,13 +477,12 @@ async function syncGamesFromESPN(
   supabase: Awaited<ReturnType<typeof createClient>>,
   mmPoolId: string
 ) {
-  // Fetch R64 games from our DB — only unplayed games
+  // Fetch all R64 games — sync updates spreads to ESPN closing lines regardless of status
   const { data: mmGames, error: gamesError } = await supabase
     .from('mm_games')
     .select('id, round, region, game_number, status, higher_seed_team_id, lower_seed_team_id')
     .eq('mm_pool_id', mmPoolId)
     .eq('round', 'R64')
-    .in('status', ['scheduled', 'upcoming'])
 
   if (gamesError) {
     return NextResponse.json({ error: gamesError.message }, { status: 400 })
@@ -491,10 +490,8 @@ async function syncGamesFromESPN(
 
   if (!mmGames || mmGames.length === 0) {
     return NextResponse.json({
-      success: true,
-      message: 'No unplayed R64 games to sync — all games are in progress or final.',
-      updated: 0,
-    })
+      error: 'No R64 games found. Make sure Link Teams has been run first.',
+    }, { status: 400 })
   }
 
   // Fetch pool teams for region+seed lookup
@@ -585,7 +582,7 @@ async function syncGamesFromESPN(
 
   return NextResponse.json({
     success: true,
-    message: `Synced ${updatedCount}/${mmGames.length} unplayed R64 games with ESPN spreads`,
+    message: `Synced ${updatedCount}/${mmGames.length} R64 games with ESPN closing lines`,
     updated: updatedCount,
     errors: updateErrors.length > 0 ? updateErrors : undefined,
     espnErrors: errors.length > 0 ? errors : undefined,
