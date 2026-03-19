@@ -500,10 +500,11 @@ async function syncGamesFromESPN(
     return NextResponse.json({ error: 'No pool teams found' }, { status: 400 })
   }
 
-  // Build team_id -> { region, seed } map
+  // Build mm_pool_teams.id -> { region, seed } map
+  // (mm_games references mm_pool_teams.id, not bb_teams.id)
   const teamInfo = new Map<string, { region: string; seed: number }>()
   for (const pt of poolTeams) {
-    teamInfo.set(pt.team_id, { region: pt.region, seed: pt.seed })
+    teamInfo.set(pt.id, { region: pt.region, seed: pt.seed })
   }
 
   // Fetch ESPN bracket data
