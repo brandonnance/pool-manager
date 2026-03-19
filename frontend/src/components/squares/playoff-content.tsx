@@ -9,6 +9,7 @@ import { PoolSettings } from './pool-settings'
 import { AssignNameDialog } from './assign-name-dialog'
 import { BulkAssignDialog } from './bulk-assign-dialog'
 import { EditGameTeamsButton } from './edit-game-teams-button'
+import { EspnLoadSquaresButton } from './espn-load-squares-button'
 import { LiveScoringControl } from './live-scoring-control'
 import { ParticipantSummaryPanel } from './participant-summary-panel'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -757,6 +758,10 @@ export function PlayoffContent({
                 <CardDescription>{games.length} playoff games</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* ESPN load button for March Madness squares with TBD teams */}
+                {isCommissioner && eventType === 'march_madness' && games.some(g => g.round === 'mm_r64' && g.home_team === 'TBD') && (
+                  <EspnLoadSquaresButton sqPoolId={sqPoolId} poolId={poolId} className="w-full" />
+                )}
                 {roundOrder.map((round) => {
                   const roundGames = gamesByRound[round]
                   if (!roundGames || roundGames.length === 0) return null

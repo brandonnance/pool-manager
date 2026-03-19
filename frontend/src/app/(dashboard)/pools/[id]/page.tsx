@@ -39,6 +39,7 @@ import { MmPublicUrlCard } from '@/components/march-madness/mm-public-url-card'
 import { RandomDrawButton } from '@/components/march-madness/random-draw-button'
 import { LinkTeamsButton } from '@/components/march-madness/link-teams-button'
 import { DemoSeedButton } from '@/components/march-madness/demo-seed-button'
+import { EspnLoadButton } from '@/components/march-madness/espn-load-button'
 import { GolfStandingsWrapper } from '@/components/golf/golf-standings-wrapper'
 import { getPoolPermissions } from '@/lib/permissions'
 import { getPoolBaseData } from '@/lib/data/pool'
@@ -406,6 +407,15 @@ export default async function PoolDetailPage({ params }: PageProps) {
                       className="w-full"
                     />
                   )}
+                  {/* ESPN Load Teams: show when draw done, no teams loaded yet */}
+                  {mmPoolData.draw_completed && !mmPoolData.teams_linked && mmPoolTeamsData.length === 0 && (
+                    <EspnLoadButton
+                      mmPoolId={mmPoolData.id}
+                      poolId={id}
+                      variant="load_teams"
+                      className="w-full"
+                    />
+                  )}
                   {/* Link Teams button: show when pre-draw done, teams loaded, not yet linked */}
                   {mmPoolData.draw_completed && !mmPoolData.teams_linked && mmPoolTeamsData.length === 64 && (
                     <LinkTeamsButton
@@ -417,11 +427,19 @@ export default async function PoolDetailPage({ params }: PageProps) {
                     />
                   )}
                   {mmPoolData.teams_linked && (
-                    <Button variant="outline" className="w-full" asChild>
-                      <Link href={`/pools/${id}/march-madness/games`}>
-                        Enter Scores
-                      </Link>
-                    </Button>
+                    <>
+                      <Button variant="outline" className="w-full" asChild>
+                        <Link href={`/pools/${id}/march-madness/games`}>
+                          Enter Scores
+                        </Link>
+                      </Button>
+                      <EspnLoadButton
+                        mmPoolId={mmPoolData.id}
+                        poolId={id}
+                        variant="sync_games"
+                        className="w-full"
+                      />
+                    </>
                   )}
                   {/* Super admin: seed mock teams for testing */}
                   {isSuperAdmin && mmPoolTeamsData.length < 64 && (
