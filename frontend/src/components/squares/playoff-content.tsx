@@ -464,6 +464,25 @@ function SimplePlayoffGameCard({
           HT: {game.halftime_away_score} - {game.halftime_home_score}
         </div>
       )}
+      {/* Winner display for final/live games */}
+      {hasScores && (isFinal || game.status === 'in_progress') && rowNumbers.length > 0 && colNumbers.length > 0 && (() => {
+        const homeDigit = game.home_score! % 10
+        const awayDigit = game.away_score! % 10
+        const rowIdx = rowNumbers.indexOf(homeDigit)
+        const colIdx = colNumbers.indexOf(awayDigit)
+        const square = rowIdx !== -1 && colIdx !== -1
+          ? squares.find(s => s.row_index === rowIdx && s.col_index === colIdx)
+          : null
+        const winnerName = square?.participant_name ?? null
+        if (!winnerName) return null
+        return (
+          <div className={`mt-2 pt-2 border-t text-center text-xs ${isFinal ? 'border-emerald-200' : 'border-amber-200'}`}>
+            <span className={`inline-block px-2 py-0.5 rounded-full font-medium ${isFinal ? 'bg-emerald-50 text-emerald-700' : 'bg-emerald-100 text-emerald-700'}`}>
+              {winnerName}
+            </span>
+          </div>
+        )
+      })()}
       {/* Live scoring control for commissioners */}
       {isCommissioner && game.espn_game_id && (
         <div className="mt-2 pt-2 border-t">
