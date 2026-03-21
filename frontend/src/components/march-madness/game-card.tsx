@@ -301,12 +301,12 @@ export function GameCard({
         {/* Commissioner controls */}
         {isCommissioner && (
           <div className="mt-4 pt-3 border-t flex gap-2">
-            {!hasSpread && game.status === 'scheduled' && onEnterSpread && (
+            {!isFinal && onEnterSpread && (
               <button
                 onClick={onEnterSpread}
                 className="flex-1 text-xs px-3 py-1.5 bg-muted hover:bg-muted/80 rounded-md transition-colors"
               >
-                Enter Spread
+                {hasSpread ? 'Edit Spread' : 'Enter Spread'}
               </button>
             )}
             {onEnterScore && (
