@@ -327,7 +327,7 @@ export default async function MarchMadnessGamesPage({ params }: PageProps) {
 
                         {/* Actions */}
                         <div className="flex gap-2">
-                          {game.spread === null && game.status === 'scheduled' && (
+                          {game.status !== 'final' && (
                             <EnterSpreadDialog
                               gameId={game.id}
                               higherSeedTeamName={higherTeam?.bb_teams?.name || 'Higher Seed'}

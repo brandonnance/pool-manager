@@ -608,7 +608,7 @@ export function MarchMadnessContent({
               )}
               <div className="mt-2">
                 <Button variant="outline" size="sm" asChild>
-                  <Link href={`/pools/${poolId}/march-madness/scores`}>
+                  <Link href={`/pools/${poolId}/march-madness/games`}>
                     Enter Scores
                   </Link>
                 </Button>
