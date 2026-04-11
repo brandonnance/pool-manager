@@ -40,6 +40,7 @@ import { RandomDrawButton } from '@/components/march-madness/random-draw-button'
 import { LinkTeamsButton } from '@/components/march-madness/link-teams-button'
 import { DemoSeedButton } from '@/components/march-madness/demo-seed-button'
 import { EspnLoadButton } from '@/components/march-madness/espn-load-button'
+import { MmCompletePoolButton } from '@/components/march-madness/mm-complete-pool-button'
 import { GolfStandingsWrapper } from '@/components/golf/golf-standings-wrapper'
 import { getPoolPermissions } from '@/lib/permissions'
 import { getPoolBaseData } from '@/lib/data/pool'
@@ -444,6 +445,17 @@ export default async function PoolDetailPage({ params }: PageProps) {
                   {/* Super admin: seed mock teams for testing */}
                   {isSuperAdmin && mmPoolTeamsData.length < 64 && (
                     <DemoSeedButton mmPoolId={mmPoolData.id} variant="teams" className="w-full" />
+                  )}
+                  {/* Complete Pool: show once teams are linked and pool isn't already completed */}
+                  {mmPoolData.teams_linked && pool.status !== 'completed' && (
+                    <div className="pt-2 border-t">
+                      <MmCompletePoolButton
+                        poolId={id}
+                        allGamesFinal={mmGamesData.length > 0 && mmGamesData.every(g => g.status === 'final')}
+                        finalGamesCount={mmGamesData.filter(g => g.status === 'final').length}
+                        totalGamesCount={mmGamesData.length}
+                      />
+                    </div>
                   )}
                 </CardContent>
               </Card>
