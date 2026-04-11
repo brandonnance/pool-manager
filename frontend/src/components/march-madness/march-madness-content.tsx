@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Copy, ExternalLink, Check, X, Edit2 } from 'lucide-react'
+import { Copy, ExternalLink, Check, X, Edit2, CheckCircle2, Trophy } from 'lucide-react'
 import { BracketView } from './bracket-view'
 import { StandingsTable } from './standings-table'
 import { TeamDrawDisplay } from './team-draw-display'
@@ -39,6 +39,7 @@ interface MmPool {
 interface MarchMadnessContentProps {
   mmPool: MmPool
   poolId: string
+  poolStatus: string
   entries: MmEntry[]
   poolTeams: MmPoolTeam[]
   games: MmGame[]
@@ -50,10 +51,14 @@ interface MarchMadnessContentProps {
 interface CommissionerToolsCardProps {
   mmPoolId: string
   poolId: string
+  poolStatus: string
   publicSlug: string | null
+  allGamesFinal: boolean
+  finalGamesCount: number
+  totalGamesCount: number
 }
 
-function CommissionerToolsCard({ mmPoolId, poolId, publicSlug }: CommissionerToolsCardProps) {
+function CommissionerToolsCard({ mmPoolId, poolId, poolStatus, publicSlug, allGamesFinal, finalGamesCount, totalGamesCount }: CommissionerToolsCardProps) {
   const router = useRouter()
   const [isEditingSlug, setIsEditingSlug] = useState(false)
   const [slugInput, setSlugInput] = useState(publicSlug ?? '')
@@ -61,6 +66,31 @@ function CommissionerToolsCard({ mmPoolId, poolId, publicSlug }: CommissionerToo
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [origin, setOrigin] = useState('')
+  const [isCompleting, setIsCompleting] = useState(false)
+
+  const handleComplete = async () => {
+    if (!confirm('Are you sure you want to complete this pool? This will finalize standings and no more scores can be entered.')) {
+      return
+    }
+
+    setIsCompleting(true)
+    setError(null)
+
+    const supabase = createClient()
+
+    const { error: updateError } = await supabase
+      .from('pools')
+      .update({ status: 'completed' })
+      .eq('id', poolId)
+
+    if (updateError) {
+      setError(updateError.message)
+      setIsCompleting(false)
+      return
+    }
+
+    router.refresh()
+  }
 
   // Set origin on client-side only to avoid hydration mismatch
   useEffect(() => {
@@ -264,6 +294,38 @@ function CommissionerToolsCard({ mmPoolId, poolId, publicSlug }: CommissionerToo
             </Alert>
           )}
         </div>
+
+        {/* Complete Pool */}
+        {poolStatus !== 'completed' && (
+          <div className="pt-4 border-t">
+            {allGamesFinal ? (
+              <Button
+                onClick={handleComplete}
+                disabled={isCompleting}
+                className="w-full"
+              >
+                <CheckCircle2 className="size-4 mr-1.5" />
+                {isCompleting ? 'Completing...' : 'Complete Pool'}
+              </Button>
+            ) : (
+              <div className="text-sm text-muted-foreground bg-muted rounded-md p-3">
+                <p className="font-medium">Tournament in progress</p>
+                <p className="text-xs mt-1">
+                  {finalGamesCount} of {totalGamesCount} games final. Complete Pool will be available when all games are final.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {poolStatus === 'completed' && (
+          <div className="pt-4 border-t">
+            <div className="flex items-center gap-2 text-sm bg-amber-50 dark:bg-amber-950/20 text-amber-900 dark:text-amber-200 rounded-md p-3 border border-amber-200 dark:border-amber-900">
+              <Trophy className="size-4" />
+              <span className="font-medium">Pool Complete</span>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   )
@@ -272,6 +334,7 @@ function CommissionerToolsCard({ mmPoolId, poolId, publicSlug }: CommissionerToo
 export function MarchMadnessContent({
   mmPool,
   poolId,
+  poolStatus,
   entries,
   poolTeams,
   games,
@@ -619,7 +682,11 @@ export function MarchMadnessContent({
           <CommissionerToolsCard
             mmPoolId={mmPool.id}
             poolId={poolId}
+            poolStatus={poolStatus}
             publicSlug={mmPool.public_slug}
+            allGamesFinal={completedGames === totalGames && totalGames > 0}
+            finalGamesCount={completedGames}
+            totalGamesCount={totalGames}
           />
         </>
       )}

@@ -142,6 +142,7 @@ export default async function MarchMadnessPage({ params }: PageProps) {
       <MarchMadnessContent
         mmPool={mmPool}
         poolId={pool.id}
+        poolStatus={pool.status}
         entries={entries ?? []}
         poolTeams={poolTeams ?? []}
         games={games ?? []}
