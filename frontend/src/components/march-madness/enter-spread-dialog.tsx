@@ -2,7 +2,10 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { createClient } from '@/lib/supabase/client'
+import { mmSpreadSchema, type MMSpreadValues } from '@/lib/form-schemas'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -14,7 +17,14 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
 
 interface EnterSpreadDialogProps {
   gameId: string
@@ -32,33 +42,25 @@ export function EnterSpreadDialog({
   trigger,
 }: EnterSpreadDialogProps) {
   const [open, setOpen] = useState(false)
-  const [spread, setSpread] = useState(currentSpread?.toString() ?? '')
-  const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setIsSubmitting(true)
+  const form = useForm<MMSpreadValues>({
+    resolver: zodResolver(mmSpreadSchema),
+    defaultValues: { spread: currentSpread?.toString() ?? '' },
+  })
 
-    const spreadValue = parseFloat(spread)
-    if (isNaN(spreadValue)) {
-      setError('Please enter a valid spread')
-      setIsSubmitting(false)
-      return
-    }
+  const onSubmit = async (values: MMSpreadValues) => {
+    setError(null)
 
     const supabase = createClient()
-
     const { error: updateError } = await supabase
       .from('mm_games')
-      .update({ spread: spreadValue })
+      .update({ spread: parseFloat(values.spread) })
       .eq('id', gameId)
 
     if (updateError) {
       setError(updateError.message)
-      setIsSubmitting(false)
       return
     }
 
@@ -66,8 +68,16 @@ export function EnterSpreadDialog({
     router.refresh()
   }
 
+  const handleOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen)
+    if (!isOpen) {
+      setError(null)
+      form.reset({ spread: currentSpread?.toString() ?? '' })
+    }
+  }
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {trigger || (
           <Button variant="outline" size="sm">
@@ -76,51 +86,60 @@ export function EnterSpreadDialog({
         )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
-        <form onSubmit={handleSubmit}>
-          <DialogHeader>
-            <DialogTitle>Enter Spread</DialogTitle>
-            <DialogDescription>
-              Enter the point spread for this game. Negative means the higher seed is favored.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="text-sm text-muted-foreground text-center">
-              <span className="font-medium text-foreground">{higherSeedTeamName}</span>
-              {' vs '}
-              <span className="font-medium text-foreground">{lowerSeedTeamName}</span>
-            </div>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            <DialogHeader>
+              <DialogTitle>Enter Spread</DialogTitle>
+              <DialogDescription>
+                Enter the point spread for this game. Negative means the higher seed is favored.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="text-sm text-muted-foreground text-center">
+                <span className="font-medium text-foreground">{higherSeedTeamName}</span>
+                {' vs '}
+                <span className="font-medium text-foreground">{lowerSeedTeamName}</span>
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="spread">
-                Spread (negative = {higherSeedTeamName} favored)
-              </Label>
-              <Input
-                id="spread"
-                type="number"
-                step="0.5"
-                value={spread}
-                onChange={(e) => setSpread(e.target.value)}
-                placeholder="-5.5"
-                className="text-center text-lg font-mono"
+              <FormField
+                control={form.control}
+                name="spread"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Spread (negative = {higherSeedTeamName} favored)
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.5"
+                        placeholder="-5.5"
+                        className="text-center text-lg font-mono"
+                        {...field}
+                      />
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground">
+                      Example: -5.5 means {higherSeedTeamName} is favored by 5.5 points
+                    </p>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-              <p className="text-xs text-muted-foreground">
-                Example: -5.5 means {higherSeedTeamName} is favored by 5.5 points
-              </p>
-            </div>
 
-            {error && (
-              <p className="text-sm text-destructive">{error}</p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : 'Save Spread'}
-            </Button>
-          </DialogFooter>
-        </form>
+              {error && (
+                <p className="text-sm text-destructive">{error}</p>
+              )}
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? 'Saving...' : 'Save Spread'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   )

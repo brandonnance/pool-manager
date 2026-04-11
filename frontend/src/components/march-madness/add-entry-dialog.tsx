@@ -2,7 +2,10 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { createClient } from '@/lib/supabase/client'
+import { mmAddEntrySchema, type MMAddEntryValues } from '@/lib/form-schemas'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -16,6 +19,14 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
 
 interface AddEntryDialogProps {
   mmPoolId: string
@@ -23,41 +34,33 @@ interface AddEntryDialogProps {
   drawCompleted: boolean
 }
 
+const DEFAULTS: MMAddEntryValues = { name: '', email: '', verified: false }
+
 export function AddEntryDialog({
   mmPoolId,
   currentEntryCount,
   drawCompleted,
 }: AddEntryDialogProps) {
   const [open, setOpen] = useState(false)
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [verified, setVerified] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
+  const form = useForm<MMAddEntryValues>({
+    resolver: zodResolver(mmAddEntrySchema),
+    defaultValues: DEFAULTS,
+  })
+
   const spotsRemaining = 64 - currentEntryCount
 
-  const handleAdd = async () => {
-    if (!name.trim()) {
-      setError('Please enter a name')
-      return
-    }
-
-    const trimmedEmail = email.trim()
-    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      setError('Please enter a valid email address')
-      return
-    }
-
+  const onSubmit = async (values: MMAddEntryValues) => {
     setError(null)
-    setIsSubmitting(true)
 
+    const trimmedEmail = values.email?.trim() ?? ''
     const supabase = createClient()
     const insertData: { mm_pool_id: string; display_name: string; email?: string; verified: boolean } = {
       mm_pool_id: mmPoolId,
-      display_name: name.trim(),
-      verified,
+      display_name: values.name.trim(),
+      verified: values.verified,
     }
     if (trimmedEmail) {
       insertData.email = trimmedEmail
@@ -75,16 +78,20 @@ export function AddEntryDialog({
       } else {
         setError(insertError.message)
       }
-      setIsSubmitting(false)
       return
     }
 
-    setName('')
-    setEmail('')
-    setVerified(false)
+    form.reset(DEFAULTS)
     setOpen(false)
-    setIsSubmitting(false)
     router.refresh()
+  }
+
+  const handleOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen)
+    if (!isOpen) {
+      setError(null)
+      form.reset(DEFAULTS)
+    }
   }
 
   if (drawCompleted) {
@@ -92,21 +99,11 @@ export function AddEntryDialog({
   }
 
   if (spotsRemaining === 0) {
-    return (
-      <Button disabled>Pool Full (64/64)</Button>
-    )
+    return <Button disabled>Pool Full (64/64)</Button>
   }
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => {
-      setOpen(isOpen)
-      if (!isOpen) {
-        setError(null)
-        setName('')
-        setEmail('')
-        setVerified(false)
-      }
-    }}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button>Add Entry</Button>
       </DialogTrigger>
@@ -118,53 +115,66 @@ export function AddEntryDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Participant Name</Label>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="John Smith"
-              onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Participant Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="John Smith" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email (optional)</Label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="john@example.com"
-              onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="verified"
-              checked={verified}
-              onCheckedChange={(val) => setVerified(val === true)}
-            />
-            <Label htmlFor="verified" className="text-sm font-normal cursor-pointer">
-              Mark as verified
-            </Label>
-          </div>
-        </div>
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email (optional)</FormLabel>
+                  <FormControl>
+                    <Input type="email" placeholder="john@example.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleAdd}
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? 'Adding...' : 'Add Entry'}
-          </Button>
-        </DialogFooter>
+            <FormField
+              control={form.control}
+              name="verified"
+              render={({ field }) => (
+                <FormItem className="flex items-center gap-2 space-y-0">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={(val) => field.onChange(val === true)}
+                    />
+                  </FormControl>
+                  <Label className="text-sm font-normal cursor-pointer">
+                    Mark as verified
+                  </Label>
+                </FormItem>
+              )}
+            />
+
+            {error && <p className="text-sm text-destructive">{error}</p>}
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? 'Adding...' : 'Add Entry'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   )

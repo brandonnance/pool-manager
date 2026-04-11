@@ -2,8 +2,11 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
+import { generateLinkSchema, type GenerateLinkValues } from '@/lib/form-schemas'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -18,29 +21,45 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
 
 interface GenerateLinkButtonProps {
   poolId: string
 }
 
 function generateToken(): string {
-  // Use cryptographically secure random via Web Crypto API
   return crypto.randomUUID().replace(/-/g, '').slice(0, 16)
+}
+
+function computeExpiresAt(expiresIn: 'never' | '1d' | '7d' | '30d'): string | null {
+  const DAY_MS = 24 * 60 * 60 * 1000
+  switch (expiresIn) {
+    case '1d': return new Date(Date.now() + DAY_MS).toISOString()
+    case '7d': return new Date(Date.now() + 7 * DAY_MS).toISOString()
+    case '30d': return new Date(Date.now() + 30 * DAY_MS).toISOString()
+    default: return null
+  }
 }
 
 export function GenerateLinkButton({ poolId }: GenerateLinkButtonProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null)
-
-  const [maxUses, setMaxUses] = useState<string>('')
-  const [expiresIn, setExpiresIn] = useState<string>('never')
-
   const router = useRouter()
 
-  const handleGenerate = async () => {
-    setIsLoading(true)
+  const form = useForm<GenerateLinkValues>({
+    resolver: zodResolver(generateLinkSchema),
+    defaultValues: { maxUses: '', expiresIn: 'never' },
+  })
+
+  const onSubmit = async (values: GenerateLinkValues) => {
     setError(null)
 
     const supabase = createClient()
@@ -48,20 +67,11 @@ export function GenerateLinkButton({ poolId }: GenerateLinkButtonProps) {
 
     if (!user) {
       setError('You must be logged in')
-      setIsLoading(false)
       return
     }
 
     const token = generateToken()
-
-    let expiresAt: string | null = null
-    if (expiresIn === '1d') {
-      expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-    } else if (expiresIn === '7d') {
-      expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-    } else if (expiresIn === '30d') {
-      expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-    }
+    const expiresAt = computeExpiresAt(values.expiresIn)
 
     const { error: insertError } = await supabase
       .from('join_links')
@@ -69,19 +79,17 @@ export function GenerateLinkButton({ poolId }: GenerateLinkButtonProps) {
         pool_id: poolId,
         token,
         created_by: user.id,
-        max_uses: maxUses ? parseInt(maxUses, 10) : null,
-        expires_at: expiresAt
+        max_uses: values.maxUses ? parseInt(values.maxUses, 10) : null,
+        expires_at: expiresAt,
       })
 
     if (insertError) {
       setError(insertError.message)
-      setIsLoading(false)
       return
     }
 
     const url = `${window.location.origin}/join/${token}`
     setGeneratedUrl(url)
-    setIsLoading(false)
     router.refresh()
   }
 
@@ -101,8 +109,7 @@ export function GenerateLinkButton({ poolId }: GenerateLinkButtonProps) {
     if (!open) {
       setGeneratedUrl(null)
       setError(null)
-      setMaxUses('')
-      setExpiresIn('never')
+      form.reset({ maxUses: '', expiresIn: 'never' })
     }
   }
 
@@ -153,47 +160,63 @@ export function GenerateLinkButton({ poolId }: GenerateLinkButtonProps) {
             </DialogFooter>
           </div>
         ) : (
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="maxUses">Maximum uses (optional)</Label>
-              <Input
-                id="maxUses"
-                type="number"
-                value={maxUses}
-                onChange={(e) => setMaxUses(e.target.value)}
-                placeholder="Unlimited"
-                min="1"
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+              <FormField
+                control={form.control}
+                name="maxUses"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Maximum uses (optional)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="Unlimited"
+                        min="1"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="expiresIn">Expires</Label>
-              <select
-                id="expiresIn"
-                value={expiresIn}
-                onChange={(e) => setExpiresIn(e.target.value)}
-                className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <option value="never">Never</option>
-                <option value="1d">In 1 day</option>
-                <option value="7d">In 7 days</option>
-                <option value="30d">In 30 days</option>
-              </select>
-            </div>
+              <FormField
+                control={form.control}
+                name="expiresIn"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Expires</FormLabel>
+                    <FormControl>
+                      <select
+                        {...field}
+                        className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <option value="never">Never</option>
+                        <option value="1d">In 1 day</option>
+                        <option value="7d">In 7 days</option>
+                        <option value="30d">In 30 days</option>
+                      </select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => handleOpenChange(false)}
-              >
-                Cancel
-              </Button>
-              <Button onClick={handleGenerate} disabled={isLoading}>
-                {isLoading ? 'Generating...' : 'Generate'}
-              </Button>
-            </DialogFooter>
-          </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => handleOpenChange(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={form.formState.isSubmitting}>
+                  {form.formState.isSubmitting ? 'Generating...' : 'Generate'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         )}
       </DialogContent>
     </Dialog>

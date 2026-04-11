@@ -2,7 +2,10 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { createClient } from '@/lib/supabase/client'
+import { mmScoreSchema, type MMScoreValues } from '@/lib/form-schemas'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -14,7 +17,6 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -22,6 +24,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
 
 interface EnterScoreDialogProps {
   gameId: string
@@ -36,6 +46,8 @@ interface EnterScoreDialogProps {
   trigger?: React.ReactNode
 }
 
+type GameStatus = 'scheduled' | 'in_progress' | 'final'
+
 export function EnterScoreDialog({
   gameId,
   higherSeedTeamName,
@@ -49,53 +61,39 @@ export function EnterScoreDialog({
   trigger,
 }: EnterScoreDialogProps) {
   const [open, setOpen] = useState(false)
-  const [higherScore, setHigherScore] = useState(currentHigherScore?.toString() ?? '')
-  const [lowerScore, setLowerScore] = useState(currentLowerScore?.toString() ?? '')
-  const [status, setStatus] = useState(currentStatus)
-  const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const initialValues: MMScoreValues = {
+    higherScore: currentHigherScore?.toString() ?? '',
+    lowerScore: currentLowerScore?.toString() ?? '',
+    status: (currentStatus as GameStatus) ?? 'scheduled',
+  }
+
+  const form = useForm<MMScoreValues>({
+    resolver: zodResolver(mmScoreSchema),
+    defaultValues: initialValues,
+  })
+
+  const higherScoreValue = form.watch('higherScore')
+  const lowerScoreValue = form.watch('lowerScore')
+  const statusValue = form.watch('status')
+
+  const onSubmit = async (values: MMScoreValues) => {
     setError(null)
-    setIsSubmitting(true)
-
-    const higherScoreNum = parseInt(higherScore)
-    const lowerScoreNum = parseInt(lowerScore)
-
-    if (isNaN(higherScoreNum) || isNaN(lowerScoreNum)) {
-      setError('Please enter valid scores')
-      setIsSubmitting(false)
-      return
-    }
-
-    if (higherScoreNum < 0 || lowerScoreNum < 0) {
-      setError('Scores cannot be negative')
-      setIsSubmitting(false)
-      return
-    }
-
-    if (status === 'final' && higherScoreNum === lowerScoreNum) {
-      setError('Final score cannot be a tie')
-      setIsSubmitting(false)
-      return
-    }
 
     const supabase = createClient()
-
     const { error: updateError } = await supabase
       .from('mm_games')
       .update({
-        higher_seed_score: higherScoreNum,
-        lower_seed_score: lowerScoreNum,
-        status,
+        higher_seed_score: parseInt(values.higherScore, 10),
+        lower_seed_score: parseInt(values.lowerScore, 10),
+        status: values.status,
       })
       .eq('id', gameId)
 
     if (updateError) {
       setError(updateError.message)
-      setIsSubmitting(false)
       return
     }
 
@@ -103,11 +101,19 @@ export function EnterScoreDialog({
     router.refresh()
   }
 
+  const handleOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen)
+    if (!isOpen) {
+      setError(null)
+      form.reset(initialValues)
+    }
+  }
+
   // Calculate who covers if we have spread and scores
   let spreadCoverPreview = ''
-  if (spread !== null && higherScore && lowerScore) {
-    const hScore = parseInt(higherScore)
-    const lScore = parseInt(lowerScore)
+  if (spread !== null && higherScoreValue && lowerScoreValue) {
+    const hScore = parseInt(higherScoreValue, 10)
+    const lScore = parseInt(lowerScoreValue, 10)
     if (!isNaN(hScore) && !isNaN(lScore)) {
       const adjustedHigher = hScore + spread
       if (adjustedHigher > lScore) {
@@ -121,7 +127,7 @@ export function EnterScoreDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {trigger || (
           <Button variant="outline" size="sm">
@@ -130,91 +136,112 @@ export function EnterScoreDialog({
         )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
-        <form onSubmit={handleSubmit}>
-          <DialogHeader>
-            <DialogTitle>Enter Game Score</DialogTitle>
-            <DialogDescription>
-              Enter the final or current score for this game.
-              {spread !== null && (
-                <span className="block mt-1">
-                  Spread: {spread > 0 ? '+' : ''}{spread} ({spread < 0 ? higherSeedTeamName : lowerSeedTeamName} favored)
-                </span>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            {/* Higher seed team */}
-            <div className="space-y-2">
-              <Label htmlFor="higherScore">
-                #{higherSeedSeed} {higherSeedTeamName}
-              </Label>
-              <Input
-                id="higherScore"
-                type="number"
-                min="0"
-                value={higherScore}
-                onChange={(e) => setHigherScore(e.target.value)}
-                placeholder="0"
-                className="text-center text-2xl font-bold"
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            <DialogHeader>
+              <DialogTitle>Enter Game Score</DialogTitle>
+              <DialogDescription>
+                Enter the final or current score for this game.
+                {spread !== null && (
+                  <span className="block mt-1">
+                    Spread: {spread > 0 ? '+' : ''}{spread} ({spread < 0 ? higherSeedTeamName : lowerSeedTeamName} favored)
+                  </span>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <FormField
+                control={form.control}
+                name="higherScore"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      #{higherSeedSeed} {higherSeedTeamName}
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        className="text-center text-2xl font-bold"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
 
-            {/* Lower seed team */}
-            <div className="space-y-2">
-              <Label htmlFor="lowerScore">
-                #{lowerSeedSeed} {lowerSeedTeamName}
-              </Label>
-              <Input
-                id="lowerScore"
-                type="number"
-                min="0"
-                value={lowerScore}
-                onChange={(e) => setLowerScore(e.target.value)}
-                placeholder="0"
-                className="text-center text-2xl font-bold"
+              <FormField
+                control={form.control}
+                name="lowerScore"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      #{lowerSeedSeed} {lowerSeedTeamName}
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        className="text-center text-2xl font-bold"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
 
-            {/* Spread cover preview */}
-            {spreadCoverPreview && (
-              <div className="p-2 bg-muted rounded-md text-center text-sm">
-                {spreadCoverPreview}
-              </div>
-            )}
+              {spreadCoverPreview && (
+                <div className="p-2 bg-muted rounded-md text-center text-sm">
+                  {spreadCoverPreview}
+                </div>
+              )}
 
-            {/* Game status */}
-            <div className="space-y-2">
-              <Label htmlFor="status">Game Status</Label>
-              <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger id="status">
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="scheduled">Scheduled</SelectItem>
-                  <SelectItem value="in_progress">In Progress</SelectItem>
-                  <SelectItem value="final">Final</SelectItem>
-                </SelectContent>
-              </Select>
-              {status === 'final' && (
-                <p className="text-xs text-amber-600">
-                  Setting to final will process advancement and elimination.
-                </p>
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Game Status</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="scheduled">Scheduled</SelectItem>
+                        <SelectItem value="in_progress">In Progress</SelectItem>
+                        <SelectItem value="final">Final</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {statusValue === 'final' && (
+                      <p className="text-xs text-amber-600">
+                        Setting to final will process advancement and elimination.
+                      </p>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {error && (
+                <p className="text-sm text-destructive">{error}</p>
               )}
             </div>
-
-            {error && (
-              <p className="text-sm text-destructive">{error}</p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : 'Save Score'}
-            </Button>
-          </DialogFooter>
-        </form>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? 'Saving...' : 'Save Score'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   )

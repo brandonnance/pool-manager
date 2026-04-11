@@ -28,10 +28,10 @@ The work is organized into 8 phases. Phases 0-2 are highest priority. The depend
 | **2A**: Remove "No-Account" Naming | **DONE** | 2026-02-26 | Renamed types/variables across 12 files, removed dead code |
 | **2B**: DB Column Cleanup | **DONE** | 2026-02-26 | Dropped columns, rewrote 6 RLS policies, dropped FK, regenerated types |
 | **3A**: Commissioner Workflow Redesign | **DONE** | 2026-03-02 | Reusable wizard component, 4 step components via shared context. Setup page reduced from 902 → 175 lines. Auto-step logic based on setup completion state. |
-| **4A**: Form Library | **DONE** | 2026-03-02 | Installed RHF + Zod + shadcn Form. Created Zod schemas. Converted 3 settings forms (profile, email, password). |
+| **4A**: Form Library | **DONE** | 2026-04-11 | Installed RHF + Zod + shadcn Form. Converted all priority forms: 3 settings (2026-03-02), create-pool-button, generate-link-button, add-entry-dialog (MM), enter-spread-dialog (MM), enter-score-dialog (MM), enter-squares-score-button. Golf setup deferred (pool type may be removed). |
 | **4B**: Data Fetching Helpers | **DONE** | 2026-03-02 | Extracted pool detail page into 5 modules under `lib/data/`. Page reduced from 1193 → 756 lines. |
 | **4C**: Expanded shadcn Usage | **DONE** | 2026-03-02 | Breadcrumb (11 replacements), Sonner (0C), Accordion (golf-standings + golf-public-leaderboard), Command (installed), DataTable (generic component + admin users + golf scores refactors). |
-| **4D**: Slug Validation Utility | **DONE** | 2026-03-02 | Created `lib/slug.ts` (5 functions) + `hooks/use-slug.ts` (debounced hook). Updated 4 consuming files. |
+| **4D**: Slug Validation Utility | **DONE** | 2026-04-11 | Created `lib/slug.ts` (5 functions) + `hooks/use-slug.ts` (debounced hook) on 2026-03-02. Wrote `UI_PATTERNS.md` spec (form patterns, slug pattern, shadcn usage, error/loading conventions) on 2026-04-11. |
 | **5A-F**: DB Simplification | **DONE** | 2026-03-02 | Dropped 1 trigger, 6 BB functions, ~30 RLS policies, 10 zero-scan indexes. Migrated `demo_mode` from `pools` to `gp_pools`. Added read-only super admin policies on BB tables. |
 | **6A**: Bowl Buster Tech Spec | **DONE** | 2026-03-02 | Created `BOWL_BUSTER_TECH_SPEC.md` with scoring, CFP, locking, lifecycle, DB tables |
 | **6B**: Bowl Buster Code Deletion | **DONE** | 2026-03-02 | Deleted ~20 files/directories (components, pages, data). Removed BB conditionals from 12+ files. Zero `bowl_buster` references remain outside `database.ts`. |
@@ -544,9 +544,11 @@ The work app has two wizard systems. For golf setup, use the **client-side Wizar
 **Dependencies**: Phase 0A
 **Priority**: Medium — quality of life
 
-### 4A: Form Library
+### 4A: Form Library — DONE (2026-04-11)
 
 **Problem**: Forms use raw `useState` for every field. The `create-pool-button.tsx` has 15 state variables. Golf setup has 11. No validation framework.
+
+**Completion notes**: All priority forms converted to RHF + Zod + shadcn `<Form>` components. Schemas live in `lib/form-schemas.ts` — one per form plus inferred value types. Converted files: `settings/update-profile-form.tsx`, `settings/update-email-form.tsx`, `settings/update-password-form.tsx`, `pools/create-pool-button.tsx`, `members/generate-link-button.tsx`, `march-madness/add-entry-dialog.tsx`, `march-madness/enter-spread-dialog.tsx`, `march-madness/enter-score-dialog.tsx`, `squares/enter-squares-score-button.tsx`. Patterns documented in `UI_PATTERNS.md`. Golf setup (`gp_*`) forms intentionally skipped — golf pool type flagged for possible removal. `add-org-member-button` and `single-game-score-entry` skipped — selection UI / live scoring state, not forms.
 
 **Solution**: Introduce React Hook Form + Zod.
 
@@ -617,13 +619,15 @@ The work app's `GridComponent<T>` is its most reused component. Build the React 
 
 **Completion notes**: Installed Breadcrumb (replaced 11 custom implementations across pool pages), Accordion, Command (shadcn CLI), and `@tanstack/react-table`. **Accordion**: Refactored `golf-standings.tsx` (`type="multiple"` — multiple entries expand) and `golf-public-leaderboard.tsx` (`type="single" collapsible` — one at a time). Removed manual expand/collapse state and chevron icons; AccordionTrigger provides built-in animated chevron. **Command**: Installed only — all autocomplete targets touch live pools (MM team-selector, squares edit-game-teams) or are being removed (Bowl Buster team-autocomplete). Available for Phase 3A golf work. **DataTable**: Created generic `components/ui/data-table.tsx` with TanStack Table (sorting, search, pagination, mobile card view via `mobileCard` prop, empty state, row click, row className). Refactored admin users page — extracted `components/admin/users-table.tsx` Client Component wrapper, eliminated ~100 lines of duplicated mobile/desktop markup. Refactored golf scores page — replaced inline table + search with DataTable column defs. **Blocked items**: Form (4A), Stepper (Phase 3). Skeleton already done in 0C, Sonner already done in 0C.
 
-### 4D: Slug Validation Utility
+### 4D: Slug Validation Utility — DONE (2026-04-11)
 
 **Problem**: Each pool type validates and generates public slugs independently.
 
 **Solution**: Create `frontend/src/lib/slug.ts` with shared validation logic (format rules, uniqueness check pattern, URL generation). Keep the actual slug column on type-specific tables since URL prefixes differ (`/view/[slug]` for squares, `/pools/golf/[slug]` for golf, `/view/mm/[slug]` for March Madness).
 
 **Spec file**: `UI_PATTERNS.md` — shadcn guidelines, form patterns, loading state patterns
+
+**Completion notes**: `lib/slug.ts` built on 2026-03-02 (5 functions: `formatSlugInput`, `validateSlugFormat`, `generateSlugFromName`, `checkSlugAvailability`, `buildPublicUrl`). `UI_PATTERNS.md` authored on 2026-04-11 covering: RHF+Zod form conventions, field-level vs form-level error patterns, slug-validation usage pattern, loading state conventions (Skeleton, toast, button labels), shadcn component preferences, and a migration checklist for converting legacy forms.
 
 ---
 

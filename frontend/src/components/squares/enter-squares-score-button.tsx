@@ -2,7 +2,10 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { createClient } from '@/lib/supabase/client'
+import { squaresScoreSchema, type SquaresScoreValues } from '@/lib/form-schemas'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -16,6 +19,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormMessage,
+} from '@/components/ui/form'
 
 interface EnterSquaresScoreButtonProps {
   gameId: string
@@ -51,57 +61,44 @@ export function EnterSquaresScoreButton({
   colNumbers,
 }: EnterSquaresScoreButtonProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
-  const [homeScore, setHomeScore] = useState(currentHomeScore?.toString() ?? '')
-  const [awayScore, setAwayScore] = useState(currentAwayScore?.toString() ?? '')
-  const [halftimeHomeScore, setHalftimeHomeScore] = useState(
-    currentHalftimeHomeScore?.toString() ?? ''
-  )
-  const [halftimeAwayScore, setHalftimeAwayScore] = useState(
-    currentHalftimeAwayScore?.toString() ?? ''
-  )
-  const [status, setStatus] = useState(currentStatus ?? 'scheduled')
+  const initialValues: SquaresScoreValues = {
+    homeScore: currentHomeScore?.toString() ?? '',
+    awayScore: currentAwayScore?.toString() ?? '',
+    halftimeHomeScore: currentHalftimeHomeScore?.toString() ?? '',
+    halftimeAwayScore: currentHalftimeAwayScore?.toString() ?? '',
+    status: (currentStatus as 'scheduled' | 'in_progress' | 'final') ?? 'scheduled',
+    paysHalftime,
+  }
+
+  const form = useForm<SquaresScoreValues>({
+    resolver: zodResolver(squaresScoreSchema),
+    defaultValues: initialValues,
+  })
+
+  const homeScore = form.watch('homeScore') ?? ''
+  const awayScore = form.watch('awayScore') ?? ''
+  const status = form.watch('status')
 
   const handleOpen = () => {
-    setHomeScore(currentHomeScore?.toString() ?? '')
-    setAwayScore(currentAwayScore?.toString() ?? '')
-    setHalftimeHomeScore(currentHalftimeHomeScore?.toString() ?? '')
-    setHalftimeAwayScore(currentHalftimeAwayScore?.toString() ?? '')
-    setStatus(currentStatus ?? 'scheduled')
+    form.reset(initialValues)
     setError(null)
     setIsOpen(true)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
+  const onSubmit = async (values: SquaresScoreValues) => {
     setError(null)
-
-    // Validate scores if status is final
-    if (status === 'final') {
-      if (homeScore === '' || awayScore === '') {
-        setError('Please enter both final scores')
-        setIsLoading(false)
-        return
-      }
-      if (paysHalftime && (halftimeHomeScore === '' || halftimeAwayScore === '')) {
-        setError('Please enter halftime scores for this game')
-        setIsLoading(false)
-        return
-      }
-    }
 
     const supabase = createClient()
 
     const updates: Record<string, unknown> = {
-      status,
-      home_score: homeScore !== '' ? parseInt(homeScore, 10) : null,
-      away_score: awayScore !== '' ? parseInt(awayScore, 10) : null,
-      halftime_home_score: halftimeHomeScore !== '' ? parseInt(halftimeHomeScore, 10) : null,
-      halftime_away_score: halftimeAwayScore !== '' ? parseInt(halftimeAwayScore, 10) : null,
+      status: values.status,
+      home_score: values.homeScore ? parseInt(values.homeScore, 10) : null,
+      away_score: values.awayScore ? parseInt(values.awayScore, 10) : null,
+      halftime_home_score: values.halftimeHomeScore ? parseInt(values.halftimeHomeScore, 10) : null,
+      halftime_away_score: values.halftimeAwayScore ? parseInt(values.halftimeAwayScore, 10) : null,
     }
 
     const { error: updateError } = await supabase
@@ -111,26 +108,22 @@ export function EnterSquaresScoreButton({
 
     if (updateError) {
       setError(updateError.message)
-      setIsLoading(false)
       return
     }
 
-    // Calculate and record winners
     if (rowNumbers && colNumbers) {
-      // Record halftime winners if halftime scores are entered (even if game not final)
-      const hasHalftimeScores = paysHalftime && halftimeHomeScore !== '' && halftimeAwayScore !== ''
-      // Record final winners only when game is final
-      const hasFinalScores = status === 'final' && homeScore !== '' && awayScore !== ''
+      const hasHalftimeScores = paysHalftime && !!values.halftimeHomeScore && !!values.halftimeAwayScore
+      const hasFinalScores = values.status === 'final' && !!values.homeScore && !!values.awayScore
 
       if (hasHalftimeScores || hasFinalScores) {
         await calculateAndRecordWinners(
           supabase,
           gameId,
           sqPoolId,
-          hasFinalScores ? parseInt(homeScore, 10) : null,
-          hasFinalScores ? parseInt(awayScore, 10) : null,
-          hasHalftimeScores ? parseInt(halftimeHomeScore, 10) : null,
-          hasHalftimeScores ? parseInt(halftimeAwayScore, 10) : null,
+          hasFinalScores ? parseInt(values.homeScore!, 10) : null,
+          hasFinalScores ? parseInt(values.awayScore!, 10) : null,
+          hasHalftimeScores ? parseInt(values.halftimeHomeScore!, 10) : null,
+          hasHalftimeScores ? parseInt(values.halftimeAwayScore!, 10) : null,
           rowNumbers,
           colNumbers,
           reverseScoring
@@ -138,7 +131,6 @@ export function EnterSquaresScoreButton({
       }
     }
 
-    setIsLoading(false)
     setIsOpen(false)
     router.refresh()
   }
@@ -158,142 +150,180 @@ export function EnterSquaresScoreButton({
           <DialogDescription>{gameName}</DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit}>
-          <div className="space-y-4 py-4">
-            {/* Final Score Entry */}
-            <div>
-              <Label className="text-sm font-medium mb-2 block">Final Score</Label>
-              <div className="grid grid-cols-3 gap-4 items-center">
-                <div className="text-center">
-                  <Label className="block mb-2 text-xs text-muted-foreground">{awayTeam}</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={awayScore}
-                    onChange={(e) => setAwayScore(e.target.value)}
-                    className="text-2xl font-bold text-center h-14"
-                    placeholder="0"
-                  />
-                </div>
-
-                <div className="text-center text-muted-foreground text-lg font-medium pt-6">@</div>
-
-                <div className="text-center">
-                  <Label className="block mb-2 text-xs text-muted-foreground">{homeTeam}</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={homeScore}
-                    onChange={(e) => setHomeScore(e.target.value)}
-                    className="text-2xl font-bold text-center h-14"
-                    placeholder="0"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Halftime Score Entry (if pays halftime) */}
-            {paysHalftime && (
-              <div className="border-t pt-4">
-                <Label className="text-sm font-medium mb-2 block">Halftime Score</Label>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            <div className="space-y-4 py-4">
+              {/* Final Score Entry */}
+              <div>
+                <Label className="text-sm font-medium mb-2 block">Final Score</Label>
                 <div className="grid grid-cols-3 gap-4 items-center">
-                  <div className="text-center">
-                    <Input
-                      type="number"
-                      min="0"
-                      value={halftimeAwayScore}
-                      onChange={(e) => setHalftimeAwayScore(e.target.value)}
-                      className="text-xl font-bold text-center h-12"
-                      placeholder="0"
+                  <FormField
+                    control={form.control}
+                    name="awayScore"
+                    render={({ field }) => (
+                      <FormItem className="text-center">
+                        <Label className="block mb-2 text-xs text-muted-foreground">{awayTeam}</Label>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min="0"
+                            className="text-2xl font-bold text-center h-14"
+                            placeholder="0"
+                            {...field}
+                            value={field.value ?? ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="text-center text-muted-foreground text-lg font-medium pt-6">@</div>
+
+                  <FormField
+                    control={form.control}
+                    name="homeScore"
+                    render={({ field }) => (
+                      <FormItem className="text-center">
+                        <Label className="block mb-2 text-xs text-muted-foreground">{homeTeam}</Label>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min="0"
+                            className="text-2xl font-bold text-center h-14"
+                            placeholder="0"
+                            {...field}
+                            value={field.value ?? ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              {/* Halftime Score Entry (if pays halftime) */}
+              {paysHalftime && (
+                <div className="border-t pt-4">
+                  <Label className="text-sm font-medium mb-2 block">Halftime Score</Label>
+                  <div className="grid grid-cols-3 gap-4 items-center">
+                    <FormField
+                      control={form.control}
+                      name="halftimeAwayScore"
+                      render={({ field }) => (
+                        <FormItem className="text-center">
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min="0"
+                              className="text-xl font-bold text-center h-12"
+                              placeholder="0"
+                              {...field}
+                              value={field.value ?? ''}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                  </div>
 
-                  <div className="text-center text-muted-foreground text-sm">Halftime</div>
+                    <div className="text-center text-muted-foreground text-sm">Halftime</div>
 
-                  <div className="text-center">
-                    <Input
-                      type="number"
-                      min="0"
-                      value={halftimeHomeScore}
-                      onChange={(e) => setHalftimeHomeScore(e.target.value)}
-                      className="text-xl font-bold text-center h-12"
-                      placeholder="0"
+                    <FormField
+                      control={form.control}
+                      name="halftimeHomeScore"
+                      render={({ field }) => (
+                        <FormItem className="text-center">
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min="0"
+                              className="text-xl font-bold text-center h-12"
+                              placeholder="0"
+                              {...field}
+                              value={field.value ?? ''}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Status */}
-            <div className="space-y-2">
-              <Label>Game Status</Label>
-              <div className="grid grid-cols-3 gap-2">
-                <Button
-                  type="button"
-                  variant={status === 'scheduled' ? 'default' : 'outline'}
-                  onClick={() => setStatus('scheduled')}
-                  size="sm"
-                >
-                  Scheduled
-                </Button>
-                <Button
-                  type="button"
-                  variant={status === 'in_progress' ? 'default' : 'outline'}
-                  onClick={() => setStatus('in_progress')}
-                  className={status === 'in_progress' ? 'bg-amber-500 hover:bg-amber-600' : ''}
-                  size="sm"
-                >
-                  In Progress
-                </Button>
-                <Button
-                  type="button"
-                  variant={status === 'final' ? 'default' : 'outline'}
-                  onClick={() => setStatus('final')}
-                  size="sm"
-                >
-                  Final
-                </Button>
+              {/* Status */}
+              <div className="space-y-2">
+                <Label>Game Status</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  <Button
+                    type="button"
+                    variant={status === 'scheduled' ? 'default' : 'outline'}
+                    onClick={() => form.setValue('status', 'scheduled')}
+                    size="sm"
+                  >
+                    Scheduled
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={status === 'in_progress' ? 'default' : 'outline'}
+                    onClick={() => form.setValue('status', 'in_progress')}
+                    className={status === 'in_progress' ? 'bg-amber-500 hover:bg-amber-600' : ''}
+                    size="sm"
+                  >
+                    In Progress
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={status === 'final' ? 'default' : 'outline'}
+                    onClick={() => form.setValue('status', 'final')}
+                    size="sm"
+                  >
+                    Final
+                  </Button>
+                </div>
               </div>
+
+              {/* Winner Preview (if final and numbers locked) */}
+              {status === 'final' && homeScore && awayScore && rowNumbers && colNumbers && (
+                <div className="bg-muted rounded-md p-3 text-sm">
+                  <div className="font-medium mb-1">Winners Preview:</div>
+                  <div className="space-y-1 text-muted-foreground">
+                    <div>
+                      Normal: Square {parseInt(awayScore) % 10}-{parseInt(homeScore) % 10}
+                    </div>
+                    {reverseScoring && (
+                      <div>
+                        Reverse: Square {parseInt(homeScore) % 10}-{parseInt(awayScore) % 10}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
             </div>
 
-            {/* Winner Preview (if final and numbers locked) */}
-            {status === 'final' && homeScore && awayScore && rowNumbers && colNumbers && (
-              <div className="bg-muted rounded-md p-3 text-sm">
-                <div className="font-medium mb-1">Winners Preview:</div>
-                <div className="space-y-1 text-muted-foreground">
-                  <div>
-                    Normal: Square {parseInt(awayScore) % 10}-{parseInt(homeScore) % 10}
-                  </div>
-                  {reverseScoring && (
-                    <div>
-                      Reverse: Square {parseInt(homeScore) % 10}-{parseInt(awayScore) % 10}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setIsOpen(false)}
-              disabled={isLoading}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Saving...' : 'Save Score'}
-            </Button>
-          </DialogFooter>
-        </form>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setIsOpen(false)}
+                disabled={form.formState.isSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? 'Saving...' : 'Save Score'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   )
