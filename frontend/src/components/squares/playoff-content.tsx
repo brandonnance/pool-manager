@@ -757,6 +757,16 @@ export function PlayoffContent({
     setSelectedSquare(null)
   }
 
+  // Resolve the selected square from live realtime state (not the click-time
+  // snapshot) so the assign dialog can detect concurrent edits
+  const liveSelectedSquare = selectedSquare
+    ? squares.find(
+        (sq) =>
+          sq.row_index === selectedSquare.rowIndex &&
+          sq.col_index === selectedSquare.colIndex
+      ) ?? null
+    : null
+
   return (
     <div className="space-y-6">
       <div className="grid gap-6 lg:grid-cols-4">
@@ -930,9 +940,9 @@ export function PlayoffContent({
           sqPoolId={sqPoolId}
           rowIndex={selectedSquare.rowIndex}
           colIndex={selectedSquare.colIndex}
-          currentName={selectedSquare.square?.participant_name ?? null}
-          currentVerified={selectedSquare.square?.verified ?? false}
-          squareId={selectedSquare.square?.id ?? null}
+          currentName={liveSelectedSquare?.participant_name ?? null}
+          currentVerified={liveSelectedSquare?.verified ?? false}
+          squareId={liveSelectedSquare?.id ?? null}
           onSaved={() => {}}
         />
       )}

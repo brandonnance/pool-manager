@@ -8,6 +8,7 @@ import type { WinningRound, Square, Winner, Game } from './types'
 /**
  * Round hierarchy for determining display priority.
  * Higher number = higher tier (takes precedence in display).
+ * Canonical source — round-config.ts and the public view derive from this.
  */
 export const ROUND_HIERARCHY: Record<string, number> = {
   // Playoff rounds
@@ -16,6 +17,13 @@ export const ROUND_HIERARCHY: Record<string, number> = {
   conference: 3,
   super_bowl_halftime: 4,
   super_bowl: 5,
+  // March Madness rounds
+  mm_r64: 1,
+  mm_r32: 2,
+  mm_s16: 3,
+  mm_e8: 4,
+  mm_f4: 5,
+  mm_final: 6,
   // Single game
   single_game: 1,
   // Score change mode
@@ -25,6 +33,19 @@ export const ROUND_HIERARCHY: Record<string, number> = {
   score_change_final: 3,
   score_change_final_reverse: 3,
   score_change_final_both: 4,
+  // Hybrid mode quarters
+  hybrid_q1: 5,
+  hybrid_q1_reverse: 5,
+  hybrid_q1_both: 6,
+  hybrid_halftime: 7,
+  hybrid_halftime_reverse: 7,
+  hybrid_halftime_both: 8,
+  hybrid_q3: 9,
+  hybrid_q3_reverse: 9,
+  hybrid_q3_both: 10,
+  hybrid_final: 11,
+  hybrid_final_reverse: 11,
+  hybrid_final_both: 12,
 }
 
 /**
@@ -256,6 +277,93 @@ export function buildQuarterModeWinningRoundsMap(
       winningSquareRounds.set(w.square_id, 'single_game')
     }
   })
+
+  return winningSquareRounds
+}
+
+/**
+ * Build a map of square IDs to their winning round across all pool modes
+ * (playoff, single game quarter/score_change, hybrid, march madness).
+ * Used by the public view where the pool mode isn't known up front.
+ *
+ * @param winners - Array of winner records
+ * @param games - Array of games (to look up round for normal/reverse wins)
+ * @returns Map of square ID to winning round
+ */
+export function buildWinningRoundsMap(
+  winners: Winner[],
+  games: Game[]
+): Map<string, WinningRound> {
+  const winningSquareRounds = new Map<string, WinningRound>()
+  const gameById = new Map(games.map((g) => [g.id, g]))
+
+  for (const winner of winners) {
+    if (!winner.square_id) continue
+
+    // Determine winning round based on win_type
+    let round: WinningRound = null
+    if (winner.win_type === 'normal' || winner.win_type === 'reverse') {
+      const game = gameById.get(winner.sq_game_id)
+      if (game) {
+        round = game.round as WinningRound
+      }
+    } else if (winner.win_type.startsWith('score_change')) {
+      // Score change mode winning types
+      if (winner.win_type === 'score_change_final_both') {
+        round = 'score_change_final_both'
+      } else if (winner.win_type === 'score_change_final_reverse') {
+        round = 'score_change_final_reverse'
+      } else if (winner.win_type === 'score_change_final') {
+        round = 'score_change_final'
+      } else if (winner.win_type === 'score_change_reverse') {
+        // Check if also forward winner for "both"
+        const alsoForward = winners.some(
+          (w) => w.square_id === winner.square_id && w.win_type === 'score_change'
+        )
+        round = alsoForward ? 'score_change_both' : 'score_change_reverse'
+      } else if (winner.win_type === 'score_change') {
+        const alsoReverse = winners.some(
+          (w) => w.square_id === winner.square_id && w.win_type === 'score_change_reverse'
+        )
+        round = alsoReverse ? 'score_change_both' : 'score_change_forward'
+      }
+    }
+    // Quarter mode - q1, halftime, q3 (forward)
+    // Note: Quarter mode final scores use score_change_final types (handled above) due to DB constraint
+    else if (winner.win_type === 'q1' || winner.win_type === 'halftime' || winner.win_type === 'q3') {
+      const reverseType = `${winner.win_type}_reverse`
+      const alsoReverse = winners.some(
+        (w) => w.square_id === winner.square_id && w.win_type === reverseType
+      )
+      round = alsoReverse ? 'score_change_both' : 'score_change_forward'
+    }
+    // Quarter mode - q1_reverse, halftime_reverse, q3_reverse
+    else if (winner.win_type === 'q1_reverse' || winner.win_type === 'halftime_reverse' || winner.win_type === 'q3_reverse') {
+      const forwardType = winner.win_type.replace('_reverse', '')
+      const alsoForward = winners.some(
+        (w) => w.square_id === winner.square_id && w.win_type === forwardType
+      )
+      round = alsoForward ? 'score_change_both' : 'score_change_reverse'
+    }
+    // Hybrid mode - forward quarter winners
+    else if (winner.win_type === 'hybrid_q1' || winner.win_type === 'hybrid_halftime' || winner.win_type === 'hybrid_q3' || winner.win_type === 'hybrid_final') {
+      const reverseType = `${winner.win_type}_reverse`
+      const alsoReverse = winners.some(
+        (w) => w.square_id === winner.square_id && w.win_type === reverseType
+      )
+      round = alsoReverse ? `${winner.win_type}_both` as WinningRound : winner.win_type as WinningRound
+    }
+    // Hybrid mode - reverse quarter winners
+    else if (winner.win_type === 'hybrid_q1_reverse' || winner.win_type === 'hybrid_halftime_reverse' || winner.win_type === 'hybrid_q3_reverse' || winner.win_type === 'hybrid_final_reverse') {
+      const forwardType = winner.win_type.replace('_reverse', '')
+      const alsoForward = winners.some(
+        (w) => w.square_id === winner.square_id && w.win_type === forwardType
+      )
+      round = alsoForward ? `${forwardType}_both` as WinningRound : winner.win_type as WinningRound
+    }
+
+    updateWinningRoundWithHierarchy(winningSquareRounds, winner.square_id, round)
+  }
 
   return winningSquareRounds
 }

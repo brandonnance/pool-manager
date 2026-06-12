@@ -35,9 +35,8 @@ import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { PublicRealtimeGrid } from '@/components/squares/public-realtime-grid'
 import { PublicRealtimeGames } from '@/components/squares/public-realtime-games'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import type { WinningRound } from '@/components/squares/square-cell'
 
 interface PageProps {
   params: Promise<{ slug: string }>
@@ -168,129 +167,8 @@ export default async function PublicViewPage({ params }: PageProps) {
     }
   }
 
-  // Round hierarchy for playoff mode (higher number = higher tier)
-  const roundHierarchy: Record<string, number> = {
-    wild_card: 1,
-    divisional: 2,
-    conference: 3,
-    super_bowl_halftime: 4,
-    super_bowl: 5,
-    // March Madness rounds
-    mm_r64: 1,
-    mm_r32: 2,
-    mm_s16: 3,
-    mm_e8: 4,
-    mm_f4: 5,
-    mm_final: 6,
-    // Single game mode
-    single_game: 1,
-    // Score change mode
-    score_change_forward: 1,
-    score_change_reverse: 1,
-    score_change_both: 2,
-    score_change_final: 3,
-    score_change_final_reverse: 3,
-    score_change_final_both: 4,
-    // Hybrid mode quarters
-    hybrid_q1: 5,
-    hybrid_q1_reverse: 5,
-    hybrid_q1_both: 6,
-    hybrid_halftime: 7,
-    hybrid_halftime_reverse: 7,
-    hybrid_halftime_both: 8,
-    hybrid_q3: 9,
-    hybrid_q3_reverse: 9,
-    hybrid_q3_both: 10,
-    hybrid_final: 11,
-    hybrid_final_reverse: 11,
-    hybrid_final_both: 12,
-  }
-
-  // Build winning squares map for grid highlighting
-  // Use an array of tuples for serialization (Maps can't be passed to client components)
-  const winningSquareRoundsMap = new Map<string, WinningRound>()
-
-  if (sqPool.numbers_locked) {
-    for (const winner of winners) {
-      if (winner.square_id) {
-        // Determine winning round based on win_type
-        let round: WinningRound = null
-        if (winner.win_type === 'normal' || winner.win_type === 'reverse') {
-          const game = games.find((g) => g.id === winner.sq_game_id)
-          if (game) {
-            round = game.round as WinningRound
-          }
-        } else if (winner.win_type.startsWith('score_change')) {
-          // Score change mode winning types
-          if (winner.win_type === 'score_change_final_both') {
-            round = 'score_change_final_both'
-          } else if (winner.win_type === 'score_change_final_reverse') {
-            round = 'score_change_final_reverse'
-          } else if (winner.win_type === 'score_change_final') {
-            round = 'score_change_final'
-          } else if (winner.win_type === 'score_change_reverse') {
-            // Check if also forward winner for "both"
-            const alsoForward = winners.some(
-              (w) => w.square_id === winner.square_id && w.win_type === 'score_change'
-            )
-            round = alsoForward ? 'score_change_both' : 'score_change_reverse'
-          } else if (winner.win_type === 'score_change') {
-            const alsoReverse = winners.some(
-              (w) => w.square_id === winner.square_id && w.win_type === 'score_change_reverse'
-            )
-            round = alsoReverse ? 'score_change_both' : 'score_change_forward'
-          }
-        }
-        // Quarter mode - q1, halftime, q3 (forward)
-        // Note: Quarter mode final scores use score_change_final types (handled above) due to DB constraint
-        else if (winner.win_type === 'q1' || winner.win_type === 'halftime' || winner.win_type === 'q3') {
-          const reverseType = `${winner.win_type}_reverse`
-          const alsoReverse = winners.some(
-            (w) => w.square_id === winner.square_id && w.win_type === reverseType
-          )
-          round = alsoReverse ? 'score_change_both' : 'score_change_forward'
-        }
-        // Quarter mode - q1_reverse, halftime_reverse, q3_reverse
-        else if (winner.win_type === 'q1_reverse' || winner.win_type === 'halftime_reverse' || winner.win_type === 'q3_reverse') {
-          const forwardType = winner.win_type.replace('_reverse', '')
-          const alsoForward = winners.some(
-            (w) => w.square_id === winner.square_id && w.win_type === forwardType
-          )
-          round = alsoForward ? 'score_change_both' : 'score_change_reverse'
-        }
-        // Hybrid mode - forward quarter winners
-        else if (winner.win_type === 'hybrid_q1' || winner.win_type === 'hybrid_halftime' || winner.win_type === 'hybrid_q3' || winner.win_type === 'hybrid_final') {
-          const reverseType = `${winner.win_type}_reverse`
-          const alsoReverse = winners.some(
-            (w) => w.square_id === winner.square_id && w.win_type === reverseType
-          )
-          round = alsoReverse ? `${winner.win_type}_both` as WinningRound : winner.win_type as WinningRound
-        }
-        // Hybrid mode - reverse quarter winners
-        else if (winner.win_type === 'hybrid_q1_reverse' || winner.win_type === 'hybrid_halftime_reverse' || winner.win_type === 'hybrid_q3_reverse' || winner.win_type === 'hybrid_final_reverse') {
-          const forwardType = winner.win_type.replace('_reverse', '')
-          const alsoForward = winners.some(
-            (w) => w.square_id === winner.square_id && w.win_type === forwardType
-          )
-          round = alsoForward ? `${forwardType}_both` as WinningRound : winner.win_type as WinningRound
-        }
-
-        if (round) {
-          // Only set if new round is higher in hierarchy than existing
-          const existing = winningSquareRoundsMap.get(winner.square_id)
-          const existingRank = existing ? roundHierarchy[existing] ?? 0 : 0
-          const newRank = roundHierarchy[round] ?? 0
-
-          if (newRank > existingRank) {
-            winningSquareRoundsMap.set(winner.square_id, round)
-          }
-        }
-      }
-    }
-  }
-
-  // Convert Map to array for serialization to client component
-  const winningSquareRoundsArray = Array.from(winningSquareRoundsMap.entries())
+  // Winning-square highlighting is computed client-side in PublicRealtimeGrid
+  // (lib/squares buildWinningRoundsMap) so it can update live as winners change.
 
   // Get team labels - only use team names for single game mode
   // For playoff mode, teams change per game so use generic labels
@@ -338,76 +216,39 @@ export default async function PublicViewPage({ params }: PageProps) {
       </header>
 
       <main className="max-w-6xl mx-auto p-4 space-y-6">
-        {/* Grid - with realtime updates */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Squares Grid</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <PublicRealtimeGrid
-              sqPoolId={sqPool.id}
-              initialSquares={squares.map((s) => ({
-                id: s.id,
-                row_index: s.row_index,
-                col_index: s.col_index,
-                participant_name: s.participant_name,
-                verified: false, // Public view never shows verified status
-              }))}
-              initialGames={games.map((g) => ({
-                id: g.id,
-                home_score: g.home_score,
-                away_score: g.away_score,
-                status: g.status,
-              }))}
-              rowNumbers={sqPool.row_numbers}
-              colNumbers={sqPool.col_numbers}
-              numbersLocked={sqPool.numbers_locked ?? false}
-              reverseScoring={sqPool.reverse_scoring ?? false}
-              winningSquareRoundsArray={winningSquareRoundsArray}
-              homeTeamLabel={homeTeamLabel}
-              awayTeamLabel={awayTeamLabel}
-              legendMode={legendMode}
-            />
-          </CardContent>
-        </Card>
-
-        {/* Final Winner Banner */}
-        {sqPool.numbers_locked && firstGame?.status === 'final' && (() => {
-          const finalWinner = winners.find(w => w.win_type === 'score_change_final' || w.win_type === 'hybrid_final')
-          const finalReverseWinner = winners.find(w => w.win_type === 'score_change_final_reverse' || w.win_type === 'hybrid_final_reverse')
-
-          if (!finalWinner && !finalReverseWinner) return null
-
-          return (
-            <div className="rounded-lg border-2 border-purple-300 bg-purple-50 p-6">
-              <div className="text-center space-y-3">
-                <div className="text-sm font-medium text-purple-600 uppercase tracking-wide">
-                  Final Winner{sqPool.reverse_scoring ? 's' : ''}
-                </div>
-                <div className="flex items-center justify-center gap-8">
-                  {finalWinner && (
-                    <div className="text-center">
-                      {sqPool.reverse_scoring && (
-                        <div className="text-xs text-muted-foreground mb-1">Forward</div>
-                      )}
-                      <div className="text-2xl font-bold text-purple-700">
-                        {finalWinner.winner_name || 'Unclaimed'}
-                      </div>
-                    </div>
-                  )}
-                  {sqPool.reverse_scoring && finalReverseWinner && (
-                    <div className="text-center">
-                      <div className="text-xs text-muted-foreground mb-1">Reverse</div>
-                      <div className="text-2xl font-bold text-fuchsia-700">
-                        {finalReverseWinner.winner_name || 'Unclaimed'}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )
-        })()}
+        {/* Grid - with realtime updates (renders its own card + final winner banner) */}
+        <PublicRealtimeGrid
+          sqPoolId={sqPool.id}
+          initialSquares={squares.map((s) => ({
+            id: s.id,
+            row_index: s.row_index,
+            col_index: s.col_index,
+            participant_name: s.participant_name,
+            verified: false, // Public view never shows verified status
+          }))}
+          initialGames={games.map((g) => ({
+            id: g.id,
+            round: g.round,
+            home_score: g.home_score,
+            away_score: g.away_score,
+            status: g.status,
+          }))}
+          initialWinners={winners.map((w) => ({
+            id: w.id,
+            sq_game_id: w.sq_game_id,
+            square_id: w.square_id,
+            win_type: w.win_type,
+            payout: w.payout,
+            winner_name: w.winner_name,
+          }))}
+          rowNumbers={sqPool.row_numbers}
+          colNumbers={sqPool.col_numbers}
+          numbersLocked={sqPool.numbers_locked ?? false}
+          reverseScoring={sqPool.reverse_scoring ?? false}
+          homeTeamLabel={homeTeamLabel}
+          awayTeamLabel={awayTeamLabel}
+          legendMode={legendMode}
+        />
 
         {/* Games and Scores - only show after lock */}
         {sqPool.numbers_locked && games.length > 0 && (

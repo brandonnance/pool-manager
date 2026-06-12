@@ -4,6 +4,8 @@
  * hardcoding NFL-specific round labels, colors, and hierarchies.
  */
 
+import { ROUND_HIERARCHY } from './winner-calculation'
+
 export interface RoundConfig {
   /** Ordered list of round keys for this event type */
   roundOrder: string[]
@@ -13,6 +15,11 @@ export interface RoundConfig {
   roundAbbrevs: Record<string, string>
   /** Numeric hierarchy for winner square priority (higher = more important) */
   roundHierarchy: Record<string, number>
+}
+
+/** Pick a subset of the canonical ROUND_HIERARCHY for an event type */
+function pickHierarchy(keys: string[]): Record<string, number> {
+  return Object.fromEntries(keys.map((key) => [key, ROUND_HIERARCHY[key]]))
 }
 
 export function getRoundConfig(eventType: string): RoundConfig {
@@ -35,14 +42,14 @@ export function getRoundConfig(eventType: string): RoundConfig {
         mm_f4: 'F4',
         mm_final: 'F',
       },
-      roundHierarchy: {
-        mm_r64: 1,
-        mm_r32: 2,
-        mm_s16: 3,
-        mm_e8: 4,
-        mm_f4: 5,
-        mm_final: 6,
-      },
+      roundHierarchy: pickHierarchy([
+        'mm_r64',
+        'mm_r32',
+        'mm_s16',
+        'mm_e8',
+        'mm_f4',
+        'mm_final',
+      ]),
     }
   }
 
@@ -62,13 +69,13 @@ export function getRoundConfig(eventType: string): RoundConfig {
       super_bowl_halftime: 'SBH',
       super_bowl: 'SB',
     },
-    roundHierarchy: {
-      wild_card: 1,
-      divisional: 2,
-      conference: 3,
-      super_bowl_halftime: 4,
-      super_bowl: 5,
-    },
+    roundHierarchy: pickHierarchy([
+      'wild_card',
+      'divisional',
+      'conference',
+      'super_bowl_halftime',
+      'super_bowl',
+    ]),
   }
 }
 

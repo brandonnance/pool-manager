@@ -4,27 +4,21 @@ import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { SquaresGrid, type Square } from './squares-grid'
 import { PublicParticipantList } from './public-participant-list'
-import type { WinningRound } from './square-cell'
-
-interface Game {
-  id: string
-  home_score: number | null
-  away_score: number | null
-  status: string | null
-}
+import { buildWinningRoundsMap } from '@/lib/squares'
+import type { Winner, Game } from '@/lib/squares'
 
 interface PublicRealtimeGridProps {
   sqPoolId: string
   initialSquares: Square[]
   initialGames: Game[]
+  initialWinners: Winner[]
   rowNumbers: number[] | null
   colNumbers: number[] | null
   numbersLocked: boolean
   reverseScoring: boolean
-  // Array format for serialization from server component
-  winningSquareRoundsArray: Array<[string, WinningRound]>
   homeTeamLabel: string
   awayTeamLabel: string
   legendMode: 'full_playoff' | 'single_game' | 'score_change' | 'march_madness'
@@ -42,11 +36,11 @@ export function PublicRealtimeGrid({
   sqPoolId,
   initialSquares,
   initialGames,
+  initialWinners,
   rowNumbers,
   colNumbers,
   numbersLocked,
   reverseScoring,
-  winningSquareRoundsArray,
   homeTeamLabel,
   awayTeamLabel,
   legendMode,
@@ -54,12 +48,20 @@ export function PublicRealtimeGrid({
   const router = useRouter()
   const [squares, setSquares] = useState<Square[]>(initialSquares)
   const [games, setGames] = useState<Game[]>(initialGames ?? [])
+  const [winners, setWinners] = useState<Winner[]>(initialWinners ?? [])
   const [selectedParticipantName, setSelectedParticipantName] = useState<string | null>(null)
 
-  // Convert array back to Map
+  // Game IDs for this pool - used to filter the table-wide winners subscription
+  // (sq_winners has no sq_pool_id column, so server-side filtering isn't possible)
+  const gameIds = useMemo(
+    () => new Set(initialGames.map((g) => g.id)),
+    [initialGames]
+  )
+
+  // Winning square highlights, recomputed whenever winners change
   const winningSquareRounds = useMemo(
-    () => new Map(winningSquareRoundsArray),
-    [winningSquareRoundsArray]
+    () => buildWinningRoundsMap(winners, games),
+    [winners, games]
   )
 
   // Calculate live winning squares from in-progress games
@@ -233,7 +235,8 @@ export function PublicRealtimeGrid({
     }
   }, [sqPoolId, numbersLocked])
 
-  // Subscribe to winners changes to refresh grid highlighting
+  // Subscribe to winners changes and patch state directly - avoids a full
+  // router.refresh() for every viewer each time winners are recorded
   useEffect(() => {
     if (!numbersLocked) return
 
@@ -248,9 +251,25 @@ export function PublicRealtimeGrid({
           schema: 'public',
           table: 'sq_winners',
         },
-        () => {
-          // Refresh page to update winning square highlights
-          router.refresh()
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const newWinner = payload.new as Database['public']['Tables']['sq_winners']['Row']
+            if (!gameIds.has(newWinner.sq_game_id)) return
+            setWinners((prev) =>
+              prev.some((w) => w.id === newWinner.id) ? prev : [...prev, newWinner]
+            )
+          } else if (payload.eventType === 'UPDATE') {
+            const updated = payload.new as Database['public']['Tables']['sq_winners']['Row']
+            if (!gameIds.has(updated.sq_game_id)) return
+            setWinners((prev) =>
+              prev.map((w) => (w.id === updated.id ? { ...w, ...updated } : w))
+            )
+          } else if (payload.eventType === 'DELETE') {
+            // DELETE payloads only carry the primary key; ids from other
+            // pools simply won't match anything in state
+            const deleted = payload.old as { id: string }
+            setWinners((prev) => prev.filter((w) => w.id !== deleted.id))
+          }
         }
       )
       .subscribe()
@@ -258,30 +277,83 @@ export function PublicRealtimeGrid({
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [sqPoolId, numbersLocked, router])
+  }, [sqPoolId, numbersLocked, gameIds])
+
+  // Final winner banner (single-game modes record score_change_final/hybrid_final)
+  const firstGame = games[0] ?? null
+  const finalWinner = winners.find(
+    (w) => w.win_type === 'score_change_final' || w.win_type === 'hybrid_final'
+  )
+  const finalReverseWinner = winners.find(
+    (w) => w.win_type === 'score_change_final_reverse' || w.win_type === 'hybrid_final_reverse'
+  )
+  const showFinalBanner =
+    numbersLocked &&
+    firstGame?.status === 'final' &&
+    Boolean(finalWinner || finalReverseWinner)
 
   return (
-    <div className="space-y-4">
-      <PublicParticipantList
-        squares={squares}
-        selectedParticipantName={selectedParticipantName}
-        onSelectParticipant={setSelectedParticipantName}
-      />
-      <SquaresGrid
-        sqPoolId={sqPoolId}
-        squares={squares}
-        rowNumbers={rowNumbers}
-        colNumbers={colNumbers}
-        numbersLocked={numbersLocked}
-        isCommissioner={false}
-        winningSquareRounds={winningSquareRounds}
-        liveWinningSquareIds={liveWinningSquareIds}
-        homeTeamLabel={homeTeamLabel}
-        awayTeamLabel={awayTeamLabel}
-        legendMode={legendMode}
-        controlledParticipantName={selectedParticipantName}
-        onParticipantSelect={setSelectedParticipantName}
-      />
-    </div>
+    <>
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">Squares Grid</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <PublicParticipantList
+              squares={squares}
+              selectedParticipantName={selectedParticipantName}
+              onSelectParticipant={setSelectedParticipantName}
+            />
+            <SquaresGrid
+              sqPoolId={sqPoolId}
+              squares={squares}
+              rowNumbers={rowNumbers}
+              colNumbers={colNumbers}
+              numbersLocked={numbersLocked}
+              isCommissioner={false}
+              winningSquareRounds={winningSquareRounds}
+              liveWinningSquareIds={liveWinningSquareIds}
+              homeTeamLabel={homeTeamLabel}
+              awayTeamLabel={awayTeamLabel}
+              legendMode={legendMode}
+              controlledParticipantName={selectedParticipantName}
+              onParticipantSelect={setSelectedParticipantName}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Final Winner Banner */}
+      {showFinalBanner && (
+        <div className="rounded-lg border-2 border-purple-300 bg-purple-50 p-6">
+          <div className="text-center space-y-3">
+            <div className="text-sm font-medium text-purple-600 uppercase tracking-wide">
+              Final Winner{reverseScoring ? 's' : ''}
+            </div>
+            <div className="flex items-center justify-center gap-8">
+              {finalWinner && (
+                <div className="text-center">
+                  {reverseScoring && (
+                    <div className="text-xs text-muted-foreground mb-1">Forward</div>
+                  )}
+                  <div className="text-2xl font-bold text-purple-700">
+                    {finalWinner.winner_name || 'Unclaimed'}
+                  </div>
+                </div>
+              )}
+              {reverseScoring && finalReverseWinner && (
+                <div className="text-center">
+                  <div className="text-xs text-muted-foreground mb-1">Reverse</div>
+                  <div className="text-2xl font-bold text-fuchsia-700">
+                    {finalReverseWinner.winner_name || 'Unclaimed'}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }

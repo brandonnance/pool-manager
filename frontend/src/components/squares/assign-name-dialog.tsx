@@ -17,7 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { CheckCircle2, XCircle } from "lucide-react";
+import { CheckCircle2, XCircle, TriangleAlert } from "lucide-react";
 
 interface ParticipantStats {
   totalSquares: number;
@@ -54,6 +54,14 @@ export function AssignNameDialog({
   const [verified, setVerified] = useState(currentVerified);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Notice shown when another commissioner changes this square while the dialog is open
+  const [conflictNotice, setConflictNotice] = useState<string | null>(null);
+  // Square state captured when the dialog opened, to detect concurrent edits
+  const [openSnapshot, setOpenSnapshot] = useState<{
+    squareId: string | null;
+    name: string | null;
+    verified: boolean;
+  } | null>(null);
 
   // Autocomplete state
   const [existingNames, setExistingNames] = useState<string[]>([]);
@@ -184,16 +192,60 @@ export function AssignNameDialog({
     inputRef.current?.focus();
   };
 
-  // Reset form when dialog opens with new values
-  useEffect(() => {
-    if (open) {
-      setName(currentName ?? "");
-      setVerified(currentVerified);
-      setError(null);
-      setShowSuggestions(false);
-      setSelectedIndex(-1);
+  // Reset the form when the dialog opens, and surface a conflict notice if
+  // the square's live props change while it stays open (the parent keeps them
+  // fresh via its realtime subscription). Adjusted during render (React's
+  // derived-state pattern) rather than in an effect.
+  if (!open && openSnapshot !== null) {
+    setOpenSnapshot(null);
+  } else if (open && openSnapshot === null) {
+    // Dialog just opened - reset form and capture snapshot
+    setName(currentName ?? "");
+    setVerified(currentVerified);
+    setError(null);
+    setConflictNotice(null);
+    setShowSuggestions(false);
+    setSelectedIndex(-1);
+    setOpenSnapshot({
+      squareId,
+      name: currentName,
+      verified: currentVerified,
+    });
+  } else if (
+    open &&
+    openSnapshot !== null &&
+    (openSnapshot.squareId !== squareId ||
+      openSnapshot.name !== currentName ||
+      openSnapshot.verified !== currentVerified)
+  ) {
+    // Square changed underneath us - tell the user without clobbering their input
+    if (!openSnapshot.squareId && squareId) {
+      setConflictNotice(
+        currentName
+          ? `This square was just assigned to ${currentName} by another commissioner. Saving will overwrite that assignment.`
+          : "This square was just assigned by another commissioner. Saving will overwrite that assignment."
+      );
+    } else if (openSnapshot.squareId && !squareId) {
+      setConflictNotice(
+        "This assignment was just cleared by another commissioner. Saving will re-assign the square."
+      );
+    } else if (openSnapshot.name !== currentName) {
+      setConflictNotice(
+        currentName
+          ? `This square was just reassigned to ${currentName} by another commissioner. Saving will overwrite that assignment.`
+          : "This square was just updated by another commissioner."
+      );
+    } else {
+      setConflictNotice(
+        `This square was just marked ${currentVerified ? "verified" : "unverified"} by another commissioner.`
+      );
     }
-  }, [open, currentName, currentVerified]);
+    setOpenSnapshot({
+      squareId,
+      name: currentName,
+      verified: currentVerified,
+    });
+  }
 
   const gridNumber = `${rowIndex}${colIndex}`;
   const isAssigned = currentName !== null;
@@ -249,16 +301,26 @@ export function AssignNameDialog({
 
     if (squareId) {
       // Update existing square
-      const { error: updateError } = await supabase
+      const { data: updatedRows, error: updateError } = await supabase
         .from("sq_squares")
         .update({
           participant_name: normalizedName,
           verified,
         })
-        .eq("id", squareId);
+        .eq("id", squareId)
+        .select("id");
 
       if (updateError) {
         setError(updateError.message);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Zero rows updated: the assignment was deleted out from under us
+      if (!updatedRows || updatedRows.length === 0) {
+        setError(
+          "This assignment was just cleared by another commissioner. Save again to re-assign the square."
+        );
         setIsSubmitting(false);
         return;
       }
@@ -273,10 +335,20 @@ export function AssignNameDialog({
       });
 
       if (insertError) {
-        // Handle unique constraint violation
+        // Unique constraint violation: another commissioner claimed it first.
+        // Look up who has it now for a useful message.
         if (insertError.code === "23505") {
+          const { data: existing } = await supabase
+            .from("sq_squares")
+            .select("participant_name")
+            .eq("sq_pool_id", sqPoolId)
+            .eq("row_index", rowIndex)
+            .eq("col_index", colIndex)
+            .maybeSingle();
           setError(
-            "This square was just claimed. Please refresh and try again."
+            existing?.participant_name
+              ? `This square was just claimed by ${existing.participant_name}. Save again to overwrite, or cancel.`
+              : "This square was just claimed by another commissioner. Save again to overwrite, or cancel."
           );
         } else {
           setError(insertError.message);
@@ -454,6 +526,15 @@ export function AssignNameDialog({
                 </div>
               </div>
             )}
+
+          {conflictNotice && (
+            <Alert className="border-amber-300 bg-amber-50 text-amber-800 [&>svg]:text-amber-600">
+              <TriangleAlert className="size-4" />
+              <AlertDescription className="text-amber-800">
+                {conflictNotice}
+              </AlertDescription>
+            </Alert>
+          )}
 
           {error && (
             <Alert variant="destructive">

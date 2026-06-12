@@ -45,4 +45,5 @@ export {
   buildScoreChangeWinningRoundsMap,
   buildPlayoffWinningRoundsMap,
   buildQuarterModeWinningRoundsMap,
+  buildWinningRoundsMap,
 } from './winner-calculation'

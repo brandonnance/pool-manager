@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { TriangleAlert } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -48,6 +49,8 @@ export function BulkAssignDialog({
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Notice shown when squares in the current selection get claimed by someone else
+  const [conflictNotice, setConflictNotice] = useState<string | null>(null);
 
   // Autocomplete state
   const [existingNames, setExistingNames] = useState<string[]>([]);
@@ -172,10 +175,33 @@ export function BulkAssignDialog({
       setVerified(false);
       setSelectedSquares(new Set());
       setError(null);
+      setConflictNotice(null);
       setShowSuggestions(false);
       setSelectedIndex(-1);
     }
   }, [open]);
+
+  // The parent keeps existingSquares fresh via realtime; if squares in our
+  // selection get claimed by another commissioner, drop them and say so.
+  // Adjusted during render (React's derived-state pattern) rather than in
+  // an effect.
+  const [prevClaimedSquares, setPrevClaimedSquares] = useState(claimedSquares);
+  if (claimedSquares !== prevClaimedSquares) {
+    setPrevClaimedSquares(claimedSquares);
+    const conflicted = Array.from(selectedSquares).filter((key) =>
+      claimedSquares.has(key)
+    );
+    if (open && conflicted.length > 0) {
+      const next = new Set(selectedSquares);
+      conflicted.forEach((key) => next.delete(key));
+      setSelectedSquares(next);
+      setConflictNotice(
+        conflicted.length === 1
+          ? "1 square in your selection was just claimed by someone else and has been removed."
+          : `${conflicted.length} squares in your selection were just claimed by someone else and have been removed.`
+      );
+    }
+  }
 
   // Handle dialog close
   const handleOpenChange = (isOpen: boolean) => {
@@ -251,8 +277,10 @@ export function BulkAssignDialog({
 
     if (insertError) {
       if (insertError.code === "23505") {
+        // The whole insert is atomic, so nothing was assigned. The conflicted
+        // squares will be pruned from the selection as realtime catches up.
         setError(
-          "Some squares were just claimed. Please refresh and try again."
+          "Some selected squares were just claimed by someone else. Nothing was assigned - review your selection and try again."
         );
       } else {
         setError(insertError.message);
@@ -422,6 +450,15 @@ export function BulkAssignDialog({
           <p className="text-xs text-muted-foreground text-center">
             Click squares to select/deselect. Gray squares are already claimed.
           </p>
+
+          {conflictNotice && (
+            <Alert className="border-amber-300 bg-amber-50 text-amber-800 [&>svg]:text-amber-600">
+              <TriangleAlert className="size-4" />
+              <AlertDescription className="text-amber-800">
+                {conflictNotice}
+              </AlertDescription>
+            </Alert>
+          )}
 
           {error && (
             <Alert variant="destructive">

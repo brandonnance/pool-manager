@@ -6,6 +6,7 @@ import {
   buildScoreChangeWinningRoundsMap,
   buildPlayoffWinningRoundsMap,
   buildQuarterModeWinningRoundsMap,
+  buildWinningRoundsMap,
   ROUND_HIERARCHY,
 } from '../winner-calculation'
 import type { Square, Winner, Game } from '../types'
@@ -371,5 +372,149 @@ describe('ROUND_HIERARCHY', () => {
 
   it('should have equal rank for final and final_reverse', () => {
     expect(ROUND_HIERARCHY.score_change_final).toBe(ROUND_HIERARCHY.score_change_final_reverse)
+  })
+
+  it('should rank march madness rounds in tournament order', () => {
+    expect(ROUND_HIERARCHY.mm_r64).toBeLessThan(ROUND_HIERARCHY.mm_r32)
+    expect(ROUND_HIERARCHY.mm_r32).toBeLessThan(ROUND_HIERARCHY.mm_s16)
+    expect(ROUND_HIERARCHY.mm_s16).toBeLessThan(ROUND_HIERARCHY.mm_e8)
+    expect(ROUND_HIERARCHY.mm_e8).toBeLessThan(ROUND_HIERARCHY.mm_f4)
+    expect(ROUND_HIERARCHY.mm_f4).toBeLessThan(ROUND_HIERARCHY.mm_final)
+  })
+
+  it('should rank hybrid quarters in game order with final highest', () => {
+    expect(ROUND_HIERARCHY.hybrid_q1).toBeLessThan(ROUND_HIERARCHY.hybrid_halftime)
+    expect(ROUND_HIERARCHY.hybrid_halftime).toBeLessThan(ROUND_HIERARCHY.hybrid_q3)
+    expect(ROUND_HIERARCHY.hybrid_q3).toBeLessThan(ROUND_HIERARCHY.hybrid_final)
+    expect(ROUND_HIERARCHY.hybrid_final_both).toBeGreaterThan(ROUND_HIERARCHY.hybrid_final)
+  })
+})
+
+describe('buildWinningRoundsMap', () => {
+  const games: Game[] = [
+    { id: 'wc1', round: 'wild_card', home_score: 24, away_score: 17, status: 'final' },
+    { id: 'sb', round: 'super_bowl', home_score: 28, away_score: 24, status: 'final' },
+    { id: 'g1', round: 'single_game', home_score: 21, away_score: 14, status: 'final' },
+  ]
+
+  const winner = (overrides: Partial<Winner>): Winner => ({
+    id: 'w1',
+    sq_game_id: 'g1',
+    square_id: 'sq-1',
+    win_type: 'normal',
+    payout: null,
+    winner_name: 'User 1',
+    ...overrides,
+  })
+
+  it('should map normal/reverse winners to their game round', () => {
+    const result = buildWinningRoundsMap(
+      [winner({ sq_game_id: 'wc1', win_type: 'normal' })],
+      games
+    )
+    expect(result.get('sq-1')).toBe('wild_card')
+  })
+
+  it('should prefer the higher round when a square wins multiple games', () => {
+    const result = buildWinningRoundsMap(
+      [
+        winner({ id: 'w1', sq_game_id: 'wc1', win_type: 'normal' }),
+        winner({ id: 'w2', sq_game_id: 'sb', win_type: 'normal' }),
+      ],
+      games
+    )
+    expect(result.get('sq-1')).toBe('super_bowl')
+  })
+
+  it('should map score_change forward-only winners', () => {
+    const result = buildWinningRoundsMap(
+      [winner({ win_type: 'score_change' })],
+      games
+    )
+    expect(result.get('sq-1')).toBe('score_change_forward')
+  })
+
+  it('should mark squares with forward and reverse score_change wins as both', () => {
+    const result = buildWinningRoundsMap(
+      [
+        winner({ id: 'w1', win_type: 'score_change' }),
+        winner({ id: 'w2', win_type: 'score_change_reverse' }),
+      ],
+      games
+    )
+    expect(result.get('sq-1')).toBe('score_change_both')
+  })
+
+  it('should rank score_change_final above regular score_change wins', () => {
+    const result = buildWinningRoundsMap(
+      [
+        winner({ id: 'w1', win_type: 'score_change' }),
+        winner({ id: 'w2', win_type: 'score_change_final' }),
+      ],
+      games
+    )
+    expect(result.get('sq-1')).toBe('score_change_final')
+  })
+
+  it('should map quarter-mode q1/halftime/q3 winners to score_change colors', () => {
+    const result = buildWinningRoundsMap([winner({ win_type: 'halftime' })], games)
+    expect(result.get('sq-1')).toBe('score_change_forward')
+  })
+
+  it('should mark quarter-mode forward+reverse winners as both', () => {
+    const result = buildWinningRoundsMap(
+      [
+        winner({ id: 'w1', win_type: 'q1' }),
+        winner({ id: 'w2', win_type: 'q1_reverse' }),
+      ],
+      games
+    )
+    expect(result.get('sq-1')).toBe('score_change_both')
+  })
+
+  it('should map hybrid quarter winners to their own rounds', () => {
+    const result = buildWinningRoundsMap(
+      [winner({ win_type: 'hybrid_halftime' })],
+      games
+    )
+    expect(result.get('sq-1')).toBe('hybrid_halftime')
+  })
+
+  it('should mark hybrid forward+reverse winners as both', () => {
+    const result = buildWinningRoundsMap(
+      [
+        winner({ id: 'w1', win_type: 'hybrid_final' }),
+        winner({ id: 'w2', win_type: 'hybrid_final_reverse' }),
+      ],
+      games
+    )
+    expect(result.get('sq-1')).toBe('hybrid_final_both')
+  })
+
+  it('should rank hybrid_final above earlier hybrid quarters', () => {
+    const result = buildWinningRoundsMap(
+      [
+        winner({ id: 'w1', win_type: 'hybrid_q1' }),
+        winner({ id: 'w2', win_type: 'hybrid_final' }),
+      ],
+      games
+    )
+    expect(result.get('sq-1')).toBe('hybrid_final')
+  })
+
+  it('should skip winners with null square_id', () => {
+    const result = buildWinningRoundsMap(
+      [winner({ square_id: null })],
+      games
+    )
+    expect(result.size).toBe(0)
+  })
+
+  it('should skip normal winners for unknown games', () => {
+    const result = buildWinningRoundsMap(
+      [winner({ sq_game_id: 'unknown', win_type: 'normal' })],
+      games
+    )
+    expect(result.size).toBe(0)
   })
 })

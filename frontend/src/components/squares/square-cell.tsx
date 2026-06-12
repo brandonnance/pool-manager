@@ -1,42 +1,10 @@
 'use client'
 
 import { cn } from '@/lib/utils'
+import type { WinningRound } from '@/lib/squares'
 
-// Winning round type for squares pool
-export type WinningRound =
-  | 'wild_card'
-  | 'divisional'
-  | 'conference'
-  | 'super_bowl'
-  | 'super_bowl_halftime'
-  | 'single_game'
-  // March Madness rounds
-  | 'mm_r64'
-  | 'mm_r32'
-  | 'mm_s16'
-  | 'mm_e8'
-  | 'mm_f4'
-  | 'mm_final'
-  | 'score_change_forward'
-  | 'score_change_reverse'
-  | 'score_change_both'
-  | 'score_change_final'
-  | 'score_change_final_reverse'
-  | 'score_change_final_both'
-  // Hybrid mode quarter winners
-  | 'hybrid_q1'
-  | 'hybrid_q1_reverse'
-  | 'hybrid_q1_both'
-  | 'hybrid_halftime'
-  | 'hybrid_halftime_reverse'
-  | 'hybrid_halftime_both'
-  | 'hybrid_q3'
-  | 'hybrid_q3_reverse'
-  | 'hybrid_q3_both'
-  | 'hybrid_final'
-  | 'hybrid_final_reverse'
-  | 'hybrid_final_both'
-  | null
+// Canonical definition lives in lib/squares/types.ts
+export type { WinningRound }
 
 // Winning colors for each round type
 const winningColors = {
