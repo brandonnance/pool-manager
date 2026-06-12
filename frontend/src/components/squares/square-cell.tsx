@@ -173,6 +173,13 @@ const hybridHalftimeBothGradient = 'bg-gradient-to-br from-blue-100 from-50% to-
 const hybridQ3BothGradient = 'bg-gradient-to-br from-teal-100 from-50% to-green-100 to-50%'
 const hybridFinalBothGradient = 'bg-gradient-to-br from-purple-100 from-50% to-fuchsia-100 to-50%'
 
+// "Brandon Nance" -> "BN", "Brandon" -> "Br"
+export function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/)
+  if (parts.length === 1) return parts[0].slice(0, 2)
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
+
 export interface SquareCellProps {
   rowIndex: number
   colIndex: number
@@ -183,6 +190,7 @@ export interface SquareCellProps {
   isLiveWinning?: boolean // Pulsing animation for in-progress game
   isHighlighted?: boolean // Highlight squares for selected participant (public view)
   isLoading?: boolean
+  mobileInitials?: boolean // Below sm, show initials instead of (truncated) full name
   onClick?: () => void
   className?: string
 }
@@ -197,6 +205,7 @@ export function SquareCell({
   isLiveWinning = false,
   isHighlighted = false,
   isLoading = false,
+  mobileInitials = false,
   onClick,
   className,
 }: SquareCellProps) {
@@ -297,6 +306,7 @@ export function SquareCell({
       onClick={isClickable ? onClick : undefined}
       disabled={!isClickable}
       title={title}
+      aria-label={title}
       className={cn(
         getStateClasses(),
         isClickable && 'cursor-pointer hover:opacity-80',
@@ -320,6 +330,15 @@ export function SquareCell({
 
       {isLoading ? (
         <span className="size-2 rounded-full bg-muted-foreground/50" />
+      ) : mobileInitials && isAssigned && participantName ? (
+        <>
+          <span className={cn(getTextClasses(), 'relative z-10 text-[10px] sm:hidden')}>
+            {getInitials(participantName)}
+          </span>
+          <span className={cn(getTextClasses(), 'relative z-10 hidden sm:inline')}>
+            {participantName}
+          </span>
+        </>
       ) : (
         <span className={cn(getTextClasses(), 'relative z-10')}>{displayText}</span>
       )}

@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import {
+  MAX_REASONABLE_SCORE,
   validateScoreChange,
+  validateScoreValue,
+  validateStageProgression,
   validateFirstScoreChange,
   getLastScore,
   sortScoreChanges,
@@ -219,5 +222,79 @@ describe('sortScoreChanges', () => {
     ]
     const sorted = sortScoreChanges(scoreChanges)
     expect(sorted.map((sc) => sc.change_order)).toEqual([1, 2, 3])
+  })
+})
+
+describe('validateScoreValue', () => {
+  it('accepts a normal score', () => {
+    expect(validateScoreValue(21).isValid).toBe(true)
+    expect(validateScoreValue(0).isValid).toBe(true)
+    expect(validateScoreValue(MAX_REASONABLE_SCORE).isValid).toBe(true)
+  })
+
+  it('rejects negative scores', () => {
+    const result = validateScoreValue(-3, 'Home score')
+    expect(result.isValid).toBe(false)
+    expect(result.error).toContain('Home score cannot be negative')
+  })
+
+  it('rejects implausibly high scores', () => {
+    const result = validateScoreValue(MAX_REASONABLE_SCORE + 1, 'Away score')
+    expect(result.isValid).toBe(false)
+    expect(result.error).toContain('too high')
+  })
+
+  it('rejects non-integer scores', () => {
+    const result = validateScoreValue(13.5)
+    expect(result.isValid).toBe(false)
+    expect(result.error).toContain('whole number')
+  })
+
+  it('rejects NaN', () => {
+    expect(validateScoreValue(NaN).isValid).toBe(false)
+  })
+})
+
+describe('validateStageProgression', () => {
+  it('accepts non-decreasing cumulative scores', () => {
+    const result = validateStageProgression([
+      { label: 'Q1', home: 7, away: 3 },
+      { label: 'Halftime', home: 14, away: 3 },
+      { label: 'Q3', home: 14, away: 10 },
+      { label: 'Final', home: 21, away: 17 },
+    ])
+    expect(result.isValid).toBe(true)
+  })
+
+  it('rejects a stage lower than the previous one', () => {
+    const result = validateStageProgression([
+      { label: 'Halftime', home: 14, away: 10 },
+      { label: 'Final', home: 13, away: 17 },
+    ])
+    expect(result.isValid).toBe(false)
+    expect(result.error).toContain('Final score cannot be lower than Halftime score')
+  })
+
+  it('skips stages without scores', () => {
+    const result = validateStageProgression([
+      { label: 'Q1', home: 7, away: 0 },
+      null,
+      { label: 'Q3', home: 10, away: 7 },
+      null,
+    ])
+    expect(result.isValid).toBe(true)
+  })
+
+  it('accepts equal consecutive stages', () => {
+    const result = validateStageProgression([
+      { label: 'Q1', home: 7, away: 7 },
+      { label: 'Halftime', home: 7, away: 7 },
+    ])
+    expect(result.isValid).toBe(true)
+  })
+
+  it('handles empty and single-stage input', () => {
+    expect(validateStageProgression([]).isValid).toBe(true)
+    expect(validateStageProgression([null, { label: 'Final', home: 21, away: 14 }]).isValid).toBe(true)
   })
 })

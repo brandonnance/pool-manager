@@ -1043,57 +1043,6 @@ export type Database = {
           },
         ]
       }
-      mm_entries_backup: {
-        Row: {
-          created_at: string | null
-          current_team_id: string | null
-          display_name: string | null
-          eliminated: boolean | null
-          eliminated_round: string | null
-          email: string | null
-          id: string | null
-          mm_pool_id: string | null
-          original_team_id: string | null
-          status: string | null
-          total_payout: number | null
-          updated_at: string | null
-          user_id: string | null
-          verified: boolean | null
-        }
-        Insert: {
-          created_at?: string | null
-          current_team_id?: string | null
-          display_name?: string | null
-          eliminated?: boolean | null
-          eliminated_round?: string | null
-          email?: string | null
-          id?: string | null
-          mm_pool_id?: string | null
-          original_team_id?: string | null
-          status?: string | null
-          total_payout?: number | null
-          updated_at?: string | null
-          user_id?: string | null
-          verified?: boolean | null
-        }
-        Update: {
-          created_at?: string | null
-          current_team_id?: string | null
-          display_name?: string | null
-          eliminated?: boolean | null
-          eliminated_round?: string | null
-          email?: string | null
-          id?: string | null
-          mm_pool_id?: string | null
-          original_team_id?: string | null
-          status?: string | null
-          total_payout?: number | null
-          updated_at?: string | null
-          user_id?: string | null
-          verified?: boolean | null
-        }
-        Relationships: []
-      }
       mm_entry_payouts: {
         Row: {
           created_at: string
@@ -1265,78 +1214,6 @@ export type Database = {
           },
         ]
       }
-      mm_games_backup: {
-        Row: {
-          advancing_entry_id: string | null
-          created_at: string | null
-          external_game_id: string | null
-          game_number: number | null
-          higher_seed_entry_id: string | null
-          higher_seed_score: number | null
-          higher_seed_team_id: string | null
-          id: string | null
-          last_synced_at: string | null
-          lower_seed_entry_id: string | null
-          lower_seed_score: number | null
-          lower_seed_team_id: string | null
-          mm_pool_id: string | null
-          region: string | null
-          round: string | null
-          scheduled_time: string | null
-          spread: number | null
-          spread_covering_team_id: string | null
-          status: string | null
-          updated_at: string | null
-          winning_team_id: string | null
-        }
-        Insert: {
-          advancing_entry_id?: string | null
-          created_at?: string | null
-          external_game_id?: string | null
-          game_number?: number | null
-          higher_seed_entry_id?: string | null
-          higher_seed_score?: number | null
-          higher_seed_team_id?: string | null
-          id?: string | null
-          last_synced_at?: string | null
-          lower_seed_entry_id?: string | null
-          lower_seed_score?: number | null
-          lower_seed_team_id?: string | null
-          mm_pool_id?: string | null
-          region?: string | null
-          round?: string | null
-          scheduled_time?: string | null
-          spread?: number | null
-          spread_covering_team_id?: string | null
-          status?: string | null
-          updated_at?: string | null
-          winning_team_id?: string | null
-        }
-        Update: {
-          advancing_entry_id?: string | null
-          created_at?: string | null
-          external_game_id?: string | null
-          game_number?: number | null
-          higher_seed_entry_id?: string | null
-          higher_seed_score?: number | null
-          higher_seed_team_id?: string | null
-          id?: string | null
-          last_synced_at?: string | null
-          lower_seed_entry_id?: string | null
-          lower_seed_score?: number | null
-          lower_seed_team_id?: string | null
-          mm_pool_id?: string | null
-          region?: string | null
-          round?: string | null
-          scheduled_time?: string | null
-          spread?: number | null
-          spread_covering_team_id?: string | null
-          status?: string | null
-          updated_at?: string | null
-          winning_team_id?: string | null
-        }
-        Relationships: []
-      }
       mm_pool_teams: {
         Row: {
           created_at: string
@@ -1390,45 +1267,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      mm_pool_teams_backup: {
-        Row: {
-          created_at: string | null
-          eliminated: boolean | null
-          eliminated_round: string | null
-          external_team_id: string | null
-          id: string | null
-          mm_pool_id: string | null
-          region: string | null
-          seed: number | null
-          team_id: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          eliminated?: boolean | null
-          eliminated_round?: string | null
-          external_team_id?: string | null
-          id?: string | null
-          mm_pool_id?: string | null
-          region?: string | null
-          seed?: number | null
-          team_id?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          eliminated?: boolean | null
-          eliminated_round?: string | null
-          external_team_id?: string | null
-          id?: string | null
-          mm_pool_id?: string | null
-          region?: string | null
-          seed?: number | null
-          team_id?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
       }
       mm_pools: {
         Row: {
@@ -1500,66 +1338,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      mm_pools_backup: {
-        Row: {
-          auto_sync_enabled: boolean | null
-          champion_payout_pct: number | null
-          created_at: string | null
-          draw_completed: boolean | null
-          draw_completed_at: string | null
-          elite8_payout_pct: number | null
-          final4_payout_pct: number | null
-          id: string | null
-          last_bracket_sync: string | null
-          last_odds_sync: string | null
-          pool_id: string | null
-          public_slug: string | null
-          push_rule: string | null
-          runnerup_payout_pct: number | null
-          sweet16_payout_pct: number | null
-          tournament_year: number | null
-          updated_at: string | null
-        }
-        Insert: {
-          auto_sync_enabled?: boolean | null
-          champion_payout_pct?: number | null
-          created_at?: string | null
-          draw_completed?: boolean | null
-          draw_completed_at?: string | null
-          elite8_payout_pct?: number | null
-          final4_payout_pct?: number | null
-          id?: string | null
-          last_bracket_sync?: string | null
-          last_odds_sync?: string | null
-          pool_id?: string | null
-          public_slug?: string | null
-          push_rule?: string | null
-          runnerup_payout_pct?: number | null
-          sweet16_payout_pct?: number | null
-          tournament_year?: number | null
-          updated_at?: string | null
-        }
-        Update: {
-          auto_sync_enabled?: boolean | null
-          champion_payout_pct?: number | null
-          created_at?: string | null
-          draw_completed?: boolean | null
-          draw_completed_at?: string | null
-          elite8_payout_pct?: number | null
-          final4_payout_pct?: number | null
-          id?: string | null
-          last_bracket_sync?: string | null
-          last_odds_sync?: string | null
-          pool_id?: string | null
-          public_slug?: string | null
-          push_rule?: string | null
-          runnerup_payout_pct?: number | null
-          sweet16_payout_pct?: number | null
-          tournament_year?: number | null
-          updated_at?: string | null
-        }
-        Relationships: []
       }
       org_memberships: {
         Row: {
@@ -2061,6 +1839,14 @@ export type Database = {
         }
         Returns: number
       }
+      delete_sq_score_changes_from: {
+        Args: {
+          p_from_change_order: number
+          p_include_final_types?: boolean
+          p_sq_game_id: string
+        }
+        Returns: undefined
+      }
       get_enabled_pool_types: { Args: never; Returns: Json }
       is_golf_picks_locked: { Args: { p_pool_id: string }; Returns: boolean }
       is_mm_pool_commissioner: {
@@ -2076,6 +1862,15 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: never; Returns: boolean }
+      replace_sq_game_winners: {
+        Args: {
+          p_filter_payout?: number
+          p_filter_win_types?: string[]
+          p_sq_game_id: string
+          p_winners: Json
+        }
+        Returns: undefined
+      }
       request_join_pool: { Args: { p_token: string }; Returns: Json }
       update_quarter_marker: {
         Args: {

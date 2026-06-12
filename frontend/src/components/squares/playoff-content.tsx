@@ -12,6 +12,7 @@ import { EditGameTeamsButton } from './edit-game-teams-button'
 import { EspnLoadSquaresButton } from './espn-load-squares-button'
 import { LiveScoringControl } from './live-scoring-control'
 import { ParticipantSummaryPanel } from './participant-summary-panel'
+import { replaceGameWinners, type WinnerInsert } from '@/lib/squares/winners'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -28,6 +29,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import type { WinningRound } from './square-cell'
+import { validateScoreValue, validateStageProgression } from '@/lib/squares'
 import {
   getRoundConfig,
   getRoundLabel as getRoundLabelFromConfig,
@@ -169,8 +171,41 @@ function PlayoffScoreEntry({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
     setError(null)
+
+    // Validate entered scores before writing anything
+    const scoreFields: Array<[string, string]> = [
+      [finalHome, `${game.home_team ?? 'Home'} final score`],
+      [finalAway, `${game.away_team ?? 'Away'} final score`],
+      ...(isSuperBowl
+        ? ([
+            [halfHome, `${game.home_team ?? 'Home'} halftime score`],
+            [halfAway, `${game.away_team ?? 'Away'} halftime score`],
+          ] as Array<[string, string]>)
+        : []),
+    ]
+    for (const [value, label] of scoreFields) {
+      if (value === '') continue
+      const result = validateScoreValue(parseInt(value, 10), label)
+      if (!result.isValid) {
+        setError(result.error)
+        return
+      }
+    }
+
+    // Cumulative scores: halftime cannot exceed final
+    if (isSuperBowl && halfHome !== '' && halfAway !== '' && finalHome !== '' && finalAway !== '') {
+      const progression = validateStageProgression([
+        { label: 'Halftime', home: parseInt(halfHome, 10), away: parseInt(halfAway, 10) },
+        { label: 'Final', home: parseInt(finalHome, 10), away: parseInt(finalAway, 10) },
+      ])
+      if (!progression.isValid) {
+        setError(progression.error)
+        return
+      }
+    }
+
+    setIsLoading(true)
 
     const supabase = createClient()
 
@@ -198,61 +233,53 @@ function PlayoffScoreEntry({
       return
     }
 
-    // Delete existing winners for this game before recalculating
-    await supabase.from('sq_winners').delete().eq('sq_game_id', game.id)
+    // Recompute the full winner set and replace atomically (single transaction)
+    const winners: WinnerInsert[] = []
 
-    // Helper to record a winner
-    const recordWinner = async (
+    const collectWinner = (
       homeScore: number,
       awayScore: number,
       winType: string,
       reverseWinType: string
     ) => {
       const forwardSquareId = getSquareId(homeScore, awayScore, false)
-      const forwardWinnerName = getWinnerName(homeScore, awayScore, false)
 
       if (forwardSquareId) {
-        await supabase.from('sq_winners').insert({
-          sq_game_id: game.id,
+        winners.push({
           square_id: forwardSquareId,
           win_type: winType,
-          winner_name: forwardWinnerName,
+          winner_name: getWinnerName(homeScore, awayScore, false),
         })
       }
 
       if (reverseScoring) {
         const reverseSquareId = getSquareId(homeScore, awayScore, true)
-        const reverseWinnerName = getWinnerName(homeScore, awayScore, true)
 
         if (reverseSquareId && reverseSquareId !== forwardSquareId) {
-          await supabase.from('sq_winners').insert({
-            sq_game_id: game.id,
+          winners.push({
             square_id: reverseSquareId,
             win_type: reverseWinType,
-            winner_name: reverseWinnerName,
+            winner_name: getWinnerName(homeScore, awayScore, true),
           })
         }
       }
     }
 
-    // Record halftime winner for Super Bowl
+    // Halftime winner for Super Bowl
     if (isSuperBowl && halfHome !== '' && halfAway !== '') {
-      await recordWinner(
-        parseInt(halfHome, 10),
-        parseInt(halfAway, 10),
-        'halftime',
-        'halftime_reverse'
-      )
+      collectWinner(parseInt(halfHome, 10), parseInt(halfAway, 10), 'halftime', 'halftime_reverse')
     }
 
-    // Record final winner (only when status is final)
+    // Final winner (only when status is final)
     if (status === 'final' && finalHome !== '' && finalAway !== '') {
-      await recordWinner(
-        parseInt(finalHome, 10),
-        parseInt(finalAway, 10),
-        'normal',
-        'reverse'
-      )
+      collectWinner(parseInt(finalHome, 10), parseInt(finalAway, 10), 'normal', 'reverse')
+    }
+
+    const { error: winnersError } = await replaceGameWinners(supabase, game.id, winners)
+    if (winnersError) {
+      setError(winnersError.message)
+      setIsLoading(false)
+      return
     }
 
     setIsLoading(false)
@@ -734,7 +761,8 @@ export function PlayoffContent({
     <div className="space-y-6">
       <div className="grid gap-6 lg:grid-cols-4">
         {/* Main content - Grid */}
-        <div className="lg:col-span-3 space-y-6">
+        {/* min-w-0: keep the wide squares grid scrolling inside its column instead of stretching the page */}
+        <div className="lg:col-span-3 space-y-6 min-w-0">
           {/* Grid */}
           <Card>
             <CardHeader className="pb-2">

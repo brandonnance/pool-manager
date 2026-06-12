@@ -27,7 +27,10 @@ export {
 
 // Score validation
 export {
+  MAX_REASONABLE_SCORE,
   validateScoreChange,
+  validateScoreValue,
+  validateStageProgression,
   validateFirstScoreChange,
   getLastScore,
   sortScoreChanges,

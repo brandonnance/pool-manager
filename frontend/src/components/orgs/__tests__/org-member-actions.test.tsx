@@ -216,8 +216,8 @@ describe('OrgMemberActions', () => {
       expect(mockConfirm).toHaveBeenCalled()
       const confirmCall = mockConfirm.mock.calls[0][0]
       expect(confirmCall).toContain('remove John Doe')
-      expect(confirmCall).toContain('Bowl Buster pools')
-      expect(confirmCall).toContain('Squares pools')
+      expect(confirmCall).toContain('remove them from all pools')
+      expect(confirmCall).toContain('squares will be abandoned or deleted')
     })
 
     it('does not remove when confirm is cancelled', async () => {

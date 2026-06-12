@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Wifi, WifiOff, RefreshCw, AlertCircle } from 'lucide-react'
+import { replaceGameWinners, type WinnerInsert } from '@/lib/squares/winners'
 import type { SyncScoreResponse } from '@/app/api/squares/sync-score/route'
 
 interface LiveScoringControlProps {
@@ -285,8 +286,8 @@ async function calculateAndRecordWinners(
   colNumbers: number[],
   reverseScoring: boolean
 ) {
-  // Delete existing winners for this game first
-  await supabase.from('sq_winners').delete().eq('sq_game_id', gameId)
+  // Collect the full winner set, then replace atomically (single transaction)
+  const winners: WinnerInsert[] = []
 
   // Final score winners
   const homeDigit = homeScore % 10
@@ -297,8 +298,7 @@ async function calculateAndRecordWinners(
 
   const normalWinner = await getWinnerName(supabase, sqPoolId, rowIndex, colIndex)
   if (normalWinner) {
-    await supabase.from('sq_winners').insert({
-      sq_game_id: gameId,
+    winners.push({
       square_id: normalWinner.squareId,
       win_type: 'normal',
       winner_name: normalWinner.winnerName,
@@ -313,8 +313,7 @@ async function calculateAndRecordWinners(
     if (reverseRowIndex !== rowIndex || reverseColIndex !== colIndex) {
       const reverseWinner = await getWinnerName(supabase, sqPoolId, reverseRowIndex, reverseColIndex)
       if (reverseWinner) {
-        await supabase.from('sq_winners').insert({
-          sq_game_id: gameId,
+        winners.push({
           square_id: reverseWinner.squareId,
           win_type: 'reverse',
           winner_name: reverseWinner.winnerName,
@@ -333,8 +332,7 @@ async function calculateAndRecordWinners(
 
     const halftimeWinner = await getWinnerName(supabase, sqPoolId, htRowIndex, htColIndex)
     if (halftimeWinner) {
-      await supabase.from('sq_winners').insert({
-        sq_game_id: gameId,
+      winners.push({
         square_id: halftimeWinner.squareId,
         win_type: 'halftime',
         winner_name: halftimeWinner.winnerName,
@@ -349,8 +347,7 @@ async function calculateAndRecordWinners(
       if (htReverseRowIndex !== htRowIndex || htReverseColIndex !== htColIndex) {
         const htReverseWinner = await getWinnerName(supabase, sqPoolId, htReverseRowIndex, htReverseColIndex)
         if (htReverseWinner) {
-          await supabase.from('sq_winners').insert({
-            sq_game_id: gameId,
+          winners.push({
             square_id: htReverseWinner.squareId,
             win_type: 'halftime_reverse',
             winner_name: htReverseWinner.winnerName,
@@ -359,4 +356,6 @@ async function calculateAndRecordWinners(
       }
     }
   }
+
+  await replaceGameWinners(supabase, gameId, winners)
 }

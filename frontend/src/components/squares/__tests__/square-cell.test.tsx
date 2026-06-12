@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { SquareCell } from '../square-cell'
+import { SquareCell, getInitials } from '../square-cell'
 import type { WinningRound } from '../square-cell'
 
 describe('SquareCell', () => {
@@ -346,6 +346,40 @@ describe('SquareCell', () => {
       const button = screen.getByRole('button')
       expect(button).toHaveAttribute('data-row', '3')
       expect(button).toHaveAttribute('data-col', '7')
+    })
+  })
+
+  describe('mobile initials mode', () => {
+    it('renders both initials and full name spans when mobileInitials is set', () => {
+      render(
+        <SquareCell {...defaultProps} participantName="John Doe" mobileInitials={true} />
+      )
+
+      const button = screen.getByRole('button')
+      // Initials span (visible below sm) and full-name span (visible sm+)
+      expect(button).toHaveTextContent('JD')
+      expect(button).toHaveTextContent('John Doe')
+    })
+
+    it('renders grid number for unassigned squares regardless of mobileInitials', () => {
+      render(<SquareCell {...defaultProps} mobileInitials={true} />)
+
+      expect(screen.getByRole('button')).toHaveTextContent('00')
+    })
+  })
+
+  describe('getInitials', () => {
+    it('uses first and last name initials', () => {
+      expect(getInitials('John Doe')).toBe('JD')
+      expect(getInitials('Mary Jo Van Buren')).toBe('MB')
+    })
+
+    it('uses first two letters for single names', () => {
+      expect(getInitials('Brandon')).toBe('Br')
+    })
+
+    it('handles surrounding whitespace', () => {
+      expect(getInitials('  John  Doe  ')).toBe('JD')
     })
   })
 

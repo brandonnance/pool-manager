@@ -65,6 +65,61 @@ export function validateScoreChange(
   return { isValid: true, error: null }
 }
 
+/** Upper bound for a plausible single-game score (football/basketball) */
+export const MAX_REASONABLE_SCORE = 200
+
+/**
+ * Validate a single score value: whole number, non-negative, plausibly sized.
+ *
+ * @param value - Parsed score value
+ * @param label - Field label for error messages (e.g. "Halftime home score")
+ * @returns Validation result
+ */
+export function validateScoreValue(
+  value: number,
+  label: string = 'Score'
+): ScoreValidationResult {
+  if (!Number.isInteger(value)) {
+    return { isValid: false, error: `${label} must be a whole number` }
+  }
+  if (value < 0) {
+    return { isValid: false, error: `${label} cannot be negative` }
+  }
+  if (value > MAX_REASONABLE_SCORE) {
+    return {
+      isValid: false,
+      error: `${label} looks too high (max ${MAX_REASONABLE_SCORE})`,
+    }
+  }
+  return { isValid: true, error: null }
+}
+
+/**
+ * Validate that cumulative stage scores never decrease (e.g. Q1 <= Halftime
+ * <= Q3 <= Final). Pass null for stages without scores; they are skipped.
+ *
+ * @param stages - Stage scores in game order, null when not entered
+ * @returns Validation result
+ */
+export function validateStageProgression(
+  stages: Array<{ label: string; home: number; away: number } | null>
+): ScoreValidationResult {
+  const present = stages.filter(
+    (s): s is { label: string; home: number; away: number } => s !== null
+  )
+  for (let i = 1; i < present.length; i++) {
+    const prev = present[i - 1]
+    const curr = present[i]
+    if (curr.home < prev.home || curr.away < prev.away) {
+      return {
+        isValid: false,
+        error: `${curr.label} score cannot be lower than ${prev.label} score`,
+      }
+    }
+  }
+  return { isValid: true, error: null }
+}
+
 /**
  * Validate that the first score change is 0-0.
  *

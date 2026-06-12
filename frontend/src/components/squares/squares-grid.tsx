@@ -1,9 +1,17 @@
 'use client'
 
 import { Fragment, useState, useRef, useEffect } from 'react'
+import { Maximize2, Minimize2 } from 'lucide-react'
 import { SquareCell } from './square-cell'
 import { cn } from '@/lib/utils'
 import type { WinningRound } from './square-cell'
+
+// Mobile view modes (sm+ always renders the fit layout regardless of mode):
+// - expand: 52px cells, readable names, two-axis scroll with sticky digit headers
+// - fit: whole grid in viewport, claimed cells show participant initials
+type GridViewMode = 'expand' | 'fit'
+
+const VIEW_MODE_STORAGE_KEY = 'squares-grid-view-mode'
 
 export type LegendMode = 'full_playoff' | 'single_game' | 'score_change' | 'march_madness'
 
@@ -61,6 +69,20 @@ export function SquaresGrid({
 }: SquaresGridProps) {
   const [loadingCell, setLoadingCell] = useState<string | null>(null)
   const [internalSelectedSquare, setInternalSelectedSquare] = useState<SelectedSquare | null>(null)
+  const [viewMode, setViewMode] = useState<GridViewMode>('expand')
+
+  // Restore saved preference after mount (avoids SSR hydration mismatch)
+  useEffect(() => {
+    const stored = localStorage.getItem(VIEW_MODE_STORAGE_KEY)
+    if (stored === 'fit' || stored === 'expand') {
+      setViewMode(stored)
+    }
+  }, [])
+
+  const changeViewMode = (mode: GridViewMode) => {
+    setViewMode(mode)
+    localStorage.setItem(VIEW_MODE_STORAGE_KEY, mode)
+  }
 
   // Use controlled participant name if provided, otherwise use internal state
   const isControlled = controlledParticipantName !== undefined
@@ -151,19 +173,51 @@ export function SquaresGrid({
 
   return (
     <div className={cn('space-y-4', className)}>
-      {/* Statistics row */}
-      <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-        <span>
-          <strong className="text-foreground">{claimedSquares}</strong> claimed
-        </span>
-        <span>
-          <strong className="text-foreground">{availableSquares}</strong> available
-        </span>
-        {isCommissioner && (
+      {/* Statistics row + mobile view toggle */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
           <span>
-            <strong className="text-green-600">{verifiedSquares}</strong> verified
+            <strong className="text-foreground">{claimedSquares}</strong> claimed
           </span>
-        )}
+          <span>
+            <strong className="text-foreground">{availableSquares}</strong> available
+          </span>
+          {isCommissioner && (
+            <span>
+              <strong className="text-green-600">{verifiedSquares}</strong> verified
+            </span>
+          )}
+        </div>
+        <div className="flex sm:hidden items-center rounded-md border border-input p-0.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => changeViewMode('expand')}
+            aria-pressed={viewMode === 'expand'}
+            className={cn(
+              'flex items-center gap-1 rounded px-2 py-1 text-xs font-medium',
+              viewMode === 'expand'
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground'
+            )}
+          >
+            <Maximize2 className="size-3" />
+            Zoom
+          </button>
+          <button
+            type="button"
+            onClick={() => changeViewMode('fit')}
+            aria-pressed={viewMode === 'fit'}
+            className={cn(
+              'flex items-center gap-1 rounded px-2 py-1 text-xs font-medium',
+              viewMode === 'fit'
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground'
+            )}
+          >
+            <Minimize2 className="size-3" />
+            Fit
+          </button>
+        </div>
       </div>
 
       {/* Tooltip for selected participant */}
@@ -190,7 +244,7 @@ export function SquaresGrid({
         </div>
       )}
 
-      <div ref={gridRef} className="overflow-x-auto overflow-y-visible pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
+      <div className="-mx-4 px-4 sm:mx-0 sm:px-0">
         {/* Away team axis label */}
         <div className="flex items-center justify-center mb-1 sm:mb-2 ml-7 sm:ml-10">
           <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-0.5 sm:py-1 bg-primary/10 rounded-full">
@@ -215,72 +269,86 @@ export function SquaresGrid({
             </div>
           </div>
 
-          {/* Grid - CSS variable based sizing for mobile */}
+          {/* Scroll container holds only the grid so sticky digit headers pin to its edges.
+              Expand mode scrolls both axes on mobile; sm+ always renders the fit layout. */}
+          {/* min-w-0 lets this flex item shrink below the grid's width so the
+              grid scrolls inside it instead of stretching the page */}
           <div
-            className="grid gap-px bg-border p-px rounded-lg flex-1"
-            style={{
-              gridTemplateColumns: `minmax(28px, 32px) repeat(10, minmax(28px, 1fr))`,
-              gridTemplateRows: `minmax(28px, 32px) repeat(10, minmax(28px, 1fr))`,
-            }}
+            ref={gridRef}
+            className={cn(
+              'flex-1 min-w-0 overflow-auto overscroll-contain pb-2',
+              viewMode === 'expand' && 'max-h-[70vh] sm:max-h-none'
+            )}
           >
-            {/* Top-left corner cell - empty */}
-            <div className="bg-slate-100 rounded-tl-lg" />
+            <div
+              className={cn(
+                'grid gap-px bg-border p-px rounded-lg',
+                viewMode === 'expand'
+                  ? 'grid-cols-[44px_repeat(10,72px)] grid-rows-[44px_repeat(10,72px)] sm:grid-cols-[minmax(28px,32px)_repeat(10,minmax(28px,1fr))] sm:grid-rows-[minmax(28px,32px)_repeat(10,minmax(28px,1fr))] w-max sm:w-auto'
+                  : 'grid-cols-[minmax(28px,32px)_repeat(10,minmax(28px,1fr))] grid-rows-[minmax(28px,32px)_repeat(10,minmax(28px,1fr))]'
+              )}
+            >
+              {/* Top-left corner cell - empty */}
+              <div className="bg-slate-100 rounded-tl-lg sticky top-0 left-0 z-30" />
 
-            {/* Column headers (Away team score - 0-9) */}
-            {Array.from({ length: 10 }, (_, colIdx) => (
-              <div
-                key={`col-header-${colIdx}`}
-                className={cn(
-                  'bg-slate-100 flex items-center justify-center font-bold text-base sm:text-lg text-slate-700',
-                  colIdx === 9 && 'rounded-tr-lg'
-                )}
-              >
-                {numbersLocked && colNumbers ? colNumbers[colIdx] : '?'}
-              </div>
-            ))}
-
-            {/* Rows */}
-            {Array.from({ length: 10 }, (_, rowIdx) => (
-              <Fragment key={`row-${rowIdx}`}>
-                {/* Row header (Home team score - 0-9) */}
+              {/* Column headers (Away team score - 0-9) */}
+              {Array.from({ length: 10 }, (_, colIdx) => (
                 <div
-                  key={`row-header-${rowIdx}`}
+                  key={`col-header-${colIdx}`}
                   className={cn(
-                    'bg-slate-100 flex items-center justify-center font-bold text-base sm:text-lg text-slate-700',
-                    rowIdx === 9 && 'rounded-bl-lg'
+                    'bg-slate-100 flex items-center justify-center font-bold text-base sm:text-lg text-slate-700 sticky top-0 z-20',
+                    colIdx === 9 && 'rounded-tr-lg'
                   )}
                 >
-                  {numbersLocked && rowNumbers ? rowNumbers[rowIdx] : '?'}
+                  {numbersLocked && colNumbers ? colNumbers[colIdx] : '?'}
                 </div>
+              ))}
 
-                {/* Square cells for this row */}
-                {Array.from({ length: 10 }, (_, colIdx) => {
-                  const cellKey = `${rowIdx}-${colIdx}`
-                  const square = squareMap.get(cellKey)
-                  const isLoading = loadingCell === cellKey
-                  // Highlight if this square belongs to selected participant
-                  const isHighlighted = selectedParticipantName
-                    ? square?.participant_name === selectedParticipantName
-                    : false
+              {/* Rows */}
+              {Array.from({ length: 10 }, (_, rowIdx) => (
+                <Fragment key={`row-${rowIdx}`}>
+                  {/* Row header (Home team score - 0-9) */}
+                  <div
+                    key={`row-header-${rowIdx}`}
+                    className={cn(
+                      'bg-slate-100 flex items-center justify-center font-bold text-base sm:text-lg text-slate-700 sticky left-0 z-20',
+                      rowIdx === 9 && 'rounded-bl-lg'
+                    )}
+                  >
+                    {numbersLocked && rowNumbers ? rowNumbers[rowIdx] : '?'}
+                  </div>
 
-                  return (
-                    <SquareCell
-                      key={cellKey}
-                      rowIndex={rowIdx}
-                      colIndex={colIdx}
-                      participantName={square?.participant_name ?? null}
-                      verified={square?.verified ?? false}
-                      isCommissioner={isCommissioner}
-                      winningRound={square?.id ? winningSquareRounds.get(square.id) ?? null : null}
-                      isLiveWinning={square?.id ? liveWinningSquareIds.has(square.id) : false}
-                      isHighlighted={isHighlighted}
-                      isLoading={isLoading}
-                      onClick={() => handleSquareClick(rowIdx, colIdx)}
-                    />
-                  )
-                })}
-              </Fragment>
-            ))}
+                  {/* Square cells for this row */}
+                  {Array.from({ length: 10 }, (_, colIdx) => {
+                    const cellKey = `${rowIdx}-${colIdx}`
+                    const square = squareMap.get(cellKey)
+                    const isLoading = loadingCell === cellKey
+                    // Highlight if this square belongs to selected participant
+                    const isHighlighted = selectedParticipantName
+                      ? square?.participant_name === selectedParticipantName
+                      : false
+
+                    return (
+                      <SquareCell
+                        key={cellKey}
+                        rowIndex={rowIdx}
+                        colIndex={colIdx}
+                        participantName={square?.participant_name ?? null}
+                        verified={square?.verified ?? false}
+                        isCommissioner={isCommissioner}
+                        winningRound={square?.id ? winningSquareRounds.get(square.id) ?? null : null}
+                        isLiveWinning={square?.id ? liveWinningSquareIds.has(square.id) : false}
+                        isHighlighted={isHighlighted}
+                        isLoading={isLoading}
+                        mobileInitials={viewMode === 'fit'}
+                        className={viewMode === 'expand' ? 'text-xs' : undefined}
+                        onClick={() => handleSquareClick(rowIdx, colIdx)}
+                      />
+                    )
+                  })}
+                </Fragment>
+              ))}
+            </div>
           </div>
         </div>
       </div>
