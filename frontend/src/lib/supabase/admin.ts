@@ -16,9 +16,11 @@ import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 
 export function createAdminClient() {
-  return createClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } }
-  )
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  // Fail with a message that names the variable: the generic supabase-js error
+  // ("supabaseKey is required") is easy to misread in production logs.
+  if (!url) throw new Error('createAdminClient: NEXT_PUBLIC_SUPABASE_URL is not set')
+  if (!key) throw new Error('createAdminClient: SUPABASE_SERVICE_ROLE_KEY is not set in this environment')
+  return createClient<Database>(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
 }
