@@ -33,7 +33,7 @@ const slugRegex = /^[a-z0-9-]+$/
 export const createPoolSchema = z.object({
   name: z.string().min(1, 'Pool name is required').trim(),
   seasonLabel: z.string().trim().optional().or(z.literal('')),
-  poolType: z.enum(['squares', 'golf', 'march_madness']),
+  poolType: z.enum(['squares', 'golf', 'march_madness', 'nfl_desperation']),
   reverseScoring: z.boolean(),
   squaresEventType: z.enum(['nfl_playoffs', 'march_madness', 'single_game']),
   scoringMode: z.enum(['quarter', 'score_change', 'hybrid']),
@@ -42,7 +42,8 @@ export const createPoolSchema = z.object({
   awayTeam: z.string().trim().optional().or(z.literal('')),
   publicSlug: z.string().trim().optional().or(z.literal('')),
 }).superRefine((data, ctx) => {
-  if ((data.poolType === 'squares' || data.poolType === 'march_madness') && data.publicSlug) {
+  const usesSlug = data.poolType === 'squares' || data.poolType === 'march_madness' || data.poolType === 'nfl_desperation'
+  if (usesSlug && data.publicSlug) {
     if (data.publicSlug.length < 3) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

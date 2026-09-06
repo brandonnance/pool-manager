@@ -4,6 +4,7 @@ export interface PoolTypes {
   squares: boolean
   golf: boolean
   march_madness: boolean
+  nfl_desperation: boolean
 }
 
 export interface SquaresGameTemplate {
@@ -27,10 +28,16 @@ export async function getEnabledPoolTypes(): Promise<PoolTypes> {
   if (error || !data) {
     console.error('Error fetching pool types:', error)
     // Default to all enabled
-    return { squares: true, golf: true, march_madness: true }
+    return { squares: true, golf: true, march_madness: true, nfl_desperation: true }
   }
 
-  return data as unknown as PoolTypes
+  const parsed = data as unknown as Partial<PoolTypes>
+  return {
+    squares: parsed.squares ?? true,
+    golf: parsed.golf ?? true,
+    march_madness: parsed.march_madness ?? true,
+    nfl_desperation: parsed.nfl_desperation ?? false,
+  }
 }
 
 /**

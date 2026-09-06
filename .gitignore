@@ -25,7 +25,7 @@ dist/
 .claude/
 
 # Supabase local
-supabase/
+/supabase/
 
 # SQL dumps and backups
 *.sql

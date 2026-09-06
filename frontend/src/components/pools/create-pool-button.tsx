@@ -71,6 +71,7 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
   const publicSlug = form.watch('publicSlug') ?? ''
   const reverseScoring = form.watch('reverseScoring')
   const slugError = form.formState.errors.publicSlug?.message
+  const usesSlug = poolType === 'squares' || poolType === 'march_madness' || poolType === 'nfl_desperation'
 
   // Fetch enabled pool types when dialog opens
   useEffect(() => {
@@ -88,6 +89,8 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
         form.setValue('poolType', 'march_madness')
       } else if (enabledPoolTypes.golf) {
         form.setValue('poolType', 'golf')
+      } else if (enabledPoolTypes.nfl_desperation) {
+        form.setValue('poolType', 'nfl_desperation')
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -95,12 +98,12 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
 
   // Auto-generate slug from pool name for squares and march madness pools
   useEffect(() => {
-    if ((poolType === 'squares' || poolType === 'march_madness') && name) {
+    if (usesSlug && name) {
       const slug = generateSlugFromName(name)
       form.setValue('publicSlug', slug, { shouldValidate: true })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, poolType])
+  }, [name, poolType, usesSlug])
 
   // Check slug availability (debounced)
   const checkSlugAvailability = useCallback(async (slug: string, type: PoolType) => {
@@ -109,14 +112,14 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
       return
     }
     setCheckingSlug(true)
-    const table = type === 'march_madness' ? 'mm_pools' as const : 'sq_pools' as const
+    const table = type === 'march_madness' ? 'mm_pools' as const : type === 'nfl_desperation' ? 'nd_pools' as const : 'sq_pools' as const
     const available = await checkSlugAvail(slug, table)
     setSlugAvailable(available)
     setCheckingSlug(false)
   }, [])
 
   useEffect(() => {
-    if ((poolType !== 'squares' && poolType !== 'march_madness') || !publicSlug || slugError) {
+    if (!usesSlug || !publicSlug || slugError) {
       setSlugAvailable(null)
       return
     }
@@ -124,7 +127,7 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
       checkSlugAvailability(publicSlug, poolType)
     }, 500)
     return () => clearTimeout(timeoutId)
-  }, [publicSlug, poolType, slugError, checkSlugAvailability])
+  }, [publicSlug, poolType, slugError, checkSlugAvailability, usesSlug])
 
   const handleSlugChange = (value: string) => {
     const formatted = formatSlugInput(value)
@@ -244,6 +247,23 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
       }
     }
 
+    if (values.poolType === 'nfl_desperation') {
+      // NFL season year = the calendar year the season kicked off (Jan/Feb belong to the prior season)
+      const now = new Date()
+      const seasonYear = now.getMonth() < 2 ? now.getFullYear() - 1 : now.getFullYear()
+      const { error: ndPoolError } = await supabase
+        .from('nd_pools')
+        .insert({
+          pool_id: pool.id,
+          season_year: seasonYear,
+          public_slug: values.publicSlug || null,
+        })
+      if (ndPoolError) {
+        setError(ndPoolError.message)
+        return
+      }
+    }
+
     setIsOpen(false)
     form.reset(DEFAULTS)
     router.refresh()
@@ -263,8 +283,9 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
   const enabledCount = enabledPoolTypes
     ? (enabledPoolTypes.squares ? 1 : 0) +
       (enabledPoolTypes.golf ? 1 : 0) +
-      (enabledPoolTypes.march_madness ? 1 : 0)
-    : 3
+      (enabledPoolTypes.march_madness ? 1 : 0) +
+      (enabledPoolTypes.nfl_desperation ? 1 : 0)
+    : 4
 
   const setPoolType = (type: PoolType) => form.setValue('poolType', type)
   const setSquaresEventType = (type: SquaresEventType) => form.setValue('squaresEventType', type)
@@ -332,13 +353,27 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
                         <div className="text-xs text-muted-foreground">64-player blind draw</div>
                       </button>
                     )}
+                    {enabledPoolTypes?.nfl_desperation && (
+                      <button
+                        type="button"
+                        onClick={() => setPoolType('nfl_desperation')}
+                        className={`p-3 rounded-lg border text-left transition-all ${
+                          poolType === 'nfl_desperation'
+                            ? 'border-primary bg-primary/10'
+                            : 'border-border hover:border-muted-foreground'
+                        }`}
+                      >
+                        <div className="font-medium">NFL Desperation</div>
+                        <div className="text-xs text-muted-foreground">Weekly all-or-nothing picks</div>
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
 
               {enabledCount === 1 && enabledPoolTypes && (
                 <div className="text-sm text-muted-foreground">
-                  Creating a {enabledPoolTypes.squares ? 'Squares' : enabledPoolTypes.golf ? 'Golf Pool' : 'March Madness'} pool
+                  Creating a {enabledPoolTypes.squares ? 'Squares' : enabledPoolTypes.golf ? 'Golf Pool' : enabledPoolTypes.march_madness ? 'March Madness' : 'NFL Desperation'} pool
                 </div>
               )}
 
@@ -353,6 +388,7 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
                         placeholder={
                           poolType === 'squares' ? 'Super Bowl Squares 2025' :
                           poolType === 'golf' ? 'Masters 2025 Pool' :
+                          poolType === 'nfl_desperation' ? 'NFL Desperation 2026' :
                           'March Madness 2025'
                         }
                         {...field}
@@ -610,6 +646,50 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
                 </div>
               )}
 
+              {/* NFL Desperation specific options */}
+              {poolType === 'nfl_desperation' && (
+                <div className="space-y-4 border-t pt-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="ndPublicSlug">Pool URL Slug</Label>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">/desperation/</span>
+                      <Input
+                        id="ndPublicSlug"
+                        value={publicSlug}
+                        onChange={(e) => handleSlugChange(e.target.value)}
+                        placeholder="desperation-2026"
+                        className={`font-mono text-sm ${
+                          slugError ? 'border-destructive' :
+                          slugAvailable === false ? 'border-destructive' :
+                          slugAvailable === true ? 'border-green-500' : ''
+                        }`}
+                      />
+                      {checkingSlug && (
+                        <div className="text-xs text-muted-foreground animate-pulse">...</div>
+                      )}
+                    </div>
+                    {slugError ? (
+                      <div className="text-xs text-destructive">{slugError}</div>
+                    ) : slugAvailable === false ? (
+                      <div className="text-xs text-destructive">
+                        This slug is already taken. Try a different one.
+                      </div>
+                    ) : slugAvailable === true ? (
+                      <div className="text-xs text-green-600">
+                        This slug is available!
+                      </div>
+                    ) : (
+                      <div className="text-xs text-muted-foreground">
+                        Players get private links under this address. Required before inviting.
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    NFL regular season only. The schedule loads from ESPN after the pool is created.
+                  </div>
+                </div>
+              )}
+
               {error && (
                 <Alert variant="destructive">
                   <AlertDescription>{error}</AlertDescription>
@@ -629,7 +709,7 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
                 type="submit"
                 disabled={
                   form.formState.isSubmitting ||
-                  ((poolType === 'squares' || poolType === 'march_madness') && (slugAvailable === false || checkingSlug))
+                  (usesSlug && (slugAvailable === false || checkingSlug))
                 }
               >
                 {form.formState.isSubmitting ? 'Creating...' : 'Create Pool'}

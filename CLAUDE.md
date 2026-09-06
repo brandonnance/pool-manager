@@ -109,6 +109,13 @@ pool-manager/
 - `bb_cfp_pool_round1` - First round matchups (seeds 5-12)
 - `bb_cfp_entry_picks` - User bracket picks for each slot
 
+### NFL Desperation (`nd_*`) — see `nfl-desperation-spec.md`
+- `nd_weeks`, `nd_games` - Season-scoped NFL schedule/scores shared across pools (ESPN-synced)
+- `nd_pools` - 1:1 with pools; `public_slug`, `season_year`
+- `nd_entries` - One per person per pool; `access_token` IS the credential (no auth user)
+- `nd_picks` - Absence of row = no pick. **No anon/member RLS access** — served only via server code
+- `nd_week_scores` - Computed per entry per week; provisional until week final
+
 ## Key Files to Know
 
 | File | Purpose |
@@ -132,6 +139,9 @@ pool-manager/
 | `frontend/src/app/(auth)/reset-password/page.tsx` | Reset password page |
 | `frontend/src/app/(dashboard)/settings/page.tsx` | Account settings page |
 | `frontend/src/components/auth/user-dropdown.tsx` | Header user dropdown |
+| `frontend/src/lib/desperation/server.ts` | NFL Desperation: token auth, ESPN sync, `buildBoard()` visibility gating |
+| `frontend/src/lib/supabase/admin.ts` | Service-role client (server only; callers do their own authz) |
+| `frontend/src/app/desperation/[slug]/e/[token]/page.tsx` | NFL Desperation player page (Picks / Board / Standings) |
 
 ## Role & Permissions System
 
@@ -237,4 +247,6 @@ The MCP server is configured in `.mcp.json`. Use these tools:
 - Pool creation auto-creates commissioner membership for the creator (DB trigger: `pool_commissioner_trigger`)
 - Self-service org creation: Any authenticated user can create organizations via dashboard or onboarding wizard
 - Org roles: `admin` (full control) or `member` (read-only) - note: renamed from previous "commissioner" terminology
+- Pool types in `pools_type_check`: bowl_buster, squares, golf, march_madness, nfl_desperation — extend the constraint when adding a type
+- NFL Desperation players have NO auth account: each `nd_entries.access_token` is a private URL. Other players' picks are read only through `buildBoard()`, which gates on kickoff (per game) and Sunday-noon-CT lock (pick counts)
 - Pool roles: `commissioner` (manage pool) or `member` (participate only) - stored in `pool_memberships.role`

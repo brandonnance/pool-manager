@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.1"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -1339,6 +1339,347 @@ export type Database = {
           },
         ]
       }
+      nd_entries: {
+        Row: {
+          access_token: string
+          active: boolean
+          created_at: string
+          display_name: string | null
+          email: string
+          id: string
+          invite_sent_at: string | null
+          joined_week: number
+          last_seen_at: string | null
+          nd_pool_id: string
+          updated_at: string
+        }
+        Insert: {
+          access_token?: string
+          active?: boolean
+          created_at?: string
+          display_name?: string | null
+          email: string
+          id?: string
+          invite_sent_at?: string | null
+          joined_week?: number
+          last_seen_at?: string | null
+          nd_pool_id: string
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string
+          active?: boolean
+          created_at?: string
+          display_name?: string | null
+          email?: string
+          id?: string
+          invite_sent_at?: string | null
+          joined_week?: number
+          last_seen_at?: string | null
+          nd_pool_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nd_entries_nd_pool_id_fkey"
+            columns: ["nd_pool_id"]
+            isOneToOne: false
+            referencedRelation: "nd_pools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nd_games: {
+        Row: {
+          away_abbr: string
+          away_logo: string | null
+          away_score: number | null
+          away_team: string
+          clock: string | null
+          created_at: string
+          espn_game_id: string
+          home_abbr: string
+          home_logo: string | null
+          home_score: number | null
+          home_team: string
+          id: string
+          kickoff_at: string
+          last_synced_at: string | null
+          neutral_site: boolean
+          odds_details: string | null
+          odds_provider: string | null
+          over_under: number | null
+          spread: number | null
+          period: number | null
+          qualifies: boolean
+          season_year: number
+          status: string
+          updated_at: string
+          venue: string | null
+          week_number: number
+          winner: string | null
+        }
+        Insert: {
+          away_abbr: string
+          away_logo?: string | null
+          away_score?: number | null
+          away_team: string
+          clock?: string | null
+          created_at?: string
+          espn_game_id: string
+          home_abbr: string
+          home_logo?: string | null
+          home_score?: number | null
+          home_team: string
+          id?: string
+          kickoff_at: string
+          last_synced_at?: string | null
+          neutral_site?: boolean
+          odds_details?: string | null
+          odds_provider?: string | null
+          over_under?: number | null
+          spread?: number | null
+          period?: number | null
+          qualifies?: boolean
+          season_year: number
+          status?: string
+          updated_at?: string
+          venue?: string | null
+          week_number: number
+          winner?: string | null
+        }
+        Update: {
+          away_abbr?: string
+          away_logo?: string | null
+          away_score?: number | null
+          away_team?: string
+          clock?: string | null
+          created_at?: string
+          espn_game_id?: string
+          home_abbr?: string
+          home_logo?: string | null
+          home_score?: number | null
+          home_team?: string
+          id?: string
+          kickoff_at?: string
+          last_synced_at?: string | null
+          neutral_site?: boolean
+          odds_details?: string | null
+          odds_provider?: string | null
+          over_under?: number | null
+          spread?: number | null
+          period?: number | null
+          qualifies?: boolean
+          season_year?: number
+          status?: string
+          updated_at?: string
+          venue?: string | null
+          week_number?: number
+          winner?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nd_games_season_year_week_number_fkey"
+            columns: ["season_year", "week_number"]
+            isOneToOne: false
+            referencedRelation: "nd_weeks"
+            referencedColumns: ["season_year", "week_number"]
+          },
+        ]
+      }
+      nd_picks: {
+        Row: {
+          created_at: string
+          entry_id: string
+          game_id: string
+          id: string
+          selection: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          entry_id: string
+          game_id: string
+          id?: string
+          selection: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          entry_id?: string
+          game_id?: string
+          id?: string
+          selection?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nd_picks_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "nd_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nd_picks_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "nd_games"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nd_pools: {
+        Row: {
+          allow_midseason_join: boolean
+          created_at: string
+          grand_prize_week: number
+          id: string
+          playoff_week: number
+          pool_id: string
+          public_slug: string | null
+          reminder_hours_before_lock: number
+          reminders_enabled: boolean
+          season_year: number
+          self_join_enabled: boolean
+          updated_at: string
+        }
+        Insert: {
+          allow_midseason_join?: boolean
+          created_at?: string
+          grand_prize_week?: number
+          id?: string
+          playoff_week?: number
+          pool_id: string
+          public_slug?: string | null
+          reminder_hours_before_lock?: number
+          reminders_enabled?: boolean
+          season_year?: number
+          self_join_enabled?: boolean
+          updated_at?: string
+        }
+        Update: {
+          allow_midseason_join?: boolean
+          created_at?: string
+          grand_prize_week?: number
+          id?: string
+          playoff_week?: number
+          pool_id?: string
+          public_slug?: string | null
+          reminder_hours_before_lock?: number
+          reminders_enabled?: boolean
+          season_year?: number
+          self_join_enabled?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nd_pools_pool_id_fkey"
+            columns: ["pool_id"]
+            isOneToOne: true
+            referencedRelation: "pools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nd_week_scores: {
+        Row: {
+          computed_at: string
+          correct_picks: number
+          entry_id: string
+          finalized: boolean
+          id: string
+          is_perfect: boolean
+          picks_made: number
+          points: number
+          qualifying_picks: number
+          season_year: number
+          week_number: number
+        }
+        Insert: {
+          computed_at?: string
+          correct_picks?: number
+          entry_id: string
+          finalized?: boolean
+          id?: string
+          is_perfect?: boolean
+          picks_made?: number
+          points?: number
+          qualifying_picks?: number
+          season_year: number
+          week_number: number
+        }
+        Update: {
+          computed_at?: string
+          correct_picks?: number
+          entry_id?: string
+          finalized?: boolean
+          id?: string
+          is_perfect?: boolean
+          picks_made?: number
+          points?: number
+          qualifying_picks?: number
+          season_year?: number
+          week_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nd_week_scores_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "nd_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nd_weeks: {
+        Row: {
+          created_at: string
+          finalized_at: string | null
+          first_kickoff_at: string | null
+          flash_prize_enabled: boolean
+          flash_prize_locked_at: string | null
+          flash_prize_note: string | null
+          id: string
+          last_kickoff_at: string | null
+          lock_at: string
+          season_year: number
+          status: string
+          updated_at: string
+          week_number: number
+        }
+        Insert: {
+          created_at?: string
+          finalized_at?: string | null
+          first_kickoff_at?: string | null
+          flash_prize_enabled?: boolean
+          flash_prize_locked_at?: string | null
+          flash_prize_note?: string | null
+          id?: string
+          last_kickoff_at?: string | null
+          lock_at: string
+          season_year: number
+          status?: string
+          updated_at?: string
+          week_number: number
+        }
+        Update: {
+          created_at?: string
+          finalized_at?: string | null
+          first_kickoff_at?: string | null
+          flash_prize_enabled?: boolean
+          flash_prize_locked_at?: string | null
+          flash_prize_note?: string | null
+          id?: string
+          last_kickoff_at?: string | null
+          lock_at?: string
+          season_year?: number
+          status?: string
+          updated_at?: string
+          week_number?: number
+        }
+        Relationships: []
+      }
       org_memberships: {
         Row: {
           created_at: string | null
@@ -1854,6 +2195,10 @@ export type Database = {
         Returns: boolean
       }
       is_mm_pool_member: { Args: { p_mm_pool_id: string }; Returns: boolean }
+      is_nd_season_commissioner: {
+        Args: { p_season: number }
+        Returns: boolean
+      }
       is_org_admin: { Args: { p_org_id: string }; Returns: boolean }
       is_pool_commissioner: { Args: { p_pool_id: string }; Returns: boolean }
       is_pool_member: { Args: { p_pool_id: string }; Returns: boolean }
@@ -1900,12 +2245,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1929,11 +2274,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1954,11 +2299,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1979,11 +2324,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1996,11 +2341,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

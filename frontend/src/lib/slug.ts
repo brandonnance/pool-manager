@@ -23,10 +23,12 @@ export function generateSlugFromName(name: string): string {
     .slice(0, 50)
 }
 
+export type SlugTable = 'sq_pools' | 'mm_pools' | 'gp_pools' | 'nd_pools'
+
 /** Check if a slug is available in the given table */
 export async function checkSlugAvailability(
   slug: string,
-  table: 'sq_pools' | 'mm_pools' | 'gp_pools',
+  table: SlugTable,
   currentSlug?: string
 ): Promise<boolean | null> {
   if (!slug || slug.length < 3) return null
@@ -48,10 +50,11 @@ const PUBLIC_URL_PREFIXES: Record<string, string> = {
   sq_pools: '/view/',
   mm_pools: '/view/mm/',
   gp_pools: '/pools/golf/',
+  nd_pools: '/desperation/',
 }
 
 /** Build the full public URL for a slug */
-export function getPublicUrl(slug: string, table: 'sq_pools' | 'mm_pools' | 'gp_pools'): string {
+export function getPublicUrl(slug: string, table: SlugTable): string {
   const prefix = PUBLIC_URL_PREFIXES[table]
   return `${typeof window !== 'undefined' ? window.location.origin : ''}${prefix}${slug}`
 }

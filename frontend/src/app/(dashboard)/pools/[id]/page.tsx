@@ -12,6 +12,7 @@
  * - squares: Football squares (single_game or playoffs mode)
  * - march_madness: 64-player blind draw tournament
  * - golf: Golf pool with tier-based picks
+ * - nfl_desperation: Weekly all-or-nothing NFL picks (token-link players)
  *
  * @permissions
  * - Super Admin: Full access to all pools
@@ -47,6 +48,9 @@ import { getPoolBaseData } from '@/lib/data/pool'
 import { getSquaresData } from '@/lib/data/squares'
 import { getMarchMadnessData } from '@/lib/data/march-madness'
 import { getGolfData } from '@/lib/data/golf'
+import { getDesperationData } from '@/lib/data/desperation'
+import { DesperationContent } from '@/components/desperation/desperation-content'
+import { appUrl } from '@/lib/desperation/emails'
 import { GpPublicUrlDisplay } from '@/components/golf/gp-public-url-display'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -108,6 +112,8 @@ export default async function PoolDetailPage({ params }: PageProps) {
     ? await getMarchMadnessData(supabase, id) : null
   const golfResult = pool.type === 'golf'
     ? await getGolfData(supabase, id, pool.status) : null
+  const ndResult = pool.type === 'nfl_desperation'
+    ? await getDesperationData(supabase, id) : null
   // Destructure type-specific results
   const sqPoolData = squaresResult?.sqPoolData ?? null
   const sqGamesData = squaresResult?.sqGamesData ?? []
@@ -190,7 +196,7 @@ export default async function PoolDetailPage({ params }: PageProps) {
                   )}
                 </div>
                 <p className="text-muted-foreground text-sm mt-2">
-                  {pool.type === 'squares' ? 'Squares' : pool.type === 'march_madness' ? 'March Madness Blind Draw' : pool.type === 'golf' ? 'Golf Pool' : pool.type}
+                  {pool.type === 'squares' ? 'Squares' : pool.type === 'march_madness' ? 'March Madness Blind Draw' : pool.type === 'golf' ? 'Golf Pool' : pool.type === 'nfl_desperation' ? 'NFL Desperation' : pool.type}
                   {pool.season_label && ` - ${pool.season_label}`}
                 </p>
                 <p className="text-xs sm:text-sm text-muted-foreground mt-1">
@@ -483,6 +489,27 @@ export default async function PoolDetailPage({ params }: PageProps) {
             <h2 className="text-lg font-semibold text-foreground mb-2">Pool Not Configured</h2>
             <p className="text-muted-foreground">
               This March Madness pool hasn&apos;t been set up yet.
+            </p>
+          </CardContent>
+        </Card>
+      ) : pool.type === 'nfl_desperation' && ndResult?.ndPoolData ? (
+        <DesperationContent
+          ndPool={ndResult.ndPoolData}
+          weeks={ndResult.ndWeeks}
+          currentWeek={ndResult.ndCurrentWeek}
+          currentGames={ndResult.ndCurrentGames}
+          entries={ndResult.ndEntries}
+          seasonTotals={ndResult.ndSeasonTotals}
+          isCommissioner={isCommissioner}
+          viewerEmail={user?.email ?? null}
+          appOrigin={appUrl()}
+        />
+      ) : pool.type === 'nfl_desperation' ? (
+        <Card>
+          <CardContent className="py-8 text-center">
+            <h2 className="text-lg font-semibold text-foreground mb-2">Pool Not Configured</h2>
+            <p className="text-muted-foreground">
+              This NFL Desperation pool hasn&apos;t been set up yet.
             </p>
           </CardContent>
         </Card>
