@@ -151,7 +151,9 @@ export function CreatePoolButton({ orgId }: CreatePoolButtonProps) {
         name: values.name,
         org_id: orgId,
         type: values.poolType,
-        status: 'draft',
+        // NFL Desperation has no setup phase (schedule comes from ESPN), so it opens on creation;
+        // a draft Desperation pool would silently reject every player at the public join link.
+        status: values.poolType === 'nfl_desperation' ? 'open' : 'draft',
         season_label: values.seasonLabel || null,
         created_by: user.id,
       })

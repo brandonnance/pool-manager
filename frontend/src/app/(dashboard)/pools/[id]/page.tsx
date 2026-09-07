@@ -501,6 +501,7 @@ export default async function PoolDetailPage({ params }: PageProps) {
           entries={ndResult.ndEntries}
           seasonTotals={ndResult.ndSeasonTotals}
           isCommissioner={isCommissioner}
+          poolStatus={pool.status}
           viewerEmail={user?.email ?? null}
           appOrigin={appUrl()}
         />

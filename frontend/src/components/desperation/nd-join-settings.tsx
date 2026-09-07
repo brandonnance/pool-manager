@@ -3,19 +3,26 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { Loader2, Unlock } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 
 interface Props {
   ndPoolId: string
+  /** pools.status — a 'draft' pool rejects every player at the join link until opened */
+  poolStatus: string
   selfJoinEnabled: boolean
   allowMidseasonJoin: boolean
 }
 
-type Patch = { self_join_enabled?: boolean; allow_midseason_join?: boolean }
+type Patch = { self_join_enabled?: boolean; allow_midseason_join?: boolean; pool_status?: 'open' }
 
-/** Commissioner toggles that control who can use the public join link. */
-export function NdJoinSettings({ ndPoolId, selfJoinEnabled, allowMidseasonJoin }: Props) {
+/**
+ * Commissioner controls for the public join link: an "Open pool" step while the
+ * pool is still a draft, then the toggles that decide who the link lets in.
+ */
+export function NdJoinSettings({ ndPoolId, poolStatus, selfJoinEnabled, allowMidseasonJoin }: Props) {
   const router = useRouter()
   const [selfJoin, setSelfJoin] = useState(selfJoinEnabled)
   const [midseason, setMidseason] = useState(allowMidseasonJoin)
@@ -46,6 +53,17 @@ export function NdJoinSettings({ ndPoolId, selfJoinEnabled, allowMidseasonJoin }
 
   return (
     <div className="space-y-3 border-t pt-3">
+      {poolStatus === 'draft' && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm">
+          <div className="font-medium text-amber-900">This pool is still a draft</div>
+          <p className="mt-0.5 text-xs text-amber-800">
+            Anyone who opens the join link sees &ldquo;This pool isn&apos;t open right now.&rdquo; Open it before you share the link.
+          </p>
+          <Button size="sm" className="mt-2 w-full" disabled={saving} onClick={() => save({ pool_status: 'open' })}>
+            {saving ? <Loader2 className="size-4 animate-spin" /> : <Unlock className="size-4" />} Open pool
+          </Button>
+        </div>
+      )}
       <Row
         id="nd-self-join"
         label="Anyone with the link can join"

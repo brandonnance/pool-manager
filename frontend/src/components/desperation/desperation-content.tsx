@@ -23,13 +23,15 @@ interface Props {
   entries: NdDashboardEntry[]
   seasonTotals: Record<string, number>
   isCommissioner: boolean
+  /** pools.status — joining only works while 'open' */
+  poolStatus: string
   /** Signed-in user's email, used to find their own entry in the roster */
   viewerEmail: string | null
   /** Absolute site origin (NEXT_PUBLIC_APP_URL) for building shareable links */
   appOrigin: string
 }
 
-export function DesperationContent({ ndPool, weeks, currentWeek, currentGames, entries, seasonTotals, isCommissioner, viewerEmail, appOrigin }: Props) {
+export function DesperationContent({ ndPool, weeks, currentWeek, currentGames, entries, seasonTotals, isCommissioner, poolStatus, viewerEmail, appOrigin }: Props) {
   const [copied, setCopied] = useState(false)
   const mine = viewerEmail ? entries.find((e) => e.email === viewerEmail.toLowerCase()) ?? null : null
 
@@ -86,6 +88,7 @@ export function DesperationContent({ ndPool, weeks, currentWeek, currentGames, e
                 {isCommissioner && (
                   <NdJoinSettings
                     ndPoolId={ndPool.id}
+                    poolStatus={poolStatus}
                     selfJoinEnabled={ndPool.self_join_enabled}
                     allowMidseasonJoin={ndPool.allow_midseason_join}
                   />
