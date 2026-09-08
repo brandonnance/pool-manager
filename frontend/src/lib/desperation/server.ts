@@ -13,8 +13,8 @@ import { fetchEspnWeek } from './espn'
 import { mapEspnEvent, computeWeekLockAt, pickCurrentWeek, joinWeekFor } from './schedule'
 import type { JoinClosedReason } from './join'
 export { pickCurrentWeek }
-import { scoreWeek, isTerminal } from './scoring'
-import { isPickVisibleToOthers, isCountVisibleToOthers } from './visibility'
+import { scoreWeek, isTerminal, sumSeasonPoints } from './scoring'
+import { isWeekLocked } from './visibility'
 import type { NdGame, NdWeek, NdPick, Board, BoardEntry } from './types'
 
 type Admin = SupabaseClient<Database>
@@ -391,19 +391,19 @@ export async function buildBoard(
     ? await admin.from('nd_picks').select('entry_id, game_id, selection').in('entry_id', entryIds).in('game_id', gameIds)
     : { data: [] as Array<{ entry_id: string; game_id: string; selection: string }> }
 
+  // Season total = finalized weeks only (see sumSeasonPoints)
   const { data: seasonScores } = entryIds.length
-    ? await admin.from('nd_week_scores').select('entry_id, week_number, points, finalized').in('entry_id', entryIds).eq('season_year', ctx.ndPool.season_year)
-    : { data: [] as Array<{ entry_id: string; week_number: number; points: number; finalized: boolean }> }
+    ? await admin
+        .from('nd_week_scores')
+        .select('entry_id, points, finalized')
+        .in('entry_id', entryIds)
+        .eq('season_year', ctx.ndPool.season_year)
+        .eq('finalized', true)
+    : { data: [] as Array<{ entry_id: string; points: number; finalized: boolean }> }
+  const seasonTotals = sumSeasonPoints(seasonScores ?? [])
 
-  const seasonTotals = new Map<string, number>()
-  let provisionalWeek: number | null = null
-  for (const s of seasonScores ?? []) {
-    seasonTotals.set(s.entry_id, (seasonTotals.get(s.entry_id) ?? 0) + s.points)
-    if (!s.finalized) provisionalWeek = s.week_number
-  }
-
-  const gameById = new Map(games.map((g) => [g.id, g]))
-  const countsVisible = isCountVisibleToOthers(week, now)
+  // One gate for everything about other entries: locked week → all visible
+  const weekVisible = isWeekLocked(week, now)
 
   const picksByEntry = new Map<string, NdPick[]>()
   for (const p of picks ?? []) {
@@ -415,23 +415,17 @@ export async function buildBoard(
   const boardEntries: BoardEntry[] = (entries ?? []).map((e) => {
     const isMe = e.id === ctx.entry.id
     const all = picksByEntry.get(e.id) ?? []
-    const visible = isMe
-      ? all
-      : all.filter((p) => {
-          const g = gameById.get(p.game_id)
-          return g ? isPickVisibleToOthers(g, now) : false
-        })
-    const showTotals = isMe || countsVisible
+    const show = isMe || weekVisible
     return {
       id: e.id,
       name: entryDisplayName(e),
       isMe,
-      pickCount: showTotals ? all.length : null,
-      picks: Object.fromEntries(visible.map((p) => [p.game_id, p.selection])),
-      score: showTotals ? scoreWeek(all, games) : null,
+      pickCount: show ? all.length : null,
+      picks: show ? Object.fromEntries(all.map((p) => [p.game_id, p.selection])) : {},
+      score: show ? scoreWeek(all, games) : null,
       seasonPoints: seasonTotals.get(e.id) ?? 0,
     }
   })
 
-  return { week, games, countsVisible, entries: boardEntries, standingsIncludeProvisionalWeek: provisionalWeek }
+  return { week, games, countsVisible: weekVisible, entries: boardEntries }
 }

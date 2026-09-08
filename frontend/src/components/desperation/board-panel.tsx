@@ -4,15 +4,15 @@ import { useMemo } from 'react'
 import { EyeOff, Skull, Trophy, Activity } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
-import { entryWeekState } from '@/lib/desperation/scoring'
+import { entryWeekState, summarizeWeekScore } from '@/lib/desperation/scoring'
 import type { BoardPayload, NdGame, Selection } from '@/lib/desperation/types'
 import { fmtLockCT } from './format'
 import { WeekNav } from './week-nav'
+import { WeekScoreLine } from './week-score-line'
 
 interface Props {
   board: BoardPayload
   viewWeek: number
-  now: number
   onChangeWeek: (w: number) => void
 }
 
@@ -38,12 +38,14 @@ function StateBadge({ state }: { state: ReturnType<typeof entryWeekState> }) {
   }
 }
 
-export function BoardPanel({ board, viewWeek, now, onChangeWeek }: Props) {
+/**
+ * Week board. Before the Sunday-noon lock only the viewer's own row carries
+ * picks and a score; every other row is name-only. After the lock, everyone's
+ * picks (with live/won/lost coloring) and X/Y · max lines are shown, sorted
+ * alive-by-max first, busted last.
+ */
+export function BoardPanel({ board, viewWeek, onChangeWeek }: Props) {
   const { week, games, entries, countsVisible } = board
-  const revealedGames = useMemo(
-    () => games.filter((g) => g.status !== 'scheduled' || new Date(g.kickoff_at).getTime() <= now),
-    [games, now]
-  )
 
   const sorted = useMemo(() => {
     const rows = [...entries]
@@ -52,7 +54,9 @@ export function BoardPanel({ board, viewWeek, now, onChangeWeek }: Props) {
         const sa = a.score, sb = b.score
         if (sa && sb) {
           if (sa.busted !== sb.busted) return sa.busted ? 1 : -1
-          if (sb.potentialPoints !== sa.potentialPoints) return sb.potentialPoints - sa.potentialPoints
+          const pa = summarizeWeekScore(sa).points, pb = summarizeWeekScore(sb).points
+          if (pb !== pa) return pb - pa
+          if (sb.correct !== sa.correct) return sb.correct - sa.correct
         }
         return a.name.localeCompare(b.name)
       })
@@ -70,8 +74,8 @@ export function BoardPanel({ board, viewWeek, now, onChangeWeek }: Props) {
         <div className="flex items-start gap-2 rounded-lg border border-dashed bg-muted/40 p-3 text-sm text-muted-foreground">
           <EyeOff className="mt-0.5 size-4 shrink-0" />
           <div>
-            Pick counts stay hidden until <span className="font-medium text-foreground">{fmtLockCT(week.lock_at)}</span>.
-            Individual picks appear as each game kicks off.
+            Everyone&apos;s picks, counts, and points stay hidden until{' '}
+            <span className="font-medium text-foreground">{fmtLockCT(week.lock_at)}</span>. Only you can see yours.
           </div>
         </div>
       )}
@@ -79,7 +83,8 @@ export function BoardPanel({ board, viewWeek, now, onChangeWeek }: Props) {
       <ul className="grid gap-2 md:grid-cols-2">
         {sorted.map((e) => {
           const state = e.score ? entryWeekState(e.score) : null
-          const revealed = revealedGames
+          // Server already gated e.picks: own picks always, others' only once the week is locked
+          const revealed = games
             .map((g) => ({ g, sel: e.picks[g.id] }))
             .filter((x): x is { g: NdGame; sel: Selection } => !!x.sel)
           return (
@@ -87,17 +92,7 @@ export function BoardPanel({ board, viewWeek, now, onChangeWeek }: Props) {
               <div className="flex flex-wrap items-center gap-2">
                 <span className={cn('font-medium', e.isMe && 'text-primary')}>{e.name}{e.isMe && ' (you)'}</span>
                 {state && <StateBadge state={state} />}
-                <span className="ml-auto flex items-center gap-3 text-sm tabular-nums">
-                  {e.pickCount !== null && (
-                    <span className="text-muted-foreground">{e.pickCount} pick{e.pickCount === 1 ? '' : 's'}</span>
-                  )}
-                  {e.score && !e.score.busted && e.score.picksMade > 0 && (
-                    <span className="font-semibold">
-                      {e.score.complete ? e.score.finalPoints : e.score.potentialPoints}
-                      <span className="ml-0.5 text-xs font-normal text-muted-foreground">{e.score.complete ? 'pts' : 'max'}</span>
-                    </span>
-                  )}
-                </span>
+                {e.score && <WeekScoreLine score={e.score} className="ml-auto text-sm" />}
               </div>
               {revealed.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
@@ -122,9 +117,6 @@ export function BoardPanel({ board, viewWeek, now, onChangeWeek }: Props) {
                     )
                   })}
                 </div>
-              )}
-              {revealed.length === 0 && revealedGames.length > 0 && e.pickCount !== 0 && (
-                <div className="mt-1 text-xs text-muted-foreground">No picks on games that have started</div>
               )}
             </li>
           )

@@ -4,7 +4,7 @@ import { useMemo } from 'react'
 import { Flame, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { canEditPick } from '@/lib/desperation/visibility'
-import { triangular } from '@/lib/desperation/scoring'
+import { scoreWeek, summarizeWeekScore } from '@/lib/desperation/scoring'
 import type { NdGame, NdWeek, Selection } from '@/lib/desperation/types'
 import { GameCard } from './game-card'
 import { fmtKickoffLong } from './format'
@@ -29,11 +29,23 @@ function groupByKickoff(games: NdGame[]) {
   return groups
 }
 
+const STATE_TEXT = {
+  no_picks: 'Zero picks scores zero',
+  alive: 'All must hit or you get 0',
+  busted: 'One pick lost — 0 this week',
+  perfect: 'Perfect week',
+} as const
+
 export function PicksPanel({ week, games, picks, saving, now, onPick }: Props) {
   const groups = useMemo(() => groupByKickoff(games), [games])
   const nowDate = new Date(now)
-  const count = Object.keys(picks).filter((id) => games.some((g) => g.id === id)).length
-  const pts = triangular(count)
+  // Same scorer the board and standings use, so the footer agrees with them
+  // (voided picks drop out of the denominator and the max).
+  const summary = useMemo(
+    () => summarizeWeekScore(scoreWeek(Object.entries(picks).map(([game_id, selection]) => ({ game_id, selection })), games)),
+    [picks, games]
+  )
+  const count = summary.counted
 
   return (
     <div className="pb-24">
@@ -70,19 +82,35 @@ export function PicksPanel({ week, games, picks, saving, now, onPick }: Props) {
       <div className="fixed inset-x-0 bottom-0 z-20 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-3 md:max-w-4xl">
           <div className="flex items-center gap-2">
-            <Flame className={cn('size-5', count >= 8 ? 'text-orange-500' : count >= 4 ? 'text-amber-500' : 'text-muted-foreground')} />
+            <Flame
+              className={cn(
+                'size-5',
+                summary.state === 'busted'
+                  ? 'text-muted-foreground/50'
+                  : count >= 8 ? 'text-orange-500' : count >= 4 ? 'text-amber-500' : 'text-muted-foreground'
+              )}
+            />
             <div>
-              <div className="text-sm font-semibold">
-                {count} pick{count === 1 ? '' : 's'}
+              <div className="text-sm font-semibold tabular-nums">
+                {summary.state === 'no_picks' ? '0 picks' : (
+                  <>
+                    {summary.right}/{count} <span className="font-normal text-muted-foreground">right</span>
+                    {summary.voided > 0 && <span className="ml-1 text-xs font-normal text-muted-foreground">({summary.voided} voided)</span>}
+                  </>
+                )}
               </div>
-              <div className="text-xs text-muted-foreground">
-                {count === 0 ? 'Zero picks scores zero' : 'All must hit or you get 0'}
+              <div className={cn('text-xs', summary.state === 'busted' ? 'text-red-600' : summary.state === 'perfect' ? 'text-emerald-700' : 'text-muted-foreground')}>
+                {STATE_TEXT[summary.state]}
               </div>
             </div>
           </div>
           <div className="text-right">
-            <div className="text-2xl font-bold tabular-nums leading-none">{pts}</div>
-            <div className="text-xs text-muted-foreground">pts if perfect</div>
+            <div className={cn('text-2xl font-bold tabular-nums leading-none', summary.state === 'busted' && 'text-red-600', summary.state === 'perfect' && 'text-emerald-700')}>
+              {summary.points}
+            </div>
+            <div className={cn('text-xs', summary.state === 'busted' ? 'text-red-600' : 'text-muted-foreground')}>
+              {summary.state === 'busted' ? 'busted' : summary.pointsLabel === 'max' ? 'max pts' : 'pts'}
+            </div>
           </div>
         </div>
       </div>

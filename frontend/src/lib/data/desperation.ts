@@ -2,6 +2,7 @@ import { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import type { NdWeek, NdGame } from '@/lib/desperation/types'
 import { pickCurrentWeek } from '@/lib/desperation/schedule'
+import { sumSeasonPoints } from '@/lib/desperation/scoring'
 
 /**
  * NFL Desperation dashboard data (commissioner view).
@@ -69,18 +70,17 @@ export async function getDesperationData(
 
   const ndEntries = (entriesRaw ?? []) as NdDashboardEntry[]
 
+  // Season total = finalized weeks only, same rule as the player board
   const { data: scoresRaw } = ndEntries.length
     ? await supabase
         .from('nd_week_scores')
-        .select('entry_id, points')
+        .select('entry_id, points, finalized')
         .in('entry_id', ndEntries.map((e) => e.id))
         .eq('season_year', ndPool.season_year)
+        .eq('finalized', true)
     : { data: [] }
 
-  const ndSeasonTotals: Record<string, number> = {}
-  for (const s of scoresRaw ?? []) {
-    ndSeasonTotals[s.entry_id] = (ndSeasonTotals[s.entry_id] ?? 0) + s.points
-  }
+  const ndSeasonTotals: Record<string, number> = Object.fromEntries(sumSeasonPoints(scoresRaw ?? []))
 
   return {
     ndPoolData: ndPool,

@@ -80,19 +80,20 @@ export interface BoardEntry {
   isMe: boolean
   /** null when hidden (before week lock, not me) */
   pickCount: number | null
-  /** game_id -> selection; only games whose picks are visible to the viewer */
+  /** game_id -> selection. Own picks always; others' picks only once the week is locked */
   picks: Record<string, Selection>
   /** null when hidden (before week lock, not me) */
   score: WeekScore | null
+  /** Sum of finalized weeks only */
   seasonPoints: number
 }
 
 export interface Board {
   week: NdWeek
   games: NdGame[]
+  /** True once the week is locked: everyone's picks, counts, and scores are visible */
   countsVisible: boolean
   entries: BoardEntry[]
-  standingsIncludeProvisionalWeek: number | null
 }
 
 /** What GET /api/desperation/board returns. */

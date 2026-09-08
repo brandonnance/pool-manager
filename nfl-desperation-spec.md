@@ -47,13 +47,16 @@ Deferred to December (Weeks 17–18): Flash Prizes (Rule 17), Grand Prize
 
 ## Visibility model — the critical part
 
-The entire pool rests on nobody seeing picks early. Two independent gates:
+The entire pool rests on nobody seeing picks early. One gate (decided 2026-09-08,
+replacing the earlier per-game kickoff reveal):
 
-1. **Individual pick on game G** is visible to other players iff `now >= G.kickoff_at`.
-2. **An entry's total pick count for the week** is visible to other players iff
-   `now >= week.lock_at` (Sunday 12:00 PM CT).
+- **Everything about another entry's week** — individual picks, pick count, X/Y, max
+  points, busted/alive state — is visible iff `now >= week.lock_at` (Sunday 12:00 PM CT).
+  A Wednesday/Thursday pick is *locked* at its kickoff but stays *hidden* until Sunday
+  noon, so nobody learns who is already busted before every pick is frozen. At the lock,
+  all picks for the week (including games not yet kicked off) become visible.
 
-An entry always sees its own picks and its own count.
+An entry always sees its own picks, count, and score.
 
 ### Enforcement
 
@@ -87,9 +90,19 @@ A game qualifies iff `status = 'final'` AND `winner <> 'tie'`. Non-qualifying:
 - **Suspended** (Rule 9) — stays active until completed or canceled.
 
 Because ties and cancellations shrink `n` retroactively, weekly scores stay **provisional**
-until every game in the week reaches a terminal state. Surface them as provisional in the UI.
+until every game in the week reaches a terminal state.
 
-Season score = sum of weekly scores. No tiebreakers anywhere (Rules 13, 16, 17).
+**Display (decided 2026-09-08):** an entry's week is shown as `X/Y · P` where X = correct
+so far, Y = picks that count (picks made minus voided), and P = max points still possible
+(`n(n+1)/2` of remaining picks) while alive, **0 the moment a pick loses**, and the final
+total once every picked game is done. The viewer sees their own line at all times; others'
+lines appear at the Sunday-noon lock. Nothing shows "points earned so far" — in
+all-or-nothing scoring that number is meaningless midweek.
+
+Season score = sum of **finalized** weeks only (`nd_week_scores.finalized = true`, set when
+the week's last game ends). An entry whose own picks are all decided early does NOT get
+credited until the week finalizes — that would leak their result before the lock.
+No tiebreakers anywhere (Rules 13, 16, 17).
 
 ## Data model
 

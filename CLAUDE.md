@@ -248,5 +248,5 @@ The MCP server is configured in `.mcp.json`. Use these tools:
 - Self-service org creation: Any authenticated user can create organizations via dashboard or onboarding wizard
 - Org roles: `admin` (full control) or `member` (read-only) - note: renamed from previous "commissioner" terminology
 - Pool types in `pools_type_check`: bowl_buster, squares, golf, march_madness, nfl_desperation — extend the constraint when adding a type
-- NFL Desperation players have NO auth account: each `nd_entries.access_token` is a private URL. Other players' picks are read only through `buildBoard()`, which gates on kickoff (per game) and Sunday-noon-CT lock (pick counts)
+- NFL Desperation players have NO auth account: each `nd_entries.access_token` is a private URL. Other players' picks, counts, and scores are read only through `buildBoard()`, which hides ALL of them until the Sunday-noon-CT week lock; season totals sum finalized weeks only
 - Pool roles: `commissioner` (manage pool) or `member` (participate only) - stored in `pool_memberships.role`

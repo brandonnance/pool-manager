@@ -83,6 +83,55 @@ export function entryWeekState(score: WeekScore): EntryWeekState {
   return 'alive'
 }
 
+/** Display-ready summary of a week score, shared by the footer, board, and standings. */
+export interface WeekScoreSummary {
+  state: EntryWeekState
+  /** Correct picks so far */
+  right: number
+  /** Picks that still count: picks made minus voided (tie / canceled) */
+  counted: number
+  /** Voided picks, for an optional "(1 tie)" hint */
+  voided: number
+  /** Max points while alive; final points once complete; 0 when busted */
+  points: number
+  /** 'max' while games remain, 'pts' once the entry's week is decided */
+  pointsLabel: 'max' | 'pts'
+}
+
+/**
+ * "X/Y" where X = correct so far and Y = picks that count, plus the one number
+ * that matters in all-or-nothing scoring: the max still on the table (or the
+ * final total once every picked game is done). Busted → 0, labeled 'pts'.
+ */
+export function summarizeWeekScore(score: WeekScore): WeekScoreSummary {
+  const state = entryWeekState(score)
+  const decided = score.complete || score.busted
+  return {
+    state,
+    right: score.correct,
+    counted: score.picksMade - score.voided,
+    voided: score.voided,
+    points: decided ? (score.finalPoints ?? 0) : score.potentialPoints,
+    pointsLabel: decided ? 'pts' : 'max',
+  }
+}
+
+/**
+ * Season total = sum of FINALIZED weeks only. A week's points join the season
+ * when its last game ends, never before — even for an entry whose own picks
+ * are all decided (that would leak their result before the Sunday lock).
+ */
+export function sumSeasonPoints<T extends { entry_id: string; points: number; finalized: boolean }>(
+  rows: T[]
+): Map<string, number> {
+  const totals = new Map<string, number>()
+  for (const r of rows) {
+    if (!r.finalized) continue
+    totals.set(r.entry_id, (totals.get(r.entry_id) ?? 0) + r.points)
+  }
+  return totals
+}
+
 export interface StandingRow<T = string> {
   entryId: T
   points: number

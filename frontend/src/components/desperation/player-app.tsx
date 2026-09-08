@@ -233,7 +233,7 @@ export function PlayerApp({ token, poolName, entryName: initialName, initial, ad
         </TabsContent>
 
         <TabsContent value="board" className="mt-4">
-          <BoardPanel board={board} viewWeek={viewWeek} now={now} onChangeWeek={changeWeek} />
+          <BoardPanel board={board} viewWeek={viewWeek} onChangeWeek={changeWeek} />
         </TabsContent>
 
         <TabsContent value="standings" className="mt-4">

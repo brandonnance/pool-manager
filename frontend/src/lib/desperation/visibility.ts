@@ -1,8 +1,10 @@
 /**
  * NFL Desperation lock & visibility gates — pure functions.
  *
- * Rules (NFL_Desperation.md §4–§5), plus the confirmed decision that
- * per-entry pick COUNTS stay hidden until the week lock (not live).
+ * Rules (NFL_Desperation.md §4–§5), plus the confirmed decision (2026-09-08) that
+ * NOTHING about another entry's week — individual picks, pick count, or points —
+ * is visible until the week lock (Sunday 12:00 PM Central). An entry always sees
+ * its own picks and score.
  *
  * Every server path that returns another entry's picks MUST go through these.
  */
@@ -25,21 +27,21 @@ export function canEditPick(
   return now < gameLockAt(game, week)
 }
 
-/** Are OTHER players' picks on this game visible? Yes once it has kicked off. */
-export function isPickVisibleToOthers(
-  game: Pick<NdGame, 'kickoff_at' | 'status'>,
-  now: Date = new Date()
-): boolean {
-  if (game.status !== 'scheduled') return true
-  return now >= new Date(game.kickoff_at)
-}
-
-/** Is the per-entry "number of picks this week" visible to other players? Only after the week lock. */
-export function isCountVisibleToOthers(week: Pick<NdWeek, 'lock_at'>, now: Date = new Date()): boolean {
-  return now >= new Date(week.lock_at)
-}
-
 /** Is the week fully locked (no game may be edited)? */
 export function isWeekLocked(week: Pick<NdWeek, 'lock_at'>, now: Date = new Date()): boolean {
   return now >= new Date(week.lock_at)
+}
+
+/**
+ * Are OTHER players' individual picks for this week visible? Only after the week lock.
+ * A pre-Sunday game's pick is locked at its kickoff but stays hidden until Sunday noon,
+ * so nobody learns who is already busted before everyone's picks are frozen.
+ */
+export function isPickVisibleToOthers(week: Pick<NdWeek, 'lock_at'>, now: Date = new Date()): boolean {
+  return isWeekLocked(week, now)
+}
+
+/** Is the per-entry pick count / week score visible to other players? Only after the week lock. */
+export function isCountVisibleToOthers(week: Pick<NdWeek, 'lock_at'>, now: Date = new Date()): boolean {
+  return isWeekLocked(week, now)
 }

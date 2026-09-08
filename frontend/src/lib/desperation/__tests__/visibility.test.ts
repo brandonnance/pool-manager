@@ -34,17 +34,14 @@ describe('canEditPick', () => {
 })
 
 describe('isPickVisibleToOthers', () => {
-  it('Wednesday picks are visible Thursday, MNF picks are not', () => {
+  it('nothing is visible before the Sunday noon lock, even a finished Wednesday game', () => {
     const thu = new Date('2026-09-11T12:00:00Z')
-    expect(isPickVisibleToOthers(wed, thu)).toBe(true)
-    expect(isPickVisibleToOthers(mnf, thu)).toBe(false)
+    expect(isPickVisibleToOthers(week, thu)).toBe(false)
+    expect(isPickVisibleToOthers(week, new Date('2026-09-13T16:59:59Z'))).toBe(false)
   })
-  it('MNF picks stay hidden Sunday afternoon even though they are locked', () => {
-    expect(isPickVisibleToOthers(mnf, new Date('2026-09-13T20:00:00Z'))).toBe(false)
-    expect(isPickVisibleToOthers(mnf, new Date('2026-09-15T00:15:00Z'))).toBe(true)
-  })
-  it('an in-progress or final game is always visible regardless of clock', () => {
-    expect(isPickVisibleToOthers({ ...mnf, status: 'in_progress' }, new Date('2026-09-01T00:00:00Z'))).toBe(true)
+  it('everything is visible from the lock second on, including games that have not kicked off', () => {
+    expect(isPickVisibleToOthers(week, new Date('2026-09-13T17:00:00Z'))).toBe(true)
+    expect(isPickVisibleToOthers(week, new Date('2026-09-13T20:00:00Z'))).toBe(true)
   })
 })
 

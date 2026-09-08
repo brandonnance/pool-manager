@@ -4,57 +4,59 @@ import { useMemo } from 'react'
 import { cn } from '@/lib/utils'
 import { rankByPoints } from '@/lib/desperation/scoring'
 import type { BoardPayload, WeekScore } from '@/lib/desperation/types'
+import { fmtLockCT } from './format'
+import { WeekScoreLine } from './week-score-line'
 
 interface Props {
   board: BoardPayload
 }
 
-/** Desktop-only column: this week's points so far. null score = hidden until the noon lock. */
-function weekCell(score: WeekScore | null) {
-  if (!score) return <span className="text-muted-foreground" title="Hidden until the Sunday noon lock">&mdash;</span>
-  if (score.busted) return <span className="text-red-600">Busted</span>
-  if (score.picksMade === 0) return <span className="text-muted-foreground">0</span>
-  if (score.complete) return <span>{score.finalPoints}</span>
-  return <span>{score.potentialPoints}<span className="ml-0.5 text-xs font-normal text-muted-foreground">max</span></span>
-}
-
+/**
+ * Season standings (finalized weeks only) with a live column for the week being
+ * viewed. The week cell is X/Y · max for the viewer at all times and for others
+ * once the week is locked; a dash until then.
+ */
 export function StandingsPanel({ board }: Props) {
+  const { week, entries } = board
   const ranked = useMemo(() => {
-    const rows = rankByPoints(board.entries.map((e) => ({ entryId: e.id, points: e.seasonPoints })))
-    const byId = new Map(board.entries.map((e) => [e.id, e]))
+    const rows = rankByPoints(entries.map((e) => ({ entryId: e.id, points: e.seasonPoints })))
+    const byId = new Map(entries.map((e) => [e.id, e]))
     return rows.map((r) => ({ ...r, entry: byId.get(r.entryId)! }))
-  }, [board.entries])
+  }, [entries])
 
-  const provisional = board.standingsIncludeProvisionalWeek
+  const weekDone = week.status === 'final'
+  const hiddenTitle = `Hidden until ${fmtLockCT(week.lock_at)}`
+
+  const weekCell = (score: WeekScore | null) =>
+    score ? (
+      <WeekScoreLine score={score} />
+    ) : (
+      <span className="text-muted-foreground" title={hiddenTitle}>&mdash;</span>
+    )
 
   return (
     <div className="space-y-3">
-      {provisional !== null && (
-        <p className="text-xs text-muted-foreground">
-          Includes provisional Week {provisional} points. Totals finalize when the last game of the week ends.
-        </p>
-      )}
       <div className="overflow-hidden rounded-xl border bg-card">
         <table className="w-full text-sm">
           <thead className="bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
-              <th className="px-3 py-2 text-left font-medium">#</th>
-              <th className="px-3 py-2 text-left font-medium">Player</th>
-              <th className="hidden px-3 py-2 text-right font-medium md:table-cell">Week {board.week.week_number}</th>
-              <th className="px-3 py-2 text-right font-medium">Season</th>
+              <th className="px-2 py-2 text-left font-medium sm:px-3">#</th>
+              <th className="px-2 py-2 text-left font-medium sm:px-3">Player</th>
+              <th className="px-2 py-2 text-right font-medium sm:px-3">Week {week.week_number}</th>
+              <th className="px-2 py-2 text-right font-medium sm:px-3">Season</th>
             </tr>
           </thead>
           <tbody>
             {ranked.map((r) => (
               <tr key={r.entryId} className={cn('border-t', r.entry.isMe && 'bg-primary/5')}>
-                <td className="px-3 py-2 tabular-nums text-muted-foreground">
+                <td className="px-2 py-2 tabular-nums text-muted-foreground sm:px-3">
                   {r.tied ? `T${r.rank}` : r.rank}
                 </td>
-                <td className={cn('px-3 py-2', r.entry.isMe && 'font-semibold text-primary')}>
+                <td className={cn('max-w-[10rem] truncate px-2 py-2 sm:max-w-none sm:px-3', r.entry.isMe && 'font-semibold text-primary')}>
                   {r.entry.name}{r.entry.isMe && ' (you)'}
                 </td>
-                <td className="hidden px-3 py-2 text-right tabular-nums md:table-cell">{weekCell(r.entry.score)}</td>
-                <td className="px-3 py-2 text-right font-semibold tabular-nums">{r.points}</td>
+                <td className="px-2 py-2 text-right sm:px-3">{weekCell(r.entry.score)}</td>
+                <td className="px-2 py-2 text-right font-semibold tabular-nums sm:px-3">{r.points}</td>
               </tr>
             ))}
             {ranked.length === 0 && (
@@ -63,7 +65,12 @@ export function StandingsPanel({ board }: Props) {
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-muted-foreground">Ties share a rank. There are no tiebreakers.</p>
+      <p className="text-xs text-muted-foreground">
+        {weekDone
+          ? `Week ${week.week_number} is final and counted in Season.`
+          : `Week ${week.week_number} points join the Season total when the week's last game ends.`}{' '}
+        Ties share a rank. There are no tiebreakers.
+      </p>
     </div>
   )
 }

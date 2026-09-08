@@ -10,8 +10,11 @@ export {
   isVoided,
   scoreWeek,
   entryWeekState,
+  summarizeWeekScore,
+  sumSeasonPoints,
   rankByPoints,
   type StandingRow,
+  type WeekScoreSummary,
 } from './scoring'
 export {
   gameLockAt,

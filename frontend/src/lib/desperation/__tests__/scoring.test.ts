@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { triangular, deriveWinner, scoreWeek, entryWeekState, rankByPoints } from '../scoring'
+import { triangular, deriveWinner, scoreWeek, entryWeekState, rankByPoints, summarizeWeekScore, sumSeasonPoints } from '../scoring'
 import type { NdGame, NdPick } from '../types'
 
 function game(id: string, over: Partial<NdGame> = {}): NdGame {
@@ -131,5 +131,57 @@ describe('rankByPoints', () => {
     expect(r.map((x) => [x.entryId, x.rank, x.tied])).toEqual([
       ['a', 1, false], ['b', 2, true], ['c', 2, true], ['d', 4, false],
     ])
+  })
+})
+
+describe('summarizeWeekScore (X/Y · points)', () => {
+  const pick = (g: NdGame): NdPick => ({ game_id: g.id, selection: 'home' })
+
+  it('alive: right/counted with the max still on the table', () => {
+    const games = [finalHome('a'), finalHome('b'), finalHome('c'), live('d'), game('e'), game('f'), game('g')]
+    const s = summarizeWeekScore(scoreWeek(games.map(pick), games))
+    expect(s).toMatchObject({ state: 'alive', right: 3, counted: 7, voided: 0, points: 28, pointsLabel: 'max' })
+  })
+
+  it('busted: the max goes to 0 the moment one pick loses, right/counted still shown', () => {
+    const games = [finalHome('a'), finalHome('b'), finalHome('c'), finalAway('d'), game('e'), game('f'), game('g')]
+    const s = summarizeWeekScore(scoreWeek(games.map(pick), games))
+    expect(s).toMatchObject({ state: 'busted', right: 3, counted: 7, points: 0, pointsLabel: 'pts' })
+  })
+
+  it('perfect: final points once every picked game is done', () => {
+    const games = ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map(finalHome)
+    const s = summarizeWeekScore(scoreWeek(games.map(pick), games))
+    expect(s).toMatchObject({ state: 'perfect', right: 7, counted: 7, points: 28, pointsLabel: 'pts' })
+  })
+
+  it('a tie drops out of the denominator and the max', () => {
+    const games = [finalHome('a'), tie('b'), game('c')]
+    const s = summarizeWeekScore(scoreWeek(games.map(pick), games))
+    expect(s).toMatchObject({ right: 1, counted: 2, voided: 1, points: 3, pointsLabel: 'max' })
+  })
+
+  it('before any kickoff: 0/N right with the full max', () => {
+    const games = ['a', 'b', 'c'].map((id) => game(id))
+    const s = summarizeWeekScore(scoreWeek(games.map(pick), games))
+    expect(s).toMatchObject({ state: 'alive', right: 0, counted: 3, points: 6, pointsLabel: 'max' })
+  })
+
+  it('no picks: 0 points', () => {
+    expect(summarizeWeekScore(scoreWeek([], [game('a')]))).toMatchObject({ state: 'no_picks', right: 0, counted: 0, points: 0 })
+  })
+})
+
+describe('sumSeasonPoints', () => {
+  it('adds finalized weeks only — an early-finished entry does not leak into Season midweek', () => {
+    const totals = sumSeasonPoints([
+      { entry_id: 'a', points: 15, finalized: true },
+      { entry_id: 'a', points: 1, finalized: false }, // picked only the Wednesday game; week not over
+      { entry_id: 'b', points: 6, finalized: true },
+      { entry_id: 'b', points: 0, finalized: true },
+    ])
+    expect(totals.get('a')).toBe(15)
+    expect(totals.get('b')).toBe(6)
+    expect(totals.has('c')).toBe(false)
   })
 })
