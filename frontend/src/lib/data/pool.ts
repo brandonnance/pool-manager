@@ -22,6 +22,7 @@ export async function getPoolBaseData(
       season_label,
       settings,
       visibility,
+      archived_at,
       created_at,
       created_by,
       org_id,

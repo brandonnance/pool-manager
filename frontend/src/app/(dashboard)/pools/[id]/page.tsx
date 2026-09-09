@@ -184,6 +184,11 @@ export default async function PoolDetailPage({ params }: PageProps) {
                      pool.status === 'draft' ? 'Draft' :
                      pool.status}
                   </Badge>
+                  {pool.archived_at && (
+                    <Badge variant="outline" className="border-muted-foreground/40 text-muted-foreground shrink-0">
+                      Archived
+                    </Badge>
+                  )}
                   {isCommissioner && (
                     <Badge variant="secondary" className="bg-primary/10 text-primary shrink-0">
                       Commissioner

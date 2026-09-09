@@ -129,6 +129,9 @@ pool-manager/
 | `frontend/src/components/games/enter-score-button.tsx` | Score entry modal |
 | `frontend/src/components/games/edit-spread-button.tsx` | Edit game details modal |
 | `frontend/src/components/standings/pool-standings.tsx` | Standings table |
+| `frontend/src/lib/pools/archive.ts` | Pool archiving helpers (`isArchived`, `canArchive`, `partitionArchived`) |
+| `frontend/src/components/pools/org-pool-card.tsx` | Org page pool card with archive + delete controls |
+| `frontend/src/components/pools/archive-pool-button.tsx` | Archive/unarchive icon button (commissioner/admin) |
 | `frontend/src/components/cfp/cfp-bracket-picker.tsx` | Interactive CFP bracket |
 | `frontend/src/app/(dashboard)/pools/[id]/members/page.tsx` | Members management page |
 | `frontend/src/components/members/member-actions.tsx` | Approve/reject/remove buttons |
@@ -232,6 +235,7 @@ The MCP server is configured in `.mcp.json`. Use these tools:
 - Dev server runs on http://localhost:3000
 - Super admin account is set up (user set `is_super_admin = true` manually)
 - Pool statuses: draft -> open -> locked -> completed
+- Pool archiving: `pools.archived_at` (NULL = active) is a shelving flag independent of `status`. Only completed pools can be archived from the UI; commissioners and org admins may archive/unarchive. Archived pools are hidden from the dashboard and default org listing; `/orgs/[id]?archived=1` shows an Archived section. Direct links and public pages are unaffected.
 - Game statuses: scheduled -> in_progress -> final
 - Dark mode disabled in `globals.css` (app uses light theme only)
 - Join requests go to "pending" status, commissioners approve via `/pools/[id]/members`

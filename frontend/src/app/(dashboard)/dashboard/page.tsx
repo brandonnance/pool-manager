@@ -20,6 +20,7 @@
  * @pool_visibility
  * - Shows pools user is a member of
  * - Shows discoverable pools in user's orgs they haven't joined
+ * - Archived pools (pools.archived_at set) are hidden; see org page "Show archived"
  * - Pending counts shown for pools user can manage
  *
  * @components
@@ -31,6 +32,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { CreateOrgButton } from '@/components/orgs/create-org-button'
+import { isArchived } from '@/lib/pools/archive'
 
 /**
  * Dashboard page component (Server Component)
@@ -76,6 +78,7 @@ export default async function DashboardPage() {
         status,
         season_label,
         visibility,
+        archived_at,
         org_id,
         organizations (
           id,
@@ -84,6 +87,9 @@ export default async function DashboardPage() {
       )
     `)
     .eq('user_id', user!.id)
+
+  // Archived pools never appear on the dashboard; the org page's "Show archived" lists them.
+  const visiblePoolMemberships = poolMemberships?.filter(pm => !pm.pools || !isArchived(pm.pools)) || []
 
   // Get discoverable pools in user's orgs that they haven't joined
   const userOrgIds = orgMemberships?.map(m => m.org_id) || []
@@ -98,6 +104,7 @@ export default async function DashboardPage() {
           status,
           season_label,
           visibility,
+          archived_at,
           org_id,
           organizations (
             id,
@@ -107,6 +114,7 @@ export default async function DashboardPage() {
         .in('org_id', userOrgIds)
         .eq('visibility', 'open_to_org')
         .in('status', ['open', 'draft'])
+        .is('archived_at', null)
         .not('id', 'in', userPoolIds.length > 0 ? `(${userPoolIds.join(',')})` : '(00000000-0000-0000-0000-000000000000)')
     : { data: [] }
 
@@ -175,7 +183,7 @@ export default async function DashboardPage() {
   })
 
   // Add user's joined pools
-  poolMemberships?.forEach(pm => {
+  visiblePoolMemberships.forEach(pm => {
     if (pm.pools && pm.pools.org_id) {
       const orgId = pm.pools.org_id
       let orgData = orgPoolsMap.get(orgId)
@@ -232,8 +240,8 @@ export default async function DashboardPage() {
     .sort((a, b) => a.name.localeCompare(b.name))
 
   // Calculate stats
-  const totalPools = poolMemberships?.filter(pm => pm.status === 'approved').length || 0
-  const activePools = poolMemberships?.filter(pm => pm.status === 'approved' && pm.pools?.status === 'open').length || 0
+  const totalPools = visiblePoolMemberships.filter(pm => pm.status === 'approved').length
+  const activePools = visiblePoolMemberships.filter(pm => pm.status === 'approved' && pm.pools?.status === 'open').length
   const discoverableCount = discoverablePools?.length || 0
 
   return (

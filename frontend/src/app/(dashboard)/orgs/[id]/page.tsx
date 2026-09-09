@@ -12,6 +12,8 @@
  * @features
  * - View organization name, member count, creation date
  * - List pools with member counts and status badges
+ * - Archived pools hidden by default; `?archived=1` reveals an Archived section
+ * - Archive/unarchive completed pools (commissioners and admins)
  * - Create new pools (admin only)
  * - Delete pools (admin only)
  * - Manage members link (admin only)
@@ -24,8 +26,8 @@
  * - Member: View accessible pools only
  *
  * @components
+ * - OrgPoolCard: Pool card with archive/delete controls
  * - CreatePoolButton: Modal to create new pool
- * - DeletePoolButton: Confirmation to delete pool
  * - DeleteOrgButton: Confirmation to delete org (super admin)
  * - SuperAdminJoinOrgButton: Join org as super admin
  */
@@ -33,23 +35,26 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { CreatePoolButton } from '@/components/pools/create-pool-button'
-import { DeletePoolButton } from '@/components/pools/delete-pool-button'
+import { OrgPoolCard } from '@/components/pools/org-pool-card'
 import { DeleteOrgButton } from '@/components/orgs/delete-org-button'
 import { SuperAdminJoinOrgButton } from '@/components/orgs/super-admin-join-org-button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { getOrgPermissions } from '@/lib/permissions'
+import { partitionArchived } from '@/lib/pools/archive'
 
 /** Page props with dynamic route parameters */
 interface PageProps {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ archived?: string }>
 }
 
 /**
  * Organization detail page component (Server Component)
  *
  * @param props.params - Contains the org id from the URL
+ * @param props.searchParams - `archived=1` reveals archived pools
  * @returns Full organization page with pools list
  *
  * @data_fetching
@@ -58,8 +63,10 @@ interface PageProps {
  * - profiles: Super admin status check
  * - pools: All pools in org with memberships
  */
-export default async function OrgDetailPage({ params }: PageProps) {
+export default async function OrgDetailPage({ params, searchParams }: PageProps) {
   const { id } = await params
+  const { archived: archivedParam } = await searchParams
+  const showArchived = archivedParam === '1'
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -91,6 +98,7 @@ export default async function OrgDetailPage({ params }: PageProps) {
       status,
       visibility,
       season_label,
+      archived_at,
       created_at,
       created_by,
       pool_memberships (
@@ -106,12 +114,16 @@ export default async function OrgDetailPage({ params }: PageProps) {
   // Filter pools based on visibility:
   // - Admins see all pools
   // - Regular members see: pools they're a member of OR open_to_org pools
-  const pools = isOrgAdmin
+  const visiblePools = isOrgAdmin
     ? allPools
     : allPools?.filter((pool) => {
         const isMember = pool.pool_memberships?.some((pm) => pm.user_id === user.id)
         return isMember || pool.visibility === 'open_to_org'
       })
+
+  // Archived pools are shelved out of the default listing
+  const { active: pools, archived: archivedPools } = partitionArchived(visiblePools)
+  const hasAnyPools = pools.length > 0 || archivedPools.length > 0
 
   // Get member count for the org
   const { count: memberCount } = await supabase
@@ -172,11 +184,20 @@ export default async function OrgDetailPage({ params }: PageProps) {
       {/* Pools Section */}
       <div className="space-y-4">
         <div className="flex justify-between items-center">
-          <h2 className="text-xl font-semibold text-foreground">Pools</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-semibold text-foreground">Pools</h2>
+            {archivedPools.length > 0 && (
+              <Button variant="ghost" size="sm" asChild className="text-muted-foreground">
+                <Link href={showArchived ? `/orgs/${id}` : `/orgs/${id}?archived=1`}>
+                  {showArchived ? 'Hide archived' : `Show archived (${archivedPools.length})`}
+                </Link>
+              </Button>
+            )}
+          </div>
           {isOrgAdmin && <CreatePoolButton orgId={id} />}
         </div>
 
-        {!pools || pools.length === 0 ? (
+        {!hasAnyPools ? (
           <Card>
             <CardContent className="py-12 text-center">
               <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
@@ -193,114 +214,37 @@ export default async function OrgDetailPage({ params }: PageProps) {
               {isOrgAdmin && <CreatePoolButton orgId={id} />}
             </CardContent>
           </Card>
+        ) : pools.length === 0 ? (
+          <Card>
+            <CardContent className="py-8 text-center text-sm text-muted-foreground">
+              No active pools.{' '}
+              {!showArchived && (
+                <Link href={`/orgs/${id}?archived=1`} className="text-primary hover:underline">
+                  Show {archivedPools.length} archived pool{archivedPools.length !== 1 ? 's' : ''}
+                </Link>
+              )}
+            </CardContent>
+          </Card>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {pools.map((pool) => {
-              const myMembership = pool.pool_memberships?.find(
-                (pm) => pm.user_id === user.id
-              )
-              const poolMemberCount = pool.pool_memberships?.filter(
-                (pm) => pm.status === 'approved'
-              ).length ?? 0
-              const pendingCount = pool.pool_memberships?.filter(
-                (pm) => pm.status === 'pending'
-              ).length ?? 0
-              // Pool commissioner = explicit pool role OR org admin (implicit rights)
-              const isPoolCommissioner = myMembership?.role === 'commissioner' || isOrgAdmin
+            {pools.map((pool) => (
+              <OrgPoolCard key={pool.id} pool={pool} orgId={id} userId={user.id} isOrgAdmin={isOrgAdmin} />
+            ))}
+          </div>
+        )}
 
-              const poolTypeLabel = pool.type === 'squares'
-                ? 'Squares'
-                : pool.type === 'golf'
-                ? 'Golf'
-                : pool.type === 'march_madness'
-                ? 'March Madness'
-                : pool.type
-
-              return (
-                <Link
-                  key={pool.id}
-                  href={`/pools/${pool.id}`}
-                  className="block group"
-                >
-                  <Card className="h-full transition-all duration-200 hover:shadow-md hover:border-primary/20 relative overflow-visible">
-                    {/* iPhone-style notification badge */}
-                    {isPoolCommissioner && pendingCount > 0 && (
-                      <div className="absolute -top-2 -left-2 z-10">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-orange-500 text-[11px] font-bold text-white shadow-sm ring-2 ring-background">
-                          {pendingCount > 9 ? '9+' : pendingCount}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Delete button for org admins */}
-                    {isOrgAdmin && (
-                      <div className="absolute top-3 right-3 z-10">
-                        <DeletePoolButton
-                          poolId={pool.id}
-                          poolName={pool.name}
-                          poolType={pool.type}
-                          orgId={id}
-                        />
-                      </div>
-                    )}
-
-                    <CardHeader className="pb-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <CardTitle className="text-base group-hover:text-primary transition-colors pr-8">
-                          {pool.name}
-                        </CardTitle>
-                      </div>
-                      <CardDescription>
-                        {poolTypeLabel}
-                        {pool.season_label && ` · ${pool.season_label}`}
-                      </CardDescription>
-                    </CardHeader>
-
-                    <CardContent className="pt-0">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">
-                          {poolMemberCount} member{poolMemberCount !== 1 ? 's' : ''}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          {isPoolCommissioner ? (
-                            <Badge variant="default" className="text-[10px] px-1.5 py-0">
-                              Commissioner
-                            </Badge>
-                          ) : myMembership ? (
-                            <Badge
-                              variant={myMembership.status === 'approved' ? 'secondary' : 'outline'}
-                              className={`text-[10px] px-1.5 py-0 ${
-                                myMembership.status === 'pending'
-                                  ? 'border-yellow-500 text-yellow-600'
-                                  : ''
-                              }`}
-                            >
-                              {myMembership.status === 'approved' ? 'Joined' : 'Pending'}
-                            </Badge>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">Not a member</span>
-                          )}
-                          <Badge
-                            variant={
-                              pool.status === 'open' ? 'default' :
-                              pool.status === 'completed' ? 'secondary' :
-                              'outline'
-                            }
-                            className={`text-[10px] px-1.5 py-0 ${
-                              pool.status === 'open' ? 'bg-green-600' :
-                              pool.status === 'draft' ? 'border-yellow-500 text-yellow-600' :
-                              ''
-                            }`}
-                          >
-                            {pool.status}
-                          </Badge>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              )
-            })}
+        {/* Archived Section */}
+        {showArchived && archivedPools.length > 0 && (
+          <div className="space-y-4 pt-4">
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-muted-foreground">Archived</h3>
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{archivedPools.length}</Badge>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {archivedPools.map((pool) => (
+                <OrgPoolCard key={pool.id} pool={pool} orgId={id} userId={user.id} isOrgAdmin={isOrgAdmin} />
+              ))}
+            </div>
           </div>
         )}
       </div>

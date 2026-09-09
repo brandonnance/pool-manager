@@ -1776,6 +1776,7 @@ export type Database = {
       }
       pools: {
         Row: {
+          archived_at: string | null
           created_at: string | null
           created_by: string | null
           id: string
@@ -1788,6 +1789,7 @@ export type Database = {
           visibility: string
         }
         Insert: {
+          archived_at?: string | null
           created_at?: string | null
           created_by?: string | null
           id?: string
@@ -1800,6 +1802,7 @@ export type Database = {
           visibility?: string
         }
         Update: {
+          archived_at?: string | null
           created_at?: string | null
           created_by?: string | null
           id?: string
